@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancela runs anteriores de la misma rama/PR si llega un push nuevo.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Lint + Build (todos los workspaces)
+    runs-on: ubuntu-latest
+    env:
+      # `prisma generate` (parte de `build:libs`) solo lee prisma/schema.prisma
+      # para generar el cliente -- no abre conexión real a la base de datos --
+      # pero exige que DATABASE_URL exista. Valor ficticio, no se usa.
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ars_platform_ci?schema=ars_platform
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      # Compila primero packages/shared-common y packages/database (este último
+      # corre `prisma generate`): los servicios dependen de sus artefactos
+      # compilados. Mismo orden que usan los scripts `start:<servicio>` locales.
+      - name: Build de librerías compartidas (packages/*)
+        run: npm run build:libs
+
+      - name: Build de todos los workspaces
+        run: npm run build
+
+      - name: Lint (todos los workspaces)
+        run: npm run lint
+
+      - name: Test (todos los workspaces)
+        run: npm run test
