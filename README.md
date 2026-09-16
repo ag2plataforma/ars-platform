@@ -30,7 +30,14 @@ ars-platform/
   docs/
 ```
 
-Cada servicio nuevo se irá scaffoldeando siguiendo exactamente la misma plantilla que `services/iam-service` (ya funcional). Los que todavía no tienen código tienen un `README.md` con su alcance.
+Los 8 servicios ya están scaffoldeados con la misma plantilla que `services/iam-service` (`ConfigModule`, `AuthModule` global, `GET /health`; `gateway` sin `PrismaModule` — ver su README) y compilan limpio. Ninguno tiene lógica de negocio propia todavía salvo `iam-service` y `product-rating-service` — el resto espera su turno en el roadmap (Fase 2 en adelante), y cada uno conserva su `README.md` con el alcance funcional documentado desde Fase 0.
+
+Para levantar cualquiera de ellos (mismo patrón que `iam-service`/`product-rating-service`, cambiando el nombre corto):
+
+```bash
+cp services/<nombre-del-servicio>/.env.example services/<nombre-del-servicio>/.env   # completar JWT_SECRET con el MISMO valor que iam-service
+npm run start:<nombre-corto>            # ej. start:party, start:reference-data, start:underwriting, start:claims, start:billing, start:gateway
+```
 
 ## Cómo levantar el entorno (por ahora, `iam-service` y `product-rating-service`)
 

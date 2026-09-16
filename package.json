@@ -22,7 +22,20 @@
     "verify:rules-engine": "npm run build:libs && npm run verify:rules-engine --workspace=packages/shared-common",
     "start:product-rating": "npm run build:libs && npm run build --workspace=services/product-rating-service && node services/product-rating-service/dist/main.js",
     "start:product-rating:watch": "npm run build:libs && npm run start:dev --workspace=services/product-rating-service",
-    "db:seed-example-rules": "node packages/database/scripts/seed-example-rules.js"
+    "db:seed-example-rules": "node packages/database/scripts/seed-example-rules.js",
+    "db:seed-example-rate-table": "node packages/database/scripts/seed-example-rate-table.js",
+    "start:party": "npm run build:libs && npm run build --workspace=services/party-service && node services/party-service/dist/main.js",
+    "start:party:watch": "npm run build:libs && npm run start:dev --workspace=services/party-service",
+    "start:reference-data": "npm run build:libs && npm run build --workspace=services/reference-data-service && node services/reference-data-service/dist/main.js",
+    "start:reference-data:watch": "npm run build:libs && npm run start:dev --workspace=services/reference-data-service",
+    "start:underwriting": "npm run build:libs && npm run build --workspace=services/underwriting-service && node services/underwriting-service/dist/main.js",
+    "start:underwriting:watch": "npm run build:libs && npm run start:dev --workspace=services/underwriting-service",
+    "start:claims": "npm run build:libs && npm run build --workspace=services/claims-service && node services/claims-service/dist/main.js",
+    "start:claims:watch": "npm run build:libs && npm run start:dev --workspace=services/claims-service",
+    "start:billing": "npm run build:libs && npm run build --workspace=services/billing-service && node services/billing-service/dist/main.js",
+    "start:billing:watch": "npm run build:libs && npm run start:dev --workspace=services/billing-service",
+    "start:gateway": "npm run build:libs && npm run build --workspace=services/gateway && node services/gateway/dist/main.js",
+    "start:gateway:watch": "npm run build:libs && npm run start:dev --workspace=services/gateway"
   },
   "devDependencies": {
     "pg": "^8.13.0"

@@ -68,6 +68,10 @@ npm run db:seed-example-rules   # (una vez, desde la raíz del repo) crea datos 
 npm run start:dev
 ```
 
+### Probar tablas de tarifa con datos reales
+
+`npm run db:seed-example-rate-table` (desde la raíz del repo) crea una tabla de tarifa de ejemplo (`SEED_TARIFA_EDAD_ZONA`, factores EDAD/ZONA) y corre varios lookups reales contra Postgres con la misma lógica de `PrismaRateValueResolver` — incluye el caso de "factor2 omitido con 2 filas que calzan" para confirmar en vivo que no hay desempate por especificidad, solo falla. Al final imprime un `GET /rate-values/lookup` de ejemplo y la llamada equivalente para usar dentro de una fórmula (`FGetRateValue('SEED_TARIFA_EDAD_ZONA','30','NORTE',NULL,NULL,NULL)`).
+
 ### Extraer el código fuente de una función legacy de Postgres
 
 Para replicar fielmente lógica legacy (ej. `FGetRateValue`) hace falta ver la definición original en `entity` u otro esquema legacy. El script busca por patrón en TODOS los esquemas de la base y dumpea el `CREATE FUNCTION` completo:
