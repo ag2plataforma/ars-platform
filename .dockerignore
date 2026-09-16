@@ -1,0 +1,19 @@
+node_modules
+.git
+dist
+build
+*.tsbuildinfo
+.env
+.env.*
+*.log
+npm-debug.log*
+logs
+.DS_Store
+.vscode
+.idea
+coverage
+.turbo
+.cache
+docs
+db
+Claude outputs
