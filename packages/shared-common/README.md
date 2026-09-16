@@ -1,0 +1,21 @@
+# @ars-platform/shared-common
+
+Librería compartida real (a diferencia de `ins-ars-shared-common` en el sistema v1, que existía pero no se reutilizaba de forma consistente entre servicios — cada uno tenía su propia copia pegada de `util.service.ts`, `jwt.service.ts`, etc.).
+
+## Qué contiene hoy
+
+- **`state-machine/`** — contrato (`StateRuleRepository`) y servicio (`StateMachineService`) equivalentes a la función PL/pgSQL `FGetState`. Implementación real (`PrismaStateRuleRepository`) en `@ars-platform/database`, conectada en `services/iam-service`. Validada end-to-end contra Postgres real.
+- **`rules-engine/`** — motor de reglas de cálculo real, equivalente a `FQuoteCoverageConcept`/`FMovementConcept` + `FGetValueAttribute`/`FGetValueRule` (ver `docs/01-especificacion-motor-negocio-actual.md`, §3):
+  - `formula-expression.ts` — evaluador de expresiones aritméticas/booleanas propio (tokenizer + parser recursivo-descendente + evaluación de AST), sin `eval`/`new Function`/SQL dinámico y sin dependencias externas. Reemplaza el `EXECUTE` de SQL dinámico del original. Soporta números, `+ - * / % ^`, paréntesis, comparaciones (`> >= < <= = != <>`, incluye el `=` estilo SQL de los datos originales) y `AND`/`OR`/`NOT`/`TRUE`/`FALSE`.
+  - `calculation-rule.interface.ts` — los cuatro puertos que implementa `@ars-platform/database`: `CalculationRuleRepository` (reglas aplicables por jerarquía Producto>PlanProductRisk>CoveragePlan + custom fields activos), `AttributeValueResolver` (equivalente a `FGetValueAttribute`), `RuleValueResolver` (equivalente a `FGetValueRule`) y `RateValueResolver` (equivalente a `FGetRateValue`, tablas de tarifa multidimensional — ver más abajo).
+  - `rules-engine.service.ts` — `RulesEngineService.evaluateChain(rules, context)`: evalúa una cadena de reglas respetando `Order`, sustituye en orden custom fields, llamadas `FGetRateValue('CODTABLE','F1','F2',NULL,NULL,NULL)` (misma firma posicional que la función original, confirmada contra su código fuente en Postgres — ver `services/product-rating-service/README.md` para la semántica exacta) y referencias `rule('COD')` (primero contra lo ya calculado en la misma cadena — en memoria — y solo si no está ahí contra la BD, replicando que el original persiste cada regla antes de evaluar la siguiente). No escribe en la base de datos: devuelve los valores calculados y deja la aplicación del resultado (actualizar columna o insertar concepto) al servicio consumidor — así queda puro y fácil de testear. **Importante al escribir una fórmula:** un custom field usado como argumento de `FGetRateValue` debe ir entre comillas igual que un literal (ej. `FGetRateValue('TARIFA_EDAD', 'EDAD', NULL, NULL, NULL, NULL)`) — la sustitución de custom fields es texto plano y preserva las comillas que ya estén alrededor del identificador.
+  - `rules-engine.module.ts` — módulo dinámico (`forRoot(...)`), mismo patrón que `StateMachineModule`.
+  - Verificación rápida sin base de datos: `npm run verify:rules-engine` (desde la raíz del repo) — evaluador puro, una cadena `PrimaNeta -> Impuesto -> PrimaTotal` y un caso de `FGetRateValue(...)` dentro de una fórmula, todo con dependencias en memoria. La validación end-to-end contra `SCalculationRule`/`SRateTable` reales ya es posible con `product-rating-service` (Fase 1) en cuanto haya configuración de negocio cargada.
+- **`auth/`** — JWT: `JwtStrategy`, `JwtAuthGuard` (guard global, opt-out con `@Public()`), `RolesGuard` (opt-in con `@Roles()`), `AuthModule` (`@Global()`, se importa una vez por servicio). Validado end-to-end en `iam-service`.
+- **`email/`** — puerto `EmailSender` + implementación real `BrevoEmailSender` (API REST de Brevo vía `fetch` nativo, sin dependencias nuevas). `EmailModule` (`@Global()`).
+- **`audit/`** — `AuditInterceptor`, funcional: estampa `UsrCreation/TstCreation/UsrModification/TstModification` en cada request POST/PATCH/PUT.
+
+## Qué falta
+
+- Doble factor de autenticación (diferido a Fase 2, ver `services/iam-service/README.md`).
+- Ver `docs/01-especificacion-motor-negocio-actual.md` en la raíz del repo para la especificación completa que esta librería va implementando.

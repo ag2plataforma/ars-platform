@@ -1,0 +1,67 @@
+# Roadmap por fases
+
+Estado a 2026-09-15.
+
+## Fase 0 — Descubrimiento ✅ (completada)
+
+- Auditoría del backend actual (20 repos, versiones, patrones, duplicación).
+- Auditoría del frontend actual (2 apps Angular, madurez, gaps).
+- Extracción y análisis de las 44 funciones PL/pgSQL (motor de negocio real).
+- Decisiones de arquitectura tomadas (ver `00-arquitectura.md`).
+
+## Fase 1 — Fundación técnica (en curso)
+
+- [x] Estructura del monorepo (`package.json`, workspaces, `tsconfig.base.json`).
+- [x] `packages/shared-common` scaffoldeado (máquina de estados y motor de reglas como esqueleto, interceptor de auditoría funcional).
+- [x] `services/iam-service` scaffoldeado como plantilla de referencia.
+- [x] Esquema `ars_platform` creado en Postgres (aislado de `entity`/v1) a partir del DDL de las 130 tablas.
+- [x] `packages/database`: Prisma conectado por introspección (130 modelos generados), `PrismaService`/`PrismaModule` y `PrismaStateRuleRepository` implementados.
+- [x] Máquina de estados validada end-to-end contra datos reales (`iam-service`, endpoints de prueba en `/state-machine/*`) — adelantado desde Fase 2 porque era el mayor riesgo técnico.
+- [x] Ciclo de desarrollo (`npm run start:iam`: build de libs + build del servicio + `node dist/main.js`) validado y estable. Dos causas raíz encontradas y corregidas en el camino: (1) faltaba `tsconfig.build.json` en el servicio — `nest build` lo busca por convención y sin él compila "0 archivos" en silencio (exit 0, sin `dist`); (2) `StateMachineModule` de `shared-common` necesitaba ser un módulo dinámico (`forRoot(repositoryProvider)`) para que el binding de `STATE_RULE_REPOSITORY`, hecho en el servicio consumidor, quedara en el mismo módulo que `StateMachineService` — Nest no resuelve providers "hacia arriba" en módulos que lo importan. Detalle completo en el `README.md` raíz.
+- [x] Autenticación JWT real (`iam-service`): `POST /auth/login` contra `TUser`/`TUserCredential` (bcrypt), guard global en `shared-common` (`AuthModule`/`JwtAuthGuard`) que protege toda ruta salvo `@Public()` — reutilizable por cualquier servicio nuevo con solo importar el módulo. Script `db:seed-admin` para crear el primer usuario de prueba. Validado end-to-end (sin token → 401, con token válido → 200 con datos reales). Tercera causa raíz encontrada en el camino: `ConfigModule.forRoot({ envFilePath: '.env' })` con ruta relativa se resuelve contra el `cwd` del proceso, no la carpeta del servicio — y `start:iam` corre `node dist/main.js` desde la raíz del repo, así que nunca encontraba el `.env` real; se resolvió usando `join(__dirname, '..', '.env')`.
+- [x] Gestión de usuarios completa (`iam-service`): CRUD de `TUser`/`TRol` (`/users`, rol `ADMIN`), cambio de contraseña, y recuperación de contraseña por correo (Brevo) con token de un solo uso auto-invalidante (sin tabla nueva en la BD). Guard de roles genérico (`@Roles`/`RolesGuard` en `shared-common`) y puerto de envío de correo (`EMAIL_SENDER`/`EmailSender`, implementación Brevo) reutilizables por cualquier servicio futuro. Doble factor de autenticación diferido deliberadamente a una fase posterior (decisión explícita — v1 tampoco lo tenía).
+- [x] Motor de reglas de cálculo real (`shared-common`), equivalente a `FQuoteCoverageConcept`/`FMovementConcept` + `FGetValueAttribute`/`FGetValueRule` (ver `docs/01-especificacion-motor-negocio-actual.md`, §3) — adelantado desde Fase 2 por ser, junto con la máquina de estados, la otra pieza central del sistema y el bloqueante real para `product-rating-service`/`underwriting-service`. El `EXECUTE` de SQL dinámico del original se reemplazó por un evaluador de expresiones propio (tokenizer + parser recursivo-descendente + evaluación de AST, sin `eval`/`new Function`/SQL dinámico — `formula-expression.ts`), sin agregar ninguna dependencia nueva. Sustitución de custom fields por límite de palabra (mejora de seguridad sobre el `strpos`/substring original, documentada en §6 de la especificación) y de referencias `rule('COD')` primero contra lo ya calculado en la misma cadena (en memoria) y solo si no está ahí contra la BD — replica el efecto de que el original persiste cada regla dentro del mismo loop antes de evaluar la siguiente, sin que este motor tenga que escribir en la BD (queda puro y testeable; la aplicación del resultado — actualizar columna o insertar concepto — la hace el servicio consumidor). Implementación real de los tres puertos (`CalculationRuleRepository`/`AttributeValueResolver`/`RuleValueResolver`) contra Postgres en `@ars-platform/database`, mismo patrón `forRoot()` que `StateMachineModule`. Verificado con `npm run verify:rules-engine` (evaluador puro + cadena `PrimaNeta -> Impuesto -> PrimaTotal` con dependencias en memoria, sin BD — no hay todavía `SCalculationRule` configuradas en `ars_platform` para una validación end-to-end contra datos reales; eso llega en Fase 2 con `product-rating-service`).
+- [x] `product-rating-service` scaffoldeado siguiendo exactamente la plantilla de `iam-service` (mismo `tsconfig.build.json`/`nest-cli.json`/patrón de `ConfigModule`), con el motor de reglas de cálculo ya conectado a Postgres real (`ProductRatingRulesEngineModule` usando `RulesEngineModule.forRoot(...)` con las implementaciones de `@ars-platform/database`) y expuesto en `GET /rules-engine/applicable-rules` y `POST /rules-engine/evaluate` para probarlo en cuanto existan `SCalculationRule` reales configuradas (hoy `ars_platform` no tiene datos de configuración de negocio, solo estructura). Ver `services/product-rating-service/README.md`.
+- [x] Script `db:seed-example-rules` (`packages/database/scripts/`): crea la cadena mínima de configuración que `SCalculationRule` exige (17 tablas de catálogo/producto, todo con códigos `SEED_...`) y tres reglas encadenadas (`PrimaNeta -> Impuesto -> PrimaTotal`), para validar `/rules-engine/*` de `product-rating-service` contra Postgres real sin depender de ningún otro servicio. Idempotente. Sirve también como referencia concreta de qué hace falta para dar de alta una regla, hasta que exista el CRUD real (Fase 2). **Validado end-to-end por el usuario**: `GET /rules-engine/applicable-rules` devolvió las 3 reglas ordenadas por `Order` con su `FormulaJSON` real, y `POST /rules-engine/evaluate` devolvió exactamente PrimaNeta=100, Impuesto=16, PrimaTotal=116 con `columnName: "Prime"` — primera prueba real (no en memoria) de todo el motor de reglas contra Postgres.
+- [x] CRUD real de los 8 catálogos "simples" en `product-rating-service` (`SRiskLevel`, `SRisk`, `SRiskType`, `SCurrency`, `SInsuranceArea`, `SInsuranceLine`, `SDeductibleType`, `SLimitType`). Lógica Create/List/Get/Update/SetState concentrada en una clase genérica (`CatalogCrudService<T>`, `src/catalogs/catalog-crud.service.ts`) para no repetirla 8 veces; cada catálogo aporta un servicio delgado que resuelve sus FKs propias por código (`SRisk.codRiskLevel`, `SInsuranceLine.codInsuranceArea`) y, en `SRiskLevel`/`SInsuranceArea`, su jerarquía opcional (`codXParent`). Lectura abierta a cualquier usuario autenticado; creación/edición/cambio de estado restringidos a `@Roles('ADMIN')`. Ver `services/product-rating-service/README.md` para el detalle de rutas.
+- [x] CRUD real de las 7 entidades "de dominio" en `product-rating-service` (`SProduct`, `SRiskProduct`, `SPlanProduct`, `SPlanProductRisk`, `SCoverage`, `SCoveragePlan`, `SCalculationRule`) — reemplaza el atajo de `db:seed-example-rules` (que queda como ejemplo/semilla rápida) y es la respuesta definitiva a "cómo se registra una fórmula nueva". Las 4 entidades con `Cod`/`Des` único (`SProduct`, `SPlanProduct`, `SCoverage`, `SCalculationRule`) reutilizan `CatalogCrudService<T>` (extendida con un `include` opcional para traer relaciones resueltas); las 3 que son tablas de unión/configuración sin código propio (`SRiskProduct`, `SPlanProductRisk`, `SCoveragePlan`) se escriben explícitas, mismo estilo que `UsersService` en `iam-service`. `SCalculationRule` valida la forma de `FormulaJSON` (`{ if, then, else }`) al guardar, antes de que el motor de reglas la encuentre mal formada al evaluar. Mismo criterio de permisos que los catálogos. Ver `services/product-rating-service/README.md` para el orden de creación (Producto → RiskProduct → PlanProduct → PlanProductRisk → CoveragePlan → CalculationRule; Coverage es independiente) y el detalle de rutas.
+- [x] CRUD real de tablas de tarifa multidimensional en `product-rating-service` (`SRateTable`, `SRateFactor`, `SRateValue`, hasta 5 factores por tabla). `SRateTable` reutiliza `CatalogCrudService<T>` (con `include` anidado para traer sus `SRateFactor` ya ordenados por `numOrder`); `SRateFactor`/`SRateValue` se escriben explícitos (sin `Cod`/`Des` propio). `SRateFactor` valida `numOrder` entre 1 y 5 sin repetir posición dentro de la misma tabla (regla de negocio, no constraint de BD). Mismo criterio de permisos que los catálogos. Ver `services/product-rating-service/README.md`.
+- [x] Equivalente exacto a `FGetRateValue`, confirmado contra el código fuente real de la función legacy en Postgres (script nuevo `packages/database/scripts/find-legacy-function.js`, reusable para cualquier función legacy futura). Resultado clave: NO hay criterio de desempate por especificidad — el original exige un calce exacto en `Factor1`, comodín solo del lado de quien llama (no de la fila) para `Factor2..5`, y falla si encuentra 0 o más de 1 fila, en vez de elegir una "más específica". Tampoco filtra por vigencia (`TstInit`/`TstEnd`) pese a que la tabla las tiene — se replicó tal cual. Una sola implementación (`PrismaRateValueResolver` en `@ars-platform/database`) sirve dos usos: el endpoint de prueba `GET /rate-values/lookup` en `product-rating-service` y el puerto `RATE_VALUE_RESOLVER` del motor de reglas. Detalle completo en el README de `product-rating-service`.
+- [x] `FGetRateValue` cableado dentro del evaluador de fórmulas (`packages/shared-common`) — una fórmula de `SCalculationRule` ya puede invocarlo con `FGetRateValue('CODTABLE','F1','F2',NULL,NULL,NULL)` (misma firma posicional que el original). Verificado sin BD en `npm run verify:rules-engine`. Con esto, `product-rating-service` cubre el 100% de lo documentado en `docs/01-especificacion-motor-negocio-actual.md` §3.
+- [ ] Scaffolding de los servicios restantes (`party-service`, `reference-data-service`, `underwriting-service`, `claims-service`, `billing-service`, `gateway`) siguiendo la misma plantilla.
+- [ ] Pipeline de CI básico (lint + build + test) en GitHub Actions.
+- [ ] Entorno de despliegue en Oracle + Coolify funcionando end-to-end con `iam-service` (hello world real desplegado).
+- [ ] Decisión sobre partición del esquema de base de datos por servicio (o esquema compartido durante transición).
+
+## Fase 2 — Núcleo asegurador (paridad funcional)
+
+- Cargar `SFieldDictionary`/`SAttribute` reales (el CRUD de `SProduct`/.../`SCalculationRule` ya está, ver Fase 1) y validar el motor de reglas contra esa configuración real; luego reemplazar los endpoints de prueba `/rules-engine/*` por el flujo de cotización en `underwriting-service`.
+- Migración de `product-rating-service` (productos, coberturas, tarifas) — CRUD de configuración y funciones de consulta completos, incluido el motor de tarifas (`FGetRateValue` cableado en las fórmulas, ver Fase 1).
+- Migración de `underwriting-service` (cotización y contratación) — el trabajo de mayor riesgo del proyecto.
+- Migración de `party-service`, `reference-data-service`, `billing-service`.
+- `gateway` real conectado a ambos frontends (hoy ninguno de los dos lo usa).
+- Actualización del frontend Angular a la última versión estable; unificación de librería de UI.
+- Implementación del módulo de Siniestros en el backoffice (hoy es un cascarón vacío).
+- Doble factor de autenticación en `iam-service` (diferido desde Fase 1 — ver `services/iam-service/README.md`).
+
+## Fase 3 — Impacto Social
+
+- `social-impact-service`: cálculo de SIP (puntos de impacto social), CFP (huella de carbono) y SP (sostenibilidad), y función de ajuste dinámico de primas.
+- Integraciones con fuentes externas de datos (huella de carbono, voluntariado) — a definir.
+- Exposición del ajuste de prima dentro del flujo de cotización existente en `underwriting-service`, sin acoplar el cálculo base al social (servicio separado, se consulta).
+
+## Fase 4 — Claims + IA
+
+- `claims-service` completo (hoy solo existe la tabla `TClaim*`, sin frontend implementado).
+- IA para triage/priorización de siniestros, y exploración de detección de fraude y extracción de datos de documentos.
+
+## Fase 5 — Distribución y omnicanalidad
+
+- Store App B2C/B2B2C, marca blanca, SDK/embebido.
+- Notificaciones omnicanal (email/SMS/WhatsApp/push).
+- Integración de pasarela de pagos.
+- Dashboard de KPIs (cartera, comercial, siniestralidad).
+
+---
+
+Cada fase se aborda con su propio plan detallado cuando llega su turno — este roadmap es la vista de alto nivel, no el plan de trabajo día a día.

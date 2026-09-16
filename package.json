@@ -1,0 +1,30 @@
+{
+  "name": "ars-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ARS Platform - core de seguros modernizado, con motor de impacto social. Monorepo de servicios NestJS.",
+  "workspaces": [
+    "packages/*",
+    "services/*"
+  ],
+  "engines": {
+    "node": ">=20 <25"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "build:libs": "npm run build --workspace=packages/shared-common --workspace=packages/database",
+    "start:iam": "npm run build:libs && npm run build --workspace=services/iam-service && node services/iam-service/dist/main.js",
+    "start:iam:watch": "npm run build:libs && npm run start:dev --workspace=services/iam-service",
+    "db:migrate": "node db/run-migration.js",
+    "db:seed-admin": "node packages/database/scripts/seed-admin-user.js",
+    "verify:rules-engine": "npm run build:libs && npm run verify:rules-engine --workspace=packages/shared-common",
+    "start:product-rating": "npm run build:libs && npm run build --workspace=services/product-rating-service && node services/product-rating-service/dist/main.js",
+    "start:product-rating:watch": "npm run build:libs && npm run start:dev --workspace=services/product-rating-service",
+    "db:seed-example-rules": "node packages/database/scripts/seed-example-rules.js"
+  },
+  "devDependencies": {
+    "pg": "^8.13.0"
+  }
+}
