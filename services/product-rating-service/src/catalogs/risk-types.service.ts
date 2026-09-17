@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService, SRiskType } from '@ars-platform/database';
 import { StateMachineService } from '@ars-platform/shared-common';
-import { CatalogCrudService } from './catalog-crud.service';
+import { CatalogCrudService } from '@ars-platform/shared-common';
 import { CreateRiskTypeDto } from './dto/create-risk-type.dto';
 import { UpdateRiskTypeDto } from './dto/update-risk-type.dto';
 

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService, SDeductibleType } from '@ars-platform/database';
 import { StateMachineService } from '@ars-platform/shared-common';
-import { CatalogCrudService } from './catalog-crud.service';
+import { CatalogCrudService } from '@ars-platform/shared-common';
 import { CreateDeductibleTypeDto } from './dto/create-deductible-type.dto';
 import { UpdateDeductibleTypeDto } from './dto/update-deductible-type.dto';
 

@@ -16,3 +16,4 @@ export * from './auth/auth.module';
 export * from './email/email-sender.interface';
 export * from './email/brevo-email-sender.service';
 export * from './email/email.module';
+export * from './catalog-crud/catalog-crud.service';

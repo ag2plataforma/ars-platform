@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService, SRateTable } from '@ars-platform/database';
 import { StateMachineService } from '@ars-platform/shared-common';
-import { CatalogCrudService } from '../catalogs/catalog-crud.service';
+import { CatalogCrudService } from '@ars-platform/shared-common';
 import { CreateRateTableDto } from './dto/create-rate-table.dto';
 import { UpdateRateTableDto } from './dto/update-rate-table.dto';
 

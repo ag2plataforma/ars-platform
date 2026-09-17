@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService, SPlanProduct } from '@ars-platform/database';
 import { StateMachineService } from '@ars-platform/shared-common';
-import { CatalogCrudService } from '../catalogs/catalog-crud.service';
+import { CatalogCrudService } from '@ars-platform/shared-common';
 import { CreatePlanProductDto } from './dto/create-plan-product.dto';
 import { UpdatePlanProductDto } from './dto/update-plan-product.dto';
 

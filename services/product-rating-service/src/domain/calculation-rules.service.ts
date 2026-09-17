@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, PrismaService, SCalculationRule } from '@ars-platform/database';
 import { StateMachineService } from '@ars-platform/shared-common';
-import { CatalogCrudService } from '../catalogs/catalog-crud.service';
+import { CatalogCrudService } from '@ars-platform/shared-common';
 import { CreateCalculationRuleDto } from './dto/create-calculation-rule.dto';
 import { UpdateCalculationRuleDto } from './dto/update-calculation-rule.dto';
 import { ListCalculationRulesDto } from './dto/list-calculation-rules.dto';

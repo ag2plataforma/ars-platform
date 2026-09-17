@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService, SCurrency } from '@ars-platform/database';
 import { StateMachineService } from '@ars-platform/shared-common';
-import { CatalogCrudService } from './catalog-crud.service';
+import { CatalogCrudService } from '@ars-platform/shared-common';
 import { CreateCurrencyDto } from './dto/create-currency.dto';
 import { UpdateCurrencyDto } from './dto/update-currency.dto';
 

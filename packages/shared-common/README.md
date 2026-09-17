@@ -14,6 +14,7 @@ Librería compartida real (a diferencia de `ins-ars-shared-common` en el sistema
 - **`auth/`** — JWT: `JwtStrategy`, `JwtAuthGuard` (guard global, opt-out con `@Public()`), `RolesGuard` (opt-in con `@Roles()`), `AuthModule` (`@Global()`, se importa una vez por servicio). Validado end-to-end en `iam-service`.
 - **`email/`** — puerto `EmailSender` + implementación real `BrevoEmailSender` (API REST de Brevo vía `fetch` nativo, sin dependencias nuevas). `EmailModule` (`@Global()`).
 - **`audit/`** — `AuditInterceptor`, funcional: estampa `UsrCreation/TstCreation/UsrModification/TstModification` en cada request POST/PATCH/PUT.
+- **`catalog-crud/`** — `CatalogCrudService<T>`: CRUD genérico (Create/List/Get/Update/SetState) para entidades con la forma `Cod<X>` único + `Des<X>` + `IdeState` + auditoría. Movido acá desde `product-rating-service` (donde nació) en cuanto `reference-data-service` lo necesitó también — cualquier servicio nuevo con catálogos "Cod/Des simples" lo reutiliza en vez de reescribirlo.
 
 ## Qué falta
 

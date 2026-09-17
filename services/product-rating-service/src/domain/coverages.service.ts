@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService, SCoverage } from '@ars-platform/database';
 import { StateMachineService } from '@ars-platform/shared-common';
-import { CatalogCrudService } from '../catalogs/catalog-crud.service';
+import { CatalogCrudService } from '@ars-platform/shared-common';
 import { CreateCoverageDto } from './dto/create-coverage.dto';
 import { UpdateCoverageDto } from './dto/update-coverage.dto';
 

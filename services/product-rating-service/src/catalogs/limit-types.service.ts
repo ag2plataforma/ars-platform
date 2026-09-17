@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService, SLimitType } from '@ars-platform/database';
 import { StateMachineService } from '@ars-platform/shared-common';
-import { CatalogCrudService } from './catalog-crud.service';
+import { CatalogCrudService } from '@ars-platform/shared-common';
 import { CreateLimitTypeDto } from './dto/create-limit-type.dto';
 import { UpdateLimitTypeDto } from './dto/update-limit-type.dto';
 

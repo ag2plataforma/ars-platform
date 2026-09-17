@@ -3,20 +3,23 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 /**
  * CRUD genérico para entidades con la forma `Cod<X>` (único), `Des<X>`,
  * `IdeState` y los 4 campos de auditoría — el molde que comparten los 8
- * catálogos "simples" (`SRiskLevel`, `SRisk`, `SRiskType`, `SCurrency`,
- * `SInsuranceArea`, `SInsuranceLine`, `SDeductibleType`, `SLimitType`, en
- * `../catalogs/`) y, un nivel más arriba, las entidades "de dominio" que
- * también tienen un único código/descripción (`SProduct`, `SPlanProduct`,
- * `SCoverage` en `../domain/`, y `SCalculationRule`). Las entidades que
- * son puras tablas de unión/configuración sin código propio
- * (`SRiskProduct`, `SPlanProductRisk`, `SCoveragePlan`) NO usan esta
- * clase — se escriben a mano, igual que `UsersService` en iam-service.
+ * catálogos "simples" de `product-rating-service` (`SRiskLevel`, `SRisk`,
+ * `SRiskType`, `SCurrency`, `SInsuranceArea`, `SInsuranceLine`,
+ * `SDeductibleType`, `SLimitType`), sus entidades "de dominio" con
+ * código propio (`SProduct`, `SPlanProduct`, `SCoverage`,
+ * `SCalculationRule`, `SRateTable`), y los catálogos de
+ * `reference-data-service` (`SFieldDictionary`, `SFieldValue`). Las
+ * entidades que son puras tablas de unión/configuración sin código
+ * propio (`SRiskProduct`, `SPlanProductRisk`, `SCoveragePlan`) NO usan
+ * esta clase — se escriben a mano, igual que `UsersService` en
+ * iam-service.
  *
  * En vez de repetir el mismo Create/List/Get/Update/SetState en cada una,
  * esta clase concentra la lógica; cada consumidor solo aporta su propio
  * delegate de Prisma, los nombres de sus columnas y, opcionalmente, un
- * `include` (ver `risk-levels.service.ts` para el caso más simple, o
- * `risks.service.ts` para uno con una FK propia resuelta por código).
+ * `include` (ver `risk-levels.service.ts` en product-rating-service para
+ * el caso más simple, o `risks.service.ts`/`field-values.service.ts`
+ * para uno con una FK propia resuelta por código).
  *
  * Nota sobre los tipos: los métodos del delegate se tipan con `any` en
  * los argumentos a propósito — cada modelo de Prisma genera su propio
@@ -25,9 +28,12 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
  * real está en que cada `*.service.ts` que instancia esta clase indica
  * su tipo de fila concreto (`CatalogCrudService<SRiskLevel>`, etc.).
  *
- * Nota de ubicación: esto vive en `product-rating-service` porque es el
- * único consumidor hoy. Si `reference-data-service` llega a scaffoldearse
- * (ver docs/02-roadmap.md), este es el candidato natural a mudarse ahí.
+ * Vive en `shared-common` porque lo consumen dos servicios:
+ * `product-rating-service` (los 8 catálogos simples de `src/catalogs/` +
+ * las entidades de dominio con código propio de `src/domain/` +
+ * `SRateTable`) y `reference-data-service` (`SFieldDictionary`,
+ * `SFieldValue`) -- pensado para que cualquier servicio futuro con
+ * catálogos "Cod/Des simples" lo reutilice sin duplicarlo.
  */
 
 export interface CatalogDelegate<T> {

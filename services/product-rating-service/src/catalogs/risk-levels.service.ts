@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService, SRiskLevel } from '@ars-platform/database';
 import { StateMachineService } from '@ars-platform/shared-common';
-import { CatalogCrudService } from './catalog-crud.service';
+import { CatalogCrudService } from '@ars-platform/shared-common';
 import { CreateRiskLevelDto } from './dto/create-risk-level.dto';
 import { UpdateRiskLevelDto } from './dto/update-risk-level.dto';
 

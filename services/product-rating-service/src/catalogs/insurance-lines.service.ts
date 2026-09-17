@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService, SInsuranceLine } from '@ars-platform/database';
 import { StateMachineService } from '@ars-platform/shared-common';
-import { CatalogCrudService } from './catalog-crud.service';
+import { CatalogCrudService } from '@ars-platform/shared-common';
 import { CreateInsuranceLineDto } from './dto/create-insurance-line.dto';
 import { UpdateInsuranceLineDto } from './dto/update-insurance-line.dto';
 

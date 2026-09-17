@@ -21,8 +21,8 @@ import { LimitTypesService } from './limit-types.service';
 /**
  * Los 8 catálogos "simples" necesarios para poder configurar
  * `SProduct`/`SCoverage`/`SCoveragePlan` sin tocar la base de datos a
- * mano (ver `catalog-crud.service.ts` para el porqué de la clase
- * genérica que comparten). `SProduct`/`SRiskProduct`/`SPlanProduct`/
+ * mano (ver `CatalogCrudService` en `@ars-platform/shared-common` para
+ * el porqué de la clase genérica que comparten). `SProduct`/`SRiskProduct`/`SPlanProduct`/
  * `SPlanProductRisk`/`SCoverage`/`SCoveragePlan`/`SCalculationRule`
  * (las 7 entidades "reales" del dominio) quedan para una siguiente
  * fase — ver docs/02-roadmap.md.
