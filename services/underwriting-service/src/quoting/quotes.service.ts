@@ -11,15 +11,18 @@ import { CreateQuoteDto } from './dto/create-quote.dto';
  * docs/02-roadmap.md), mismo criterio que se usó con `FGetRateValue` y
  * el motor de atributos: no adivinar el algoritmo, confirmarlo primero.
  *
- * Alcance de esta clase (fase 1 del ítem de roadmap): crear una
- * cotización, calcular su precio (la cascada RiskPlan -> Coverage ->
- * CoverageConcept) y las mutaciones de selección de plan/cobertura que
- * el original resolvía con CRUD directo (no con una función PL/pgSQL --
- * confirmado: no existe ninguna función `%quote%` que haga ese UPDATE,
- * es la capa CRUD de LoopBack la que lo hacía). DELIBERADAMENTE AFUERA:
- * `QUOTESUMMARY`/aceptar la cotización (`FQuote_SetState`) -- dependen
- * de `TPerson`/roles (`TOMADOR`/`TITULAR`), que todavía no existen
- * (`party-service` sigue siendo scaffold) -- ver docs/02-roadmap.md.
+ * Alcance de esta clase: crear una cotización, calcular su precio (la
+ * cascada RiskPlan -> Coverage -> CoverageConcept), las mutaciones de
+ * selección de plan/cobertura que el original resolvía con CRUD directo
+ * (no con una función PL/pgSQL -- confirmado: no existe ninguna función
+ * `%quote%` que haga ese UPDATE, es la capa CRUD de LoopBack la que lo
+ * hacía), asociar personas a la cotización (`TQuotePerson`, ahora que
+ * `party-service` tiene `TPerson`/`SPersonRol` reales), el resumen
+ * (equivalente a `FGetQuoteSummary`) y una transición de estado genérica
+ * (equivalente a `FQuote_SetState`). DELIBERADAMENTE AFUERA: la cascada
+ * de creación de contrato (`FContract` y todo lo que orquesta) -- "el
+ * trabajo de mayor riesgo del proyecto" (ver README de este servicio),
+ * le toca su propio ítem del roadmap.
  *
  * Hallazgo importante NO replicado a propósito: la rama `QUOTESUMMARY`
  * dentro de `FQuote` real tiene dos defectos de sintaxis (una coma
@@ -185,6 +188,247 @@ export class QuotesService {
       where: { IdeQuoteCoverage: ideQuoteCoverage },
       data: { IndSelected: selected, UsrModification: actor, TstModification: new Date() },
     });
+
+    return this.buildPricingResult(ideQuote);
+  }
+
+  /**
+   * Equivalente a `FGetQuoteSummary` (confirmado contra el código real,
+   * ver `packages/database/scripts/find-legacy-function.js FGetQuoteSummary`)
+   * -- NO a la rama `QUOTESUMMARY` de `FQuote`, que tiene los dos
+   * defectos de sintaxis documentados en el comentario de cabecera de
+   * esta clase y nunca llegó a ejecutarse en producción tal cual está.
+   *
+   * Diferencias deliberadas con el original:
+   *  - `plan`/`quotePrime` replican la misma limitación real del
+   *    original (subconsultas escalares que asumen un único plan
+   *    seleccionado en TODA la cotización, no por riesgo) -- acá con
+   *    `findFirst`/`aggregate` en vez de una subconsulta SQL escalar,
+   *    así que nunca explota con "more than one row", solo toma el
+   *    primero que encuentre si hubiera más de uno.
+   *  - `attributes` (`FGetParsedRiskAttribute`) queda DELIBERADAMENTE
+   *    AFUERA -- esa función todavía no se investigó contra el código
+   *    real; se expone `riskAttributeValue` crudo (el JSON tal cual se
+   *    guardó en `TQuoteRisk.RiskAttributeValue`) en su lugar, hasta que
+   *    le toque su propia investigación.
+   */
+  async getSummary(ideQuote: string) {
+    const quote = await this.prisma.tQuote.findUnique({
+      where: { IdeQuote: ideQuote },
+      include: { SProduct: { include: { SCurrency: true } } },
+    });
+    if (!quote) {
+      throw new NotFoundException(`No existe cotización con id "${ideQuote}"`);
+    }
+    const symbolCurrency = quote.SProduct.SCurrency.SymbolCurrency;
+
+    const [selectedPlan, primeAgg, personPayer, personHolder, risks] = await Promise.all([
+      this.prisma.tQuoteRiskPlan.findFirst({
+        where: { IndSelected: true, TQuoteRisk: { IdeQuote: ideQuote } },
+        include: { SPlanProductRisk: { include: { SPlanProduct: true } } },
+      }),
+      this.prisma.tQuoteCoverage.aggregate({
+        _sum: { Prime: true },
+        where: { IndSelected: true, TQuoteRiskPlan: { IndSelected: true, TQuoteRisk: { IdeQuote: ideQuote } } },
+      }),
+      this.findPersonByRole(ideQuote, 'TOMADOR'),
+      this.findPersonByRole(ideQuote, 'TITULAR'),
+      this.prisma.tQuoteRisk.findMany({
+        where: { IdeQuote: ideQuote },
+        include: {
+          SRiskProduct: true,
+          TQuoteRiskPlan: {
+            where: { IndSelected: true },
+            include: { TQuoteCoverage: { where: { IndSelected: true }, include: { SCoveragePlan: true } } },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      symbolCurrency,
+      plan: selectedPlan?.SPlanProductRisk.SPlanProduct.DesShort ?? null,
+      quotePrime: round2(Number(primeAgg._sum.Prime ?? 0)),
+      personPayer,
+      personHolder,
+      riskInfo: risks.map((risk) => ({
+        desShortRiskProduct: risk.SRiskProduct.DesShort,
+        coverages: risk.TQuoteRiskPlan.flatMap((plan) =>
+          plan.TQuoteCoverage.map((coverage) => ({
+            desShortCoverage: coverage.SCoveragePlan.DesShort,
+            coveragePrime: Number(coverage.Prime),
+            symbolCurrency,
+          })),
+        ),
+        riskAttributeValue: risk.RiskAttributeValue,
+      })),
+    };
+  }
+
+  private async findPersonByRole(ideQuote: string, codPersonRol: string) {
+    const row = await this.prisma.tQuotePerson.findFirst({
+      where: { IdeQuote: ideQuote, SPersonRol: { CodPersonRol: codPersonRol } },
+      include: { TPerson: true },
+    });
+    if (!row) return null;
+    return {
+      name: row.TPerson.DesFirstName,
+      lastname: row.TPerson.DesLastName1,
+      email: row.TPerson.DesEmail,
+      identificationNumber: row.TPerson.NumIdentification,
+    };
+  }
+
+  /**
+   * Asocia una persona a una cotización con un rol (`TQuotePerson`) --
+   * sin función PL/pgSQL propia en el original (CRUD directo, igual que
+   * `TPerson`/`TQuoteRisk`). `TPerson`/`SPersonRol` viven en el mismo
+   * Postgres compartido que ya expone `party-service` -- se resuelven
+   * acá directo por Prisma, sin llamada HTTP entre servicios, mismo
+   * criterio que ya se usa para `SProduct`/`SDistributionChannel`.
+   *
+   * Regla agregada explícitamente (ausente como validación en el
+   * original, que dependía del frontend Angular): asignar una persona a
+   * un rol reemplaza a quien tuviera ese rol antes en esta cotización --
+   * `FGetQuoteSummary` asume con una subconsulta escalar que hay como
+   * mucho UN TOMADOR y UN TITULAR por cotización (confirmado contra el
+   * código real), aunque el `UNIQUE` real de `TQuotePerson` es
+   * (`IdeQuote`,`IdePerson`,`IdePersonRol`) y en teoría permitiría más de
+   * uno.
+   */
+  async setPerson(ideQuote: string, idePerson: string, codPersonRol: string, actor: string) {
+    const [quote, person, idePersonRol] = await Promise.all([
+      this.prisma.tQuote.findUnique({ where: { IdeQuote: ideQuote } }),
+      this.prisma.tPerson.findUnique({ where: { IdePerson: idePerson } }),
+      this.resolvePersonRol(codPersonRol),
+    ]);
+    if (!quote) throw new NotFoundException(`No existe cotización con id "${ideQuote}"`);
+    if (!person) throw new NotFoundException(`No existe persona con id "${idePerson}"`);
+
+    const existing = await this.prisma.tQuotePerson.findFirst({
+      where: { IdeQuote: ideQuote, IdePersonRol: idePersonRol },
+    });
+    if (existing && existing.IdePerson === idePerson) {
+      return existing;
+    }
+
+    const activeStateId = await this.stateMachine.getStateByCode('ACTIVO');
+    const now = new Date();
+    if (existing) {
+      await this.prisma.tQuotePerson.delete({ where: { IdeQuotePerson: existing.IdeQuotePerson } });
+    }
+    return this.prisma.tQuotePerson.create({
+      data: {
+        IdeQuote: ideQuote,
+        IdePerson: idePerson,
+        IdePersonRol: idePersonRol,
+        IdeState: activeStateId,
+        UsrCreation: actor,
+        TstCreation: now,
+        UsrModification: actor,
+        TstModification: now,
+      },
+    });
+  }
+
+  async listPersons(ideQuote: string) {
+    return this.prisma.tQuotePerson.findMany({
+      where: { IdeQuote: ideQuote },
+      include: { TPerson: true, SPersonRol: true },
+    });
+  }
+
+  async removePerson(ideQuote: string, codPersonRol: string): Promise<void> {
+    const idePersonRol = await this.resolvePersonRol(codPersonRol);
+    await this.prisma.tQuotePerson.deleteMany({ where: { IdeQuote: ideQuote, IdePersonRol: idePersonRol } });
+  }
+
+  private async resolvePersonRol(codPersonRol: string): Promise<string> {
+    const row = await this.prisma.sPersonRol.findFirst({ where: { CodPersonRol: codPersonRol } });
+    if (!row) throw new NotFoundException(`No existe rol de persona con código "${codPersonRol}"`);
+    return row.IdePersonRol;
+  }
+
+  /**
+   * Equivalente a `FQuote_SetState` (confirmado contra el código real,
+   * ver `packages/database/scripts/find-legacy-function.js FQuote_SetState`):
+   * aplica una transición de estado (`codOperative`, definido en
+   * `SStateRule`) a la cotización Y a TODO su árbol -- todos los
+   * `TQuoteRisk`/`TQuoteRiskPlan`/`TQuoteCoverage`/`TQuoteCoverageConcept`,
+   * no solo los seleccionados -- igual mecanismo de cascada completa que
+   * el original (`FGetState('Next', <tabla>, estadoActual, código)` en
+   * cada nivel), acá con el `StateMachineService` ya existente en vez de
+   * repetir la lógica de transición.
+   *
+   * `codOperative` se expone tal cual (sin traducir a un endpoint
+   * "aceptar" fijo): el original es genérico -- distintos códigos
+   * operativos disparan distintas transiciones según `SStateRule`, y
+   * todavía no se investigó cuál es el código real que representa
+   * "aceptar" una cotización (ver docs/02-roadmap.md) ni la cascada de
+   * creación de contrato (`FContract`) que dispara -- eso queda para su
+   * propio ítem, deliberadamente separado por ser "el trabajo de mayor
+   * riesgo del proyecto" (ver README de este servicio).
+   */
+  async transitionState(ideQuote: string, codOperative: string, actor: string) {
+    const quote = await this.prisma.tQuote.findUnique({ where: { IdeQuote: ideQuote } });
+    if (!quote) {
+      throw new NotFoundException(`No existe cotización con id "${ideQuote}"`);
+    }
+
+    const now = new Date();
+    const nextQuoteState = await this.stateMachine.getNextState('TQuote', quote.IdeState, codOperative);
+    await this.prisma.tQuote.update({
+      where: { IdeQuote: ideQuote },
+      data: { IdeState: nextQuoteState, UsrModification: actor, TstModification: now },
+    });
+
+    const risks = await this.prisma.tQuoteRisk.findMany({ where: { IdeQuote: ideQuote } });
+    for (const risk of risks) {
+      const nextRiskState = await this.stateMachine.getNextState('TQuoteRisk', risk.IdeState, codOperative);
+      await this.prisma.tQuoteRisk.update({
+        where: { IdeQuoteRisk: risk.IdeQuoteRisk },
+        data: { IdeState: nextRiskState, UsrModification: actor, TstModification: now },
+      });
+
+      const plans = await this.prisma.tQuoteRiskPlan.findMany({ where: { IdeQuoteRisk: risk.IdeQuoteRisk } });
+      for (const plan of plans) {
+        const nextPlanState = await this.stateMachine.getNextState('TQuoteRiskPlan', plan.IdeState, codOperative);
+        await this.prisma.tQuoteRiskPlan.update({
+          where: { IdeQuoteRiskPlan: plan.IdeQuoteRiskPlan },
+          data: { IdeState: nextPlanState, UsrModification: actor, TstModification: now },
+        });
+
+        const coverages = await this.prisma.tQuoteCoverage.findMany({
+          where: { IdeQuoteRiskPlan: plan.IdeQuoteRiskPlan },
+        });
+        for (const coverage of coverages) {
+          const nextCoverageState = await this.stateMachine.getNextState(
+            'TQuoteCoverage',
+            coverage.IdeState,
+            codOperative,
+          );
+          await this.prisma.tQuoteCoverage.update({
+            where: { IdeQuoteCoverage: coverage.IdeQuoteCoverage },
+            data: { IdeState: nextCoverageState, UsrModification: actor, TstModification: now },
+          });
+
+          const concepts = await this.prisma.tQuoteCoverageConcept.findMany({
+            where: { IdeQuoteCoverage: coverage.IdeQuoteCoverage },
+          });
+          for (const concept of concepts) {
+            const nextConceptState = await this.stateMachine.getNextState(
+              'TQuoteCoverageConcept',
+              concept.IdeState,
+              codOperative,
+            );
+            await this.prisma.tQuoteCoverageConcept.update({
+              where: { IdeQuoteCoverageConcept: concept.IdeQuoteCoverageConcept },
+              data: { IdeState: nextConceptState, UsrModification: actor, TstModification: now },
+            });
+          }
+        }
+      }
+    }
 
     return this.buildPricingResult(ideQuote);
   }

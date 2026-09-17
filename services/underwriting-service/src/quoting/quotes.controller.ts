@@ -1,15 +1,20 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put } from '@nestjs/common';
 import { CurrentUser, JwtPayload } from '@ars-platform/shared-common';
 import { QuotesService } from './quotes.service';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { ToggleCoverageDto } from './dto/toggle-coverage.dto';
+import { SetQuotePersonDto } from './dto/set-quote-person.dto';
+import { TransitionQuoteStateDto } from './dto/transition-quote-state.dto';
 
 /**
  * Fase 1 del motor de cotización real (ver el comentario de cabecera de
- * `QuotesService`): crear, cotizar (precio) y las mutaciones de
- * selección de plan/cobertura. DELIBERADAMENTE AFUERA de esta fase:
- * resumen (`QUOTESUMMARY`) y aceptar la cotización -- dependen de
- * `TPerson`/`party-service`, todavía scaffold (ver docs/02-roadmap.md).
+ * `QuotesService`): crear, cotizar (precio), las mutaciones de
+ * selección de plan/cobertura, asociar personas (`TQuotePerson`),
+ * resumen (equivalente a `FGetQuoteSummary`) y una transición de estado
+ * genérica (equivalente a `FQuote_SetState`). DELIBERADAMENTE AFUERA de
+ * esta fase: la cascada de creación de contrato (`FContract` y todo lo
+ * que orquesta) -- "el trabajo de mayor riesgo del proyecto" (ver
+ * README de este servicio), le toca su propio ítem del roadmap.
  *
  * Sin `@Roles(...)`: cotizar es una operación de usuario autenticado
  * normal, no administración de catálogo (a diferencia de los
@@ -27,6 +32,11 @@ export class QuotesController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.service.buildPricingResult(id);
+  }
+
+  @Get(':id/summary')
+  getSummary(@Param('id') id: string) {
+    return this.service.getSummary(id);
   }
 
   @Post(':id/price')
@@ -53,5 +63,29 @@ export class QuotesController {
     @CurrentUser() actor: JwtPayload,
   ) {
     return this.service.toggleCoverage(id, ideQuoteRiskPlan, ideQuoteCoverage, dto.selected, actor.code);
+  }
+
+  @Get(':id/persons')
+  listPersons(@Param('id') id: string) {
+    return this.service.listPersons(id);
+  }
+
+  @Put(':id/persons')
+  setPerson(@Param('id') id: string, @Body() dto: SetQuotePersonDto, @CurrentUser() actor: JwtPayload) {
+    return this.service.setPerson(id, dto.idePerson, dto.codPersonRol, actor.code);
+  }
+
+  @Delete(':id/persons/:codPersonRol')
+  removePerson(@Param('id') id: string, @Param('codPersonRol') codPersonRol: string) {
+    return this.service.removePerson(id, codPersonRol);
+  }
+
+  @Post(':id/state')
+  transitionState(
+    @Param('id') id: string,
+    @Body() dto: TransitionQuoteStateDto,
+    @CurrentUser() actor: JwtPayload,
+  ) {
+    return this.service.transitionState(id, dto.codOperative, actor.code);
   }
 }
