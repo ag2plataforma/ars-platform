@@ -15,9 +15,27 @@ CRUD completo del diccionario de campos y sus valores posibles (mismo patrón `C
 - `GET /field-dictionary`, `GET /field-dictionary/:id`, `POST /field-dictionary` (`ADMIN`), `PATCH /field-dictionary/:id` (`ADMIN`), `PATCH /field-dictionary/:id/state` (`ADMIN`).
 - `GET /field-values`, `GET /field-values/:id`, `POST /field-values` (`ADMIN`, requiere `codFieldDictionary` de un campo existente), `PATCH /field-values/:id` (`ADMIN`), `PATCH /field-values/:id/state` (`ADMIN`).
 
-**Deliberadamente afuera de este módulo** — y de esta fase — el motor de atributos personalizables/flujos configurables completo (`SAttribute`, `SAttributeProperty`, `SModelAttribute`, enlazado con `SEntity`/`SFlowStep`, y consumido en runtime vía el JSON `RiskAttributeValue` de `TQuoteRisk`/`TFileRisk` — ver `PrismaAttributeValueResolver` en `@ars-platform/database`). Es una pieza bastante más grande e interconectada que el diccionario de campos; implementarla bien exige su propia investigación primero (mismo criterio que se usó con `FGetRateValue`), ver `docs/02-roadmap.md`.
+### `AttributeEngineModule` — motor de atributos personalizables + flujo configurable
 
-El resto del alcance de este servicio (i18n, setup, flujos de proceso) sigue sin implementar.
+Investigado y confirmado contra código y datos reales (ver `packages/database/scripts/investigate-attribute-engine.js` y `docs/02-roadmap.md`) antes de implementarse, mismo criterio que se usó con `FGetRateValue`. Dos partes:
+
+**Configuración de atributos** (lo que resuelve `attribute('COD')` en el motor de reglas — `PrismaAttributeValueResolver` en `@ars-platform/database`, sin cambios de código ahí, ya coincide con `FGetValueAttribute` real):
+- `GET/POST/PATCH /attributes` — `SAttribute`, concepto reutilizable (ej. "Raza del Perro"), ligado a un `SFieldDictionary`.
+- `GET/POST/PATCH /model-attributes` — `SModelAttribute`, qué set de atributos aplica a qué entidad/producto (ej. "Perro", "BikeMountain"). `IdeReference` es polimórfico, se acepta como uuid crudo sin validar.
+- `GET/POST/PATCH /attribute-properties` — `SAttributeProperty`, el campo de formulario REAL de un producto puntual (JSON real: `name`/`label`/`type`/`validators`), enlaza `SModelAttribute` con `SAttribute`.
+- `GET /entities`, `GET /entities/:id` — `SEntity`, de solo lectura (tipos de objeto de negocio del propio código, ej. "TQuoteRisk"; crear uno nuevo no hace nada sin soporte en código).
+
+**Configuración del flujo/wizard** (deliberadamente separado de su ejecución — ver más abajo):
+- `GET/POST/PATCH /process-flows` — `SProcessFlow`, catálogo simple.
+- `GET/POST/PATCH /steps` — `SStep`, catálogo simple.
+- `GET/POST/PATCH /screens` — `SScreen`, con `ScreenContent` (JSON real, no texto).
+- `GET/POST/PATCH /flow-steps` — `SFlowStep`, sin código propio (identificado por `IdeProcessFlow`+`IdeStepCurrent`+`IndResultOK`+`IdeStepForward`), escrito a mano en vez de con `CatalogCrudService`.
+
+Todos los `POST`/`PATCH` de `AttributeEngineModule` requieren rol `ADMIN`, igual que `FieldCatalogModule`.
+
+**Deliberadamente afuera de este módulo** la EJECUCIÓN del flujo en una sesión de cotización concreta (`FPInstanceFlow`, `FGetNextFlowStep`, `TFlowStepInstance`, el templating real `replace('#', vDesShort)`) — esto es solo la configuración; ejecutarlo depende de que `underwriting-service` tenga el flujo real de cotización, que todavía no existe.
+
+El resto del alcance de este servicio (i18n, setup) sigue sin implementar.
 
 ## Cómo correrlo
 

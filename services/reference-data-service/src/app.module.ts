@@ -5,12 +5,15 @@ import { PrismaModule } from '@ars-platform/database';
 import { AuthModule } from '@ars-platform/shared-common';
 import { HealthController } from './health/health.controller';
 import { FieldCatalogModule } from './field-catalog/field-catalog.module';
+import { AttributeEngineModule } from './attribute-engine/attribute-engine.module';
 
 /**
- * Primer módulo de negocio real de este servicio: `FieldCatalogModule`
- * (`SFieldDictionary`/`SFieldValue`, ver ese módulo para el alcance
- * exacto). El resto sigue siendo scaffold -- ver README.md de este
- * servicio y docs/02-roadmap.md para lo que falta migrar en Fase 2.
+ * Módulos de negocio reales de este servicio: `FieldCatalogModule`
+ * (`SFieldDictionary`/`SFieldValue`) y `AttributeEngineModule` (motor de
+ * atributos personalizables + flujo configurable de cotización -- ver
+ * ese módulo para el alcance exacto). El resto sigue siendo scaffold --
+ * ver README.md de este servicio y docs/02-roadmap.md para lo que falta
+ * migrar en Fase 2.
  */
 @Module({
   imports: [
@@ -24,6 +27,7 @@ import { FieldCatalogModule } from './field-catalog/field-catalog.module';
     PrismaModule,
     AuthModule, // guard JWT global — mismo JWT_SECRET que iam-service, este servicio solo VERIFICA tokens
     FieldCatalogModule,
+    AttributeEngineModule,
   ],
   controllers: [HealthController],
 })

@@ -1,0 +1,12 @@
+import { IsString } from 'class-validator';
+
+/**
+ * Mismo patrón que `SetCatalogStateDto` en `field-catalog/` (y en
+ * product-rating-service/iam-service) -- una copia más, a propósito, ver
+ * el comentario de `CatalogCrudService` en `@ars-platform/shared-common`
+ * sobre por qué esto no vale la pena compartirlo.
+ */
+export class SetCatalogStateDto {
+  @IsString()
+  codState!: string;
+}

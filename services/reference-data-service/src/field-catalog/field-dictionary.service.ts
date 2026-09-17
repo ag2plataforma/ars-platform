@@ -15,14 +15,14 @@ import { UpdateFieldDictionaryDto } from './dto/update-field-dictionary.dto';
  *
  * OJO -- esto NO es el motor de "atributos personalizables"/flujos
  * configurables completo (`SAttribute`, `SAttributeProperty`,
- * `SModelAttribute`, que además enlaza con `SEntity`/`SFlowStep` y con el
- * JSON `RiskAttributeValue` de `TQuoteRisk`/`TFileRisk` -- ver
+ * `SModelAttribute`, `SEntity`, `SFlowStep`, que enlaza con el JSON
+ * `RiskAttributeValue` de `TQuoteRisk`/`TFileRisk` -- ver
  * `PrismaAttributeValueResolver` en `@ars-platform/database` para cómo se
- * resuelve `attribute('COD')` en una fórmula). Esa parte es
- * significativamente más compleja y queda pendiente de su propia
- * investigación antes de implementarla (mismo criterio que se usó con
- * `FGetRateValue`: no adivinar la forma, confirmarla primero) -- ver
- * docs/02-roadmap.md.
+ * resuelve `attribute('COD')` en una fórmula). Ese motor, ya investigado
+ * y confirmado contra código y datos reales, vive en
+ * `../attribute-engine/` -- este `SFieldDictionary` es un catálogo más
+ * simple y anterior en la cadena, que además consumen los factores de
+ * tarifa y el resto de custom fields.
  */
 @Injectable()
 export class FieldDictionaryService {
