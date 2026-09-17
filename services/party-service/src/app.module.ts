@@ -4,11 +4,15 @@ import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '@ars-platform/database';
 import { AuthModule } from '@ars-platform/shared-common';
 import { HealthController } from './health/health.controller';
+import { PersonsModule } from './persons/persons.module';
+import { ConsentModule } from './consent/consent.module';
 
 /**
- * Scaffold minimo, misma plantilla que product-rating-service/iam-service
- * (ver README.md de este servicio para su alcance funcional y
- * docs/02-roadmap.md para cuando le toque su migracion real, Fase 2).
+ * Fase 1 de su migracion real ya en marcha: personas y consentimiento
+ * GDPR (PersonsModule/ConsentModule, ver docs/02-roadmap.md y el README
+ * de este servicio para el detalle de alcance/lo deliberadamente
+ * diferido). El resto (brokers, comisiones) sigue como scaffold
+ * minimo, misma plantilla que product-rating-service/iam-service.
  */
 @Module({
   imports: [
@@ -21,6 +25,8 @@ import { HealthController } from './health/health.controller';
     }),
     PrismaModule,
     AuthModule, // guard JWT global — mismo JWT_SECRET que iam-service, este servicio solo VERIFICA tokens
+    PersonsModule,
+    ConsentModule,
   ],
   controllers: [HealthController],
 })
