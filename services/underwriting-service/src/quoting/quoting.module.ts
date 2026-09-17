@@ -15,5 +15,6 @@ import { QuotesService } from './quotes.service';
   imports: [UnderwritingStateMachineModule, UnderwritingRulesEngineModule],
   controllers: [QuotesController],
   providers: [QuotesService],
+  exports: [QuotesService],
 })
 export class QuotingModule {}

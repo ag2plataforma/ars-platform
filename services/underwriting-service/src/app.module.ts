@@ -5,13 +5,15 @@ import { PrismaModule } from '@ars-platform/database';
 import { AuthModule } from '@ars-platform/shared-common';
 import { HealthController } from './health/health.controller';
 import { QuotingModule } from './quoting/quoting.module';
+import { ContractsModule } from './contracts/contracts.module';
 
 /**
  * Fase 1 de su migracion real ya en marcha: motor de cotizacion
- * (QuotingModule, ver docs/02-roadmap.md y el README de este servicio
- * para el detalle de alcance/lo deliberadamente diferido). El resto
- * sigue como scaffold minimo, misma plantilla que
- * product-rating-service/iam-service.
+ * (QuotingModule) y cascada de creacion de contrato (ContractsModule,
+ * "el trabajo de mayor riesgo del proyecto" -- ver docs/02-roadmap.md y
+ * el README de este servicio para el detalle de alcance/lo
+ * deliberadamente diferido). El resto sigue como scaffold minimo, misma
+ * plantilla que product-rating-service/iam-service.
  */
 @Module({
   imports: [
@@ -25,6 +27,7 @@ import { QuotingModule } from './quoting/quoting.module';
     PrismaModule,
     AuthModule, // guard JWT global — mismo JWT_SECRET que iam-service, este servicio solo VERIFICA tokens
     QuotingModule,
+    ContractsModule,
   ],
   controllers: [HealthController],
 })

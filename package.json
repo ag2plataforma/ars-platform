@@ -27,6 +27,7 @@
     "db:investigate-attribute-engine": "node packages/database/scripts/investigate-attribute-engine.js",
     "db:investigate-quote-engine": "node packages/database/scripts/investigate-quote-engine.js",
     "db:setup-quote-sequence": "node packages/database/scripts/setup-quote-number-sequence.js",
+    "db:setup-contract-sequence": "node packages/database/scripts/setup-contract-number-sequence.js",
     "db:investigate-party-service": "node packages/database/scripts/investigate-party-service.js",
     "db:investigate-contract-engine": "node packages/database/scripts/investigate-contract-engine.js",
     "start:party": "npm run build:libs && npm run build --workspace=services/party-service && node services/party-service/dist/main.js",
