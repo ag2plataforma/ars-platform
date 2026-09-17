@@ -66,16 +66,16 @@ Reglas de negocio a conservar:
 
 - `SFlowStep` define pasos con bifurcación por resultado (`IndResultOK`), reconstruidos con una CTE recursiva (`FPInstanceFlow`, `FFlowStep`).
 - `FGetNextFlowStep` / `FPFlowStepRegistry` llevan el progreso de cada sesión de usuario (`UIDSession`) en `TFlowStepInstance`.
-- Es un patrón de máquina de estados configurable por datos — coherente con la narrativa original de "flujos de contratación configurables por canal/producto". Vale la pena preservarlo como concepto, reimplementado sin el hack de reemplazo de caracteres encontrado (`replace('#','Bicicleta')`, ver §6).
+- Es un patrón de máquina de estados configurable por datos — coherente con la narrativa original de "flujos de contratación configurables por canal/producto". Vale la pena preservarlo como concepto, reimplementado a partir de `FPInstanceFlow` (no de `FFlowStep`, que resultó ser un artefacto de debug abandonado -- ver §6) -- pero implementarlo (junto con `SEntity`/`SFlowStep` en tiempo de ejecución) queda fuera de esta ronda: por ahora el roadmap prioriza solo la parte de *configuración* del motor de atributos (`SAttribute`/`SAttributeProperty`/`SModelAttribute`), no la orquestación del wizard de pasos.
 
 ## 6. Deuda técnica y riesgos detectados (a resolver, no a replicar)
 
 | Hallazgo | Ubicación | Riesgo |
 |---|---|---|
 | SQL dinámico con concatenación de texto | `FGetIdeDesc`, `FGetSiteMap`, `FGetParsedRiskAttribute`, motor de fórmulas | Inyección SQL |
-| Posible typo: llama a `FGeState` (falta la "t") | `FGetProcessFlowByUIDSession` | Puede fallar en runtime; verificar contra catálogo real de funciones |
+| Posible typo: llama a `FGeState` (falta la "t") | `FGetProcessFlowByUIDSession` | **Confirmado contra el código fuente real** (investigación del motor de atributos/flujos, ver roadmap): el typo existe tal cual, y además a esta función le falta el cast `UUID(...)` sobre `pUIDSession` que sí tienen sus funciones hermanas -- todo indica que es código roto/no usado en v1, no replicar |
 | Correlativos por parseo de texto (`split_part` + max) sin secuencia real | `FQuote`/GETQUOTENUMBER, `FReceipt_GetNumber`, `FContract`/GETNUMBER | Colisiones bajo concurrencia |
-| Hack de caracteres `replace('#','Bicicleta')` | `FFlowStep`, `FPInstanceFlow` | Comportamiento poco claro, investigar propósito real antes de migrar |
+| Hack de caracteres `replace('#','Bicicleta')` | `FFlowStep` | **Resuelto**: `FFlowStep` reemplaza literalmente `#` por el string fijo "Bicicleta" -- es un artefacto de debug/prueba abandonado, no una regla de negocio. `FPInstanceFlow` (la función hermana, con la misma lógica de CTE recursiva) hace lo correcto: `replace(cur."ScreenContent",'#',vDesShort)`, sustituyendo `#` por el `DesShort` real del producto/riesgo -- ese es el mecanismo de templating real a preservar. No replicar `FFlowStep` |
 | Placeholder de moneda con encoding roto | `FContract_Temp` | Corregir, no replicar |
 | Vigencias `TempPack`/`TempDays`/`TempDate` sin implementar | `FContract` | Funcionalidad incompleta ya en producción |
 | `ReceiptType` marcado por el propio equipo como "REVISAR ESTE PROCESO ESTA MALO" | `FReceipt` | Deuda técnica reconocida, revisar antes de portar |
