@@ -3,6 +3,7 @@ import { CurrentUser, JwtPayload } from '@ars-platform/shared-common';
 import { ContractsService } from './contracts.service';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { TransitionContractStateDto } from './dto/transition-contract-state.dto';
+import { CancelContractDto } from './dto/cancel-contract.dto';
 
 /**
  * Cascada de creación de contrato (`FContract('CONTRACTNEW', ...)` y todo lo
@@ -35,5 +36,15 @@ export class ContractsController {
     @CurrentUser() actor: JwtPayload,
   ) {
     return this.service.transitionState(id, dto.codOperative, actor.code);
+  }
+
+  /**
+   * Cascada de anulación de contrato, equivalente a `FContract('CANCELCONTRACT', ...)`.
+   * Endpoint dedicado (no el genérico `/state`) porque requiere parámetros
+   * propios del endoso de anulación -- ver `CancelContractDto`.
+   */
+  @Post('contracts/:id/cancel')
+  cancel(@Param('id') id: string, @Body() dto: CancelContractDto, @CurrentUser() actor: JwtPayload) {
+    return this.service.cancel(id, dto, actor.code);
   }
 }
