@@ -163,6 +163,12 @@ async function main() {
         IndGenerateAllFraction: false,
         IndProportionalPrime: true,
         TstInitial: now,
+        // Confirmado necesario para FMovementConcept('SetNetPrime',...):
+        // el original hace "now() between pro.TstInitial and pro.TstEnd"
+        // -- con TstEnd NULL ese BETWEEN da NULL/false y la función entera
+        // no hace nada (ver setNetPrime en underwriting-service). Mismo
+        // criterio FAR_FUTURE ya usado abajo para SPlanProductRisk.
+        TstEnd: FAR_FUTURE,
       },
       'SProduct',
     );
