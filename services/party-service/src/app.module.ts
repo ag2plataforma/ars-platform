@@ -6,13 +6,14 @@ import { AuthModule } from '@ars-platform/shared-common';
 import { HealthController } from './health/health.controller';
 import { PersonsModule } from './persons/persons.module';
 import { ConsentModule } from './consent/consent.module';
+import { BrokersModule } from './brokers/brokers.module';
 
 /**
- * Fase 1 de su migracion real ya en marcha: personas y consentimiento
- * GDPR (PersonsModule/ConsentModule, ver docs/02-roadmap.md y el README
- * de este servicio para el detalle de alcance/lo deliberadamente
- * diferido). El resto (brokers, comisiones) sigue como scaffold
- * minimo, misma plantilla que product-rating-service/iam-service.
+ * Alcance real ya en marcha (ver docs/02-roadmap.md y el README de este
+ * servicio para el detalle de alcance/lo deliberadamente diferido):
+ * personas y consentimiento GDPR (PersonsModule/ConsentModule), y
+ * brokers/comisiones por canal (BrokersModule -- TBroker/SCommissionTree/
+ * SCommissionTable/SCommission).
  */
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { ConsentModule } from './consent/consent.module';
     AuthModule, // guard JWT global — mismo JWT_SECRET que iam-service, este servicio solo VERIFICA tokens
     PersonsModule,
     ConsentModule,
+    BrokersModule,
   ],
   controllers: [HealthController],
 })

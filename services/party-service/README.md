@@ -2,7 +2,7 @@
 
 Sustituye a: `ag2personmanager` + `ag2consentmanager` + `ag2commercialmanager`.
 
-Alcance: personas (`TPerson`, `TAddress`, `TContactData`), consentimiento GDPR (`SConsent`, `TPersonConsent` — equivalente a `FConsent`), brokers/comercial (`TBroker`, comisiones por canal `SCommission*`).
+Alcance: personas (`TPerson`, `TAddress`, `TContactData`), consentimiento GDPR (`SConsent`, `TPersonConsent` — equivalente a `FConsent`), brokers/comercial (`TBroker`, árbol de comisiones `SCommissionTree`/`SCommissionTable`/`SCommission`, split de comisión por canal `SCommissionProduct`).
 
 ## Estado actual
 
@@ -27,7 +27,19 @@ Equivalente a `FConsent`, confirmado contra el código real. **Corrección delib
 - `POST /persons/:personId/consents` (body: `{ ideConsent, ideQuote }`), `GET /persons/:personId/consents?ideQuote=` -- registra/lista la aceptación de un consentimiento (`TPersonConsent`, sin función PL/pgSQL propia en el original). Idempotente a propósito (regla agregada): aceptar el mismo consentimiento dos veces para la misma persona+cotización no duplica el registro.
 - Fase 1: `TPersonConsent` solo se liga a una cotización (`IdeQuote`) -- `IdeContractOperation` queda para cuando exista la fase de contratación real.
 
-**Deliberadamente afuera de esta fase**: brokers (`TBroker`) y el árbol de comisiones (`SCommissionTree`/`SCommissionTable`/`SCommission`/`SCommissionProduct`) -- no bloquean nada hasta `FReceipt`, bastante después en la cascada de contratación; les toca su propia investigación e implementación por separado. Tampoco se implementa en esta fase la asociación persona+rol+cotización (`TQuotePerson`) -- eso vive naturalmente del lado de `underwriting-service` (mutación sobre el agregado cotización, mismo patrón que `selectPlan`/`toggleCoverage`), y es el siguiente ítem del roadmap (resumen y aceptación de cotización).
+### `BrokersModule` -- brokers y árbol de comisiones
+
+`TBroker`/`SCommissionTree`/`SCommissionTable`/`SCommission`/`SCommissionProduct` -- confirmado contra el dump completo de funciones PL/pgSQL que ninguna de las 5 tiene función propia de escritura, así que es CRUD administrativo diseñado de cero, no una réplica de lógica de negocio existente. Ya usado en la práctica por `underwriting-service`: `resolveCommissionPercentage`/`generateReceipts` (ver roadmap) calculan la comisión real de un recibo con `SCommissionTree`/`SCommissionTable`/`SCommission`, y `setContractDistributionChannel` (equivalente a `FContractDistributionChannel('SETQUOTE', ...)`) lee `SCommissionProduct` para armar el split de canales del contrato -- este módulo es lo que faltaba para darlas de alta sin tocar la BD a mano.
+
+- `GET/POST /brokers`, `GET/PATCH /brokers/:id`, `PATCH /brokers/:id/state` (`ADMIN` para mutaciones) -- catálogo `TBroker`, patrón `CatalogCrudService`; resuelve `codBrokerType`→`SBrokerType` y valida que `idePerson`→`TPerson` exista.
+- `GET/POST /commission-trees`, `GET/PATCH /commission-trees/:id`, `PATCH /commission-trees/:id/state` -- catálogo `SCommissionTree`, mismo patrón; resuelve `codDistributionChannel`→`SDistributionChannel`.
+- `GET/POST /commission-tables`, `GET/PATCH /commission-tables/:id`, `PATCH /commission-tables/:id/state` -- catálogo `SCommissionTable` (filtrable por `codCommissionTree`/`codProduct`); `idePlanProductRisk`/`ideCoveragePlan` opcionales se reciben como uuid crudo (tablas de unión sin código propio, NULL = comodín, mismo criterio que ya usa `resolveCommissionPercentage`).
+- `GET/POST /commissions`, `GET/PATCH /commissions/:id`, `PATCH /commissions/:id/state` -- `SCommission` (% vigente por tabla+proceso en una ventana `[TstInitial, TstEnd]`), escrito a mano (sin `Cod`/`Des` propio, mismo estilo que `rate-values.service.ts`). `NumMovement` es un correlativo de versión por `(IdeCommissionTable, IdeProcess)` calculado automáticamente (máximo existente + 1), no un dato que cargue el usuario. `codCommissionTable`/`codProcess` no se pueden cambiar en un `update()` (afectarían la clave de versión) -- para moverla a otra tabla/proceso se crea una fila nueva.
+
+- `GET/POST /commission-products`, `GET/PATCH /commission-products/:id`, `PATCH /commission-products/:id/state` -- `SCommissionProduct` (split de comisión de un producto entre canal de origen y uno o más de destino, con `Percentaje`/`IndMain` por destino). **Sin versionado a propósito** (decisión explícita del usuario): es la ÚNICA de las 5 tablas con función PL/pgSQL real de LECTURA (`FContractDistributionChannel('SETQUOTE', ...)`, en `underwriting-service`), y esa función no filtra por `NumMovement` ni vigencia -- toma TODAS las filas `Activa` que matcheen (producto, canal origen). Por eso `update()` edita en el lugar (`Percentaje`/`IndMain`/vigencia) en vez de crear una fila nueva -- dejar dos filas Activas para el mismo (producto, canal origen, canal destino) a la vez duplicaría el split en el contrato. `codProduct`/`codDistributionChannelOrigin`/`codDistributionChannelDestiny` no se pueden cambiar en `update()` (mueven la identidad de la fila) -- para eso se crea una fila nueva.
+- `setContractDistributionChannel` en `underwriting-service` (equivalente a `FContractDistributionChannel('SETQUOTE', ...)`, confirmado línea por línea) ya consulta `SCommissionProduct`: si hay configuración activa para (canal de origen de la cotización, producto), crea un `TContractDistributionChannel` por cada fila que matchee; si no hay ninguna, cae al fallback real (un único canal, 100%, `IndMain=true`). Ver `docs/02-roadmap.md` para el detalle de la investigación.
+
+**Deliberadamente afuera de esta fase**: la asociación persona+rol+cotización (`TQuotePerson`) -- eso vive naturalmente del lado de `underwriting-service` (mutación sobre el agregado cotización, mismo patrón que `selectPlan`/`toggleCoverage`), y es el siguiente ítem del roadmap (resumen y aceptación de cotización).
 
 ## Cómo correrlo
 
