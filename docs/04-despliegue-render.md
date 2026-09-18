@@ -78,6 +78,13 @@ Igual que en Oracle:
   real → confirma que el contenedor desplegado pega de verdad contra
   Postgres.
 
+**Verificado en producción (2026-09-18)**: `iam-service` desplegado en
+`https://ars-iam-service.onrender.com`. `GET /health` responde 200, y
+`POST /auth/login` con el usuario admin real devuelve un `token` válido
+(200) -- confirma conexión real contra Postgres, no solo que el
+contenedor levantó. Primer "hello world" de despliegue de la Fase 1
+cerrado.
+
 ## Para el resto de los servicios
 
 Mismo procedimiento (Language `Docker`, Dockerfile Path
