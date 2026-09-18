@@ -9,8 +9,16 @@
 #   - Dockerfile Location: services/gateway/Dockerfile
 # Con Docker CLI a mano, se construye así desde la raíz del repo:
 #   docker build -f services/gateway/Dockerfile -t gateway .
-FROM node:20-alpine AS build
+FROM node:20-bookworm-slim AS build
 WORKDIR /app
+# Prisma necesita el binario `openssl` instalado para detectar bien la
+# version de OpenSSL (node:20-bookworm-slim no lo trae por defecto --
+# confirmado necesario tambien en Debian, no solo en Alpine:
+# https://github.com/prisma/orm/issues/19729). Se eligio Debian slim
+# en vez de Alpine porque Prisma tiene un bug confirmado de deteccion
+# de OpenSSL en Alpine 3.21+ que rompe el motor en runtime:
+# https://github.com/prisma/prisma/issues/25817.
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 # `prisma generate` (parte de `npm run build:libs`, vía packages/database)
 # exige que DATABASE_URL exista como variable de entorno -- no abre
 # conexión real, solo lee prisma/schema.prisma -- por eso alcanza con un
@@ -24,8 +32,16 @@ RUN npm run build:libs
 RUN npm run build --workspace=services/gateway
 RUN npm prune --omit=dev
 
-FROM node:20-alpine AS runtime
+FROM node:20-bookworm-slim AS runtime
 WORKDIR /app
+# Prisma necesita el binario `openssl` instalado para detectar bien la
+# version de OpenSSL (node:20-bookworm-slim no lo trae por defecto --
+# confirmado necesario tambien en Debian, no solo en Alpine:
+# https://github.com/prisma/orm/issues/19729). Se eligio Debian slim
+# en vez de Alpine porque Prisma tiene un bug confirmado de deteccion
+# de OpenSSL en Alpine 3.21+ que rompe el motor en runtime:
+# https://github.com/prisma/prisma/issues/25817.
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
