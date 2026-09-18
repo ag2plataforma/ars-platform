@@ -6,6 +6,9 @@ import { AuthModule } from '@ars-platform/shared-common';
 import { HealthController } from './health/health.controller';
 import { FieldCatalogModule } from './field-catalog/field-catalog.module';
 import { AttributeEngineModule } from './attribute-engine/attribute-engine.module';
+import { CommonCatalogsModule } from './common-catalogs/common-catalogs.module';
+import { I18nModule } from './i18n/i18n.module';
+import { SetupModule } from './setup/setup.module';
 
 /**
  * Módulos de negocio reales de este servicio: `FieldCatalogModule`
@@ -28,6 +31,9 @@ import { AttributeEngineModule } from './attribute-engine/attribute-engine.modul
     AuthModule, // guard JWT global — mismo JWT_SECRET que iam-service, este servicio solo VERIFICA tokens
     FieldCatalogModule,
     AttributeEngineModule,
+    CommonCatalogsModule,
+    I18nModule,
+    SetupModule,
   ],
   controllers: [HealthController],
 })

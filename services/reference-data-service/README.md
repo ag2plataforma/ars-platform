@@ -35,7 +35,36 @@ Todos los `POST`/`PATCH` de `AttributeEngineModule` requieren rol `ADMIN`, igual
 
 **Deliberadamente afuera de este módulo** la EJECUCIÓN del flujo en una sesión de cotización concreta (`FPInstanceFlow`, `FGetNextFlowStep`, `TFlowStepInstance`, el templating real `replace('#', vDesShort)`) — esto es solo la configuración; ejecutarlo depende de que `underwriting-service` tenga el flujo real de cotización, que todavía no existe.
 
-El resto del alcance de este servicio (i18n, setup) sigue sin implementar.
+### `CommonCatalogsModule` — catálogos comunes
+
+Ocho catálogos simples con `CatalogCrudService` genérico (`GET`, `GET /:id`, `POST` `ADMIN`, `PATCH /:id` `ADMIN`, `PATCH /:id/state` `ADMIN`): `GET /languages`, `GET /genders`, `GET /marital-statuses`, `GET /professions`, `GET /business-activities`, `GET /identification-types`, `GET /relationships`, `GET /contact-classes`.
+
+Dos catálogos con lógica extra:
+- `GET /countries` — `SCountry`, con `CodDDI` e `IdeLanguage` (resuelto desde `codLanguage` en el body).
+- `GET /locations` — `SLocation`, escrito a mano (no `CatalogCrudService`) porque su unicidad real es compuesta (`CodLocation`+`IdeCountry`, no `CodLocation` solo) y tiene jerarquía propia (`codLocationParent`).
+
+### `I18nModule` — `STextContent` / `STranslator`
+
+Confirmado por grep sobre las funciones PL/pgSQL reales (no existe ninguna función de negocio para traducción, ni `Translat*` ni `GetText*` propias — solo el `pg_catalog.translate` nativo de Postgres) que esto es CRUD puro, sin algoritmo que replicar.
+
+- `GET/POST /text-content` — `STextContent`, el "grupo de traducción" referenciado por ~60 tablas vía su `IdeTextContent` opcional.
+- `GET/POST/PATCH /translations` — `STranslator`, una traducción puntual a un idioma. Único real por (`IdeTextContent`, `IdeLanguage`) — se valida antes de insertar.
+
+### `SetupModule` — configuración del árbol de navegación
+
+Incluye el único módulo de este servicio con una función PL/pgSQL de LECTURA real confirmada y migrada línea por línea: `FGetSiteMap` (idéntica en los esquemas `ag2ars`/`entity`/`temporal`; `ag2servicio.FGetSiteMap` es un sistema legado no relacionado, con tablas `ARS_APLICACION_MENU*` propias, descartado). El algoritmo real: árbol de 3 niveles de `SSiteMap` (raíz = `IdeSiteMapParent IS NULL`), filtrado por `SSiteMapRole`/`SApplicationRole` contra uno o más códigos de rol (separados por coma), ordenado por `NumOrder` ascendente por nivel. La función original usa SQL dinámico sin parametrizar para la lista de roles (riesgo de inyección, ya señalado en la Fase 0) — acá se reemplazó por consultas Prisma parametrizadas.
+
+**Desviación deliberada, con visto bueno explícito del usuario** (ver `docs/02-roadmap.md`): la función original NO tiene `DISTINCT`, así que un usuario con varios roles que comparten acceso al mismo ítem lo recibe duplicado. Acá se deduplica (consecuencia natural de consultar `SSiteMap` directo vía Prisma, sin código extra) porque el árbol de navegación no es lógica financiera/de negocio crítica como un cálculo de prima — a diferencia de esos casos, aquí sí se permitió corregir el defecto en vez de replicarlo tal cual.
+
+- `GET/POST/PATCH /applications` — `SApplication`, catálogo simple (`CatalogCrudService`).
+- `GET/POST/PATCH /application-roles` — `SApplicationRole`, catálogo simple con `codApplication` resuelto.
+- `GET/POST/PATCH /site-map` — `SSiteMap`, ítems del árbol (`CodSiteMap` es único global, sí usa `CatalogCrudService`), jerarquía propia vía `codSiteMapParent`.
+- `GET /site-map-menu?codApplicationRole=COD1,COD2` — el árbol de menú real ya filtrado y armado (equivalente a `FGetSiteMap`), de solo lectura.
+- `GET/POST /site-map-roles` (`PATCH /:id/state`, sin `update`) — `SSiteMapRole`, concesión rol→ítem de menú. Único real por (`IdeSiteMap`, `IdeApplicationRole`) — se valida antes de insertar. Sin `update` porque es una concesión de acceso: se otorga o se retira, no se edita.
+
+Todos los `POST`/`PATCH` de `CommonCatalogsModule`, `I18nModule` y `SetupModule` requieren rol `ADMIN`, igual que `FieldCatalogModule`.
+
+El resto del alcance original de este servicio ya está cubierto por los tres módulos de arriba más `FieldCatalogModule`/`AttributeEngineModule`.
 
 ## Cómo correrlo
 
