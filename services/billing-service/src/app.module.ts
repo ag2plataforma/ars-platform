@@ -4,11 +4,13 @@ import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '@ars-platform/database';
 import { AuthModule } from '@ars-platform/shared-common';
 import { HealthController } from './health/health.controller';
+import { BillingModule } from './billing/billing.module';
 
 /**
- * Scaffold minimo, misma plantilla que product-rating-service/iam-service
- * (ver README.md de este servicio para su alcance funcional y
- * docs/02-roadmap.md para cuando le toque su migracion real, Fase 2).
+ * Primer módulo de negocio real: BillingModule (solo lectura sobre
+ * recibos/TReceipt y períodos de facturación/TContractBilling -- ver su
+ * comentario de cabecera y docs/02-roadmap.md para el detalle completo de
+ * la decisión de alcance).
  */
 @Module({
   imports: [
@@ -21,6 +23,7 @@ import { HealthController } from './health/health.controller';
     }),
     PrismaModule,
     AuthModule, // guard JWT global — mismo JWT_SECRET que iam-service, este servicio solo VERIFICA tokens
+    BillingModule,
   ],
   controllers: [HealthController],
 })

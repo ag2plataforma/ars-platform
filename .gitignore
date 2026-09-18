@@ -29,3 +29,10 @@ coverage/
 # Misc
 .turbo/
 .cache/
+
+# Claves / credenciales (nunca deben vivir en el repo)
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+oci_retry*
