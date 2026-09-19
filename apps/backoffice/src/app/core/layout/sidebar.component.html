@@ -1,0 +1,21 @@
+<nav class="flex flex-col gap-1 overflow-y-auto px-3 py-4">
+  <a
+    routerLink="/dashboard"
+    routerLinkActive="bg-slate-800 text-white"
+    class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-300 transition-colors hover:bg-slate-800 hover:text-white"
+  >
+    <i class="pi pi-home text-base"></i>
+    <span>Inicio</span>
+  </a>
+
+  @for (item of items(); track item.Orden + item.Titulo) {
+    <app-sidebar-nav-item [node]="item" />
+  }
+
+  @if (!loading() && items().length === 0) {
+    <p class="px-3 pt-4 text-xs leading-relaxed text-slate-500">
+      Todavía no hay secciones configuradas en el menú (SApplicationRole / SSiteMap). Van a aparecer acá en
+      cuanto se den de alta desde Catálogos.
+    </p>
+  }
+</nav>

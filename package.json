@@ -5,7 +5,8 @@
   "description": "ARS Platform - core de seguros modernizado, con motor de impacto social. Monorepo de servicios NestJS.",
   "workspaces": [
     "packages/*",
-    "services/*"
+    "services/*",
+    "apps/*"
   ],
   "engines": {
     "node": ">=20 <25"
