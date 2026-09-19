@@ -61,8 +61,9 @@ identidad visual nueva, la estructura de la app) no cambia en nada.
   (`sidebar-nav-item.component.ts`).
 - Dashboard placeholder (`features/dashboard`).
 
-**Verificado en pantalla por el usuario**: login real, entrada al
-dashboard -- funciona end-to-end.
+**Verificado en pantalla por el usuario, de punta a punta**: `npm install`,
+login real, entrada al dashboard, y confirmado que el cartel de licencia
+de PrimeNG ya no aparece (bajamos a v21 justamente por eso, ver arriba).
 
 **Limitación conocida, no un bug**: `SApplicationRole`/`SSiteMap`/
 `SSiteMapRole` todavía no tienen datos reales cargados en la base (nunca se
