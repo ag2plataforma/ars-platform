@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
@@ -13,6 +13,10 @@ import { AuthService } from '../../../core/auth/auth.service';
   templateUrl: './login.component.html',
 })
 export class LoginComponent {
+  private readonly fb = inject(FormBuilder);
+  private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+
   readonly step = signal<'credentials' | 'twoFactor'>('credentials');
   readonly loading = signal(false);
   readonly errorMessage = signal<string | null>(null);
@@ -27,12 +31,6 @@ export class LoginComponent {
   readonly codeForm = this.fb.nonNullable.group({
     code: ['', Validators.required],
   });
-
-  constructor(
-    private readonly fb: FormBuilder,
-    private readonly auth: AuthService,
-    private readonly router: Router,
-  ) {}
 
   async submitCredentials(): Promise<void> {
     if (this.credentialsForm.invalid) return;
