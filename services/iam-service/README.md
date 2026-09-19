@@ -28,12 +28,18 @@ Este servicio es la **plantilla de referencia** para el resto de servicios del m
   - `GET /state-machine/initial/:codEntity` — equivalente a `FGetState('INITIAL', codEntity, null, null)`.
   - `GET /state-machine/next/:codEntity/:currentStateId/:operativeCode` — equivalente a `FGetState('NEXT', codEntity, currentStateId, operativeCode)`.
 
-**Diferido a una fase posterior:** doble factor de autenticación (v1 tampoco lo tenía implementado — decisión explícita para no sumar alcance ahora: secretos TOTP, QR de enrolamiento, segundo paso en el login y códigos de respaldo son una pieza grande en sí misma).
+- **Doble factor de autenticación (TOTP), opcional y autoservicio.** Feature nueva de cero -- v1 tampoco la tenía, no hay comportamiento legado que replicar (ver `docs/02-roadmap.md`). Cualquier usuario lo activa/desactiva sobre su propia cuenta; no cambia nada para quien no lo activa.
+  - `POST /auth/2fa/enroll` (autenticado) — genera un secreto nuevo (queda "pendiente" hasta confirmarlo) y devuelve `{ secret, otpauthUrl }` para escanear con Google Authenticator/Authy/etc. (o tipear el secreto a mano).
+  - `POST /auth/2fa/confirm` (autenticado) — `{ code }`, el código de 6 dígitos que ya generó la app. Si es válido, activa 2FA y devuelve `{ backupCodes: [...10 códigos] }` -- se muestran una sola vez, después solo existe su hash.
+  - `POST /auth/2fa/disable` (autenticado) — `{ password, code }`. Exige reingresar la contraseña Y un código válido (TOTP o uno de respaldo) -- estar logueado no alcanza para apagarlo.
+  - `POST /auth/login` (`@Public()`) cambia de forma cuando el usuario tiene 2FA activo: en vez de `{ token, ... }` devuelve `{ requiresTwoFactor: true, twoFactorToken }` (vida corta, 5 minutos).
+  - `POST /auth/2fa/verify` (`@Public()`) — `{ twoFactorToken, code }` (TOTP o de respaldo) → `{ token, codUser, userData }`, el mismo shape que un login normal sin 2FA.
+  - TOTP (RFC 6238) implementado a mano con el módulo `crypto` de Node -- sin librería nueva (`otplib` o similar), verificado línea por línea contra los vectores de prueba oficiales de la RFC. El secreto se guarda en texto plano en `TUserTwoFactor` (no se puede hashear, hace falta el valor original para generar/comparar códigos) -- decisión explícita del usuario para no sumar gestión de claves de cifrado ahora, ver `docs/02-roadmap.md`. Los códigos de respaldo sí van hasheados (bcrypt, igual que `TUserCredential`). Acceso a `TUserTwoFactor`/`TUserBackupCode` vía `$queryRaw`/`$executeRaw` en vez del cliente Prisma tipado -- ver el doc comment de `TwoFactorService` para el motivo.
+  - **Sin cobertura todavía**: recuperación de cuenta si el usuario pierde el celular Y los 10 códigos de respaldo a la vez (escenario de soporte manual, fuera de alcance de esta primera versión).
 
 Pendiente para Fase 2:
 
-- Equivalente a `FGetSiteMap` (árbol de menú por rol, vía `SApplicationRole`/`SSiteMap`/`SSiteMapRole`) — hoy en v1 usa SQL dinámico, aquí se reimplementa como query estructurada.
-- Doble factor de autenticación (ver nota arriba).
+- (nada pendiente específico de este servicio por ahora -- lo que quedaba, el equivalente a `FGetSiteMap`, se implementó del lado de `reference-data-service`, que es donde viven `SApplicationRole`/`SSiteMap`/`SSiteMapRole` -- ver su README).
 
 ## Cómo correrlo
 
@@ -69,4 +75,32 @@ curl -X POST http://localhost:3001/auth/forgot-password \
 curl -X POST http://localhost:3001/auth/reset-password \
   -H "Content-Type: application/json" \
   -d '{"token":"<el del link del correo>","newPassword":"<nueva>"}'
+
+# 5. activar 2FA sobre la propia cuenta
+curl -X POST http://localhost:3001/auth/2fa/enroll \
+  -H "Authorization: Bearer <token>"
+# devuelve { "secret": "...", "otpauthUrl": "otpauth://..." } -- escanealo con
+# Google Authenticator/Authy, o usa "npm run db:totp-code -- <secret>" para
+# generar el codigo de 6 digitos sin celular (solo para probar)
+
+curl -X POST http://localhost:3001/auth/2fa/confirm \
+  -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \
+  -d '{"code":"<el que muestre la app o el script>"}'
+# devuelve { "backupCodes": [...10 codigos] } -- se muestran una sola vez
+
+# 6. a partir de aca, el login normal ya no alcanza:
+curl -X POST http://localhost:3001/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"userName":"admin","password":"<la actual>"}'
+# devuelve { "requiresTwoFactor": true, "twoFactorToken": "..." } en vez del token
+
+curl -X POST http://localhost:3001/auth/2fa/verify \
+  -H "Content-Type: application/json" \
+  -d '{"twoFactorToken":"<el de arriba>","code":"<TOTP o uno de los backupCodes>"}'
+# devuelve { "token", "codUser", "userData" } -- igual que un login sin 2FA
+
+# 7. apagar 2FA (exige contraseña + un codigo valido, no solo estar logueado)
+curl -X POST http://localhost:3001/auth/2fa/disable \
+  -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \
+  -d '{"password":"<actual>","code":"<TOTP o uno de los backupCodes>"}'
 ```

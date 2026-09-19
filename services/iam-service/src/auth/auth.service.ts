@@ -1,9 +1,10 @@
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { PrismaService, TUserCredential } from '@ars-platform/database';
+import { PrismaService, TRol, TUser, TUserCredential } from '@ars-platform/database';
 import { EMAIL_SENDER, EmailSender, JwtPayload } from '@ars-platform/shared-common';
 import { compare, hash } from 'bcryptjs';
+import { TwoFactorService } from './two-factor/two-factor.service';
 
 export interface LoginResult {
   token: string;
@@ -11,10 +12,24 @@ export interface LoginResult {
   userData: unknown;
 }
 
+/** `login()` devuelve esto en vez del token cuando el usuario tiene 2FA activo -- ver `verifyTwoFactor`. */
+export interface TwoFactorRequiredResult {
+  requiresTwoFactor: true;
+  twoFactorToken: string;
+}
+
 interface PasswordResetPayload {
   sub: string;
   cid: string;
   purpose: 'password-reset';
+}
+
+/** Token de vida corta emitido tras validar usuario+contraseña, antes del segundo paso (código 2FA). */
+interface TwoFactorPendingPayload {
+  sub: string;
+  purpose: 'two-factor-pending';
+  /** `extendedTokenDuration` original del login, para que el token final respete lo que pidió el cliente. */
+  ext: boolean;
 }
 
 /**
@@ -47,13 +62,14 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     @Inject(EMAIL_SENDER) private readonly emailSender: EmailSender,
+    private readonly twoFactor: TwoFactorService,
   ) {}
 
   async login(
     userName: string,
     password: string,
     extendedTokenDuration = false,
-  ): Promise<LoginResult> {
+  ): Promise<LoginResult | TwoFactorRequiredResult> {
     const invalidCredentials = 'Usuario o contraseña incorrectos';
 
     const user = await this.prisma.tUser.findFirst({
@@ -74,6 +90,58 @@ export class AuthService {
       throw new UnauthorizedException(invalidCredentials);
     }
 
+    if (await this.twoFactor.isEnabled(user.IdeUser)) {
+      const pendingPayload: TwoFactorPendingPayload = {
+        sub: user.IdeUser,
+        purpose: 'two-factor-pending',
+        ext: extendedTokenDuration,
+      };
+      // Vida corta a propósito: solo alcanza para completar el segundo paso.
+      const twoFactorToken = await this.jwt.signAsync(pendingPayload, { expiresIn: '5m' });
+      return { requiresTwoFactor: true, twoFactorToken };
+    }
+
+    return this.issueToken(user, extendedTokenDuration);
+  }
+
+  /**
+   * Segundo paso del login cuando `login()` devolvió `requiresTwoFactor`.
+   * Acepta un código TOTP de 6 dígitos o un código de respaldo de un solo
+   * uso (`TwoFactorService.verifyCode` prueba ambos).
+   */
+  async verifyTwoFactor(twoFactorToken: string, code: string): Promise<LoginResult> {
+    const invalidToken = 'El token de verificación es inválido o expiró';
+
+    let payload: TwoFactorPendingPayload;
+    try {
+      payload = await this.jwt.verifyAsync<TwoFactorPendingPayload>(twoFactorToken);
+    } catch {
+      throw new UnauthorizedException(invalidToken);
+    }
+    if (payload.purpose !== 'two-factor-pending') {
+      throw new UnauthorizedException(invalidToken);
+    }
+
+    const validCode = await this.twoFactor.verifyCode(payload.sub, code);
+    if (!validCode) {
+      throw new UnauthorizedException('Código de verificación incorrecto');
+    }
+
+    const user = await this.prisma.tUser.findUnique({
+      where: { IdeUser: payload.sub },
+      include: { TRol: true },
+    });
+    if (!user) {
+      throw new UnauthorizedException(invalidToken);
+    }
+
+    return this.issueToken(user, payload.ext);
+  }
+
+  private async issueToken(
+    user: TUser & { TRol: TRol },
+    extendedTokenDuration: boolean,
+  ): Promise<LoginResult> {
     const userData = user.UserData as { lang?: string } | null;
 
     const payload: JwtPayload = {
@@ -97,18 +165,25 @@ export class AuthService {
     currentPassword: string,
     newPassword: string,
   ): Promise<{ ok: true }> {
+    const credential = await this.assertPasswordMatches(userId, currentPassword);
+    await this.createCredential(userId, newPassword, credential.IdeState, 'self-service');
+    return { ok: true };
+  }
+
+  /**
+   * Reutilizado por `changePassword` y por `AuthController.disableTwoFactor`
+   * (apagar 2FA exige reingresar la contraseña, no solo estar logueado).
+   */
+  async assertPasswordMatches(userId: string, password: string): Promise<TUserCredential> {
     const credential = await this.latestCredential(userId);
     if (!credential) {
       throw new UnauthorizedException('No hay credenciales registradas para este usuario');
     }
-
-    const matches = await compare(currentPassword, credential.Credential);
+    const matches = await compare(password, credential.Credential);
     if (!matches) {
       throw new UnauthorizedException('La contraseña actual no es correcta');
     }
-
-    await this.createCredential(userId, newPassword, credential.IdeState, 'self-service');
-    return { ok: true };
+    return credential;
   }
 
   /**

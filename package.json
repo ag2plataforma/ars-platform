@@ -35,6 +35,7 @@
     "db:seed-cancelcontract-fixtures": "node packages/database/scripts/seed-cancelcontract-fixtures.js",
     "db:verify-contract-cascade": "node packages/database/scripts/verify-contract-cascade.js",
     "db:find-legacy-function": "node packages/database/scripts/find-legacy-function.js",
+    "db:totp-code": "node packages/database/scripts/generate-totp-code.js",
     "start:party": "npm run build:libs && npm run build --workspace=services/party-service && node services/party-service/dist/main.js",
     "start:party:watch": "npm run build:libs && npm run start:dev --workspace=services/party-service",
     "start:reference-data": "npm run build:libs && npm run build --workspace=services/reference-data-service && node services/reference-data-service/dist/main.js",
