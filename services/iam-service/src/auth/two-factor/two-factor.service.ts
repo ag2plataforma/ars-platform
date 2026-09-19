@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { PrismaService } from '@ars-platform/database';
+import { PrismaService, TUserBackupCode, TUserTwoFactor } from '@ars-platform/database';
 import { compare, hash } from 'bcryptjs';
 import {
   buildOtpauthUrl,
@@ -7,18 +7,6 @@ import {
   generateTotpSecret,
   verifyTotpCode,
 } from './totp.util';
-
-interface TwoFactorRow {
-  IdeUserTwoFactor: string;
-  IdeUser: string;
-  Secret: string;
-  IndEnabled: boolean;
-}
-
-interface BackupCodeRow {
-  IdeUserBackupCode: string;
-  CodeHash: string;
-}
 
 const BACKUP_CODE_COUNT = 10;
 const SELF_SERVICE_ACTOR = 'self-service'; // mismo literal que AuthService.changePassword
@@ -29,28 +17,20 @@ const SELF_SERVICE_ACTOR = 'self-service'; // mismo literal que AuthService.chan
  * Opcional, autoservicio: cualquier usuario lo activa/desactiva sobre su
  * propia cuenta, no cambia nada para quien no lo activa.
  *
- * Accede a `TUserTwoFactor`/`TUserBackupCode` con `$queryRaw`/`$executeRaw`
- * en vez del cliente Prisma tipado (como el resto del proyecto) porque
- * regenerar el cliente (`prisma generate`) necesita descargar el motor de
- * consultas desde internet, bloqueado por la política de red de este
- * entorno de trabajo ahora mismo -- mismo patrón ya usado para los
- * correlativos de cotización/contrato (`$queryRaw` con `nextval`, ver
- * `underwriting-service`). El SQL queda parametrizado (los `${...}`
- * interpolados en el template de Prisma se bindean como parámetros
- * reales, no concatenación de strings) -- mismo nivel de seguridad que
- * el cliente tipado.
+ * Usa el cliente Prisma tipado (`this.prisma.tUserTwoFactor` /
+ * `tUserBackupCode`), igual que el resto del proyecto. Nota histórica:
+ * durante el desarrollo inicial esto se implementó con `$queryRaw` /
+ * `$executeRaw` porque el entorno de trabajo de ese momento no podía
+ * regenerar el cliente Prisma (descarga del motor de consultas bloqueada
+ * por política de red); una vez el usuario corrió `prisma generate` en su
+ * propia máquina se refactorizó al cliente tipado.
  */
 @Injectable()
 export class TwoFactorService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findByUser(userId: string): Promise<TwoFactorRow | null> {
-    const rows = await this.prisma.$queryRaw<TwoFactorRow[]>`
-      SELECT "IdeUserTwoFactor", "IdeUser", "Secret", "IndEnabled"
-      FROM ars_platform."TUserTwoFactor"
-      WHERE "IdeUser" = ${userId}::uuid
-    `;
-    return rows[0] ?? null;
+  findByUser(userId: string): Promise<TUserTwoFactor | null> {
+    return this.prisma.tUserTwoFactor.findUnique({ where: { IdeUser: userId } });
   }
 
   async isEnabled(userId: string): Promise<boolean> {
@@ -69,23 +49,24 @@ export class TwoFactorService {
   ): Promise<{ secret: string; otpauthUrl: string }> {
     const secret = generateTotpSecret();
     const now = new Date();
-    const existing = await this.findByUser(userId);
-    if (existing) {
-      await this.prisma.$executeRaw`
-        UPDATE ars_platform."TUserTwoFactor"
-        SET "Secret" = ${secret}, "IndEnabled" = false,
-            "UsrModification" = ${SELF_SERVICE_ACTOR}, "TstModification" = ${now}
-        WHERE "IdeUser" = ${userId}::uuid
-      `;
-    } else {
-      await this.prisma.$executeRaw`
-        INSERT INTO ars_platform."TUserTwoFactor"
-          ("IdeUserTwoFactor", "IdeUser", "Secret", "IndEnabled",
-           "UsrCreation", "TstCreation", "UsrModification", "TstModification")
-        VALUES (gen_random_uuid(), ${userId}::uuid, ${secret}, false,
-                ${SELF_SERVICE_ACTOR}, ${now}, ${SELF_SERVICE_ACTOR}, ${now})
-      `;
-    }
+    await this.prisma.tUserTwoFactor.upsert({
+      where: { IdeUser: userId },
+      update: {
+        Secret: secret,
+        IndEnabled: false,
+        UsrModification: SELF_SERVICE_ACTOR,
+        TstModification: now,
+      },
+      create: {
+        IdeUser: userId,
+        Secret: secret,
+        IndEnabled: false,
+        UsrCreation: SELF_SERVICE_ACTOR,
+        TstCreation: now,
+        UsrModification: SELF_SERVICE_ACTOR,
+        TstModification: now,
+      },
+    });
     return { secret, otpauthUrl: buildOtpauthUrl(secret, accountName) };
   }
 
@@ -103,23 +84,21 @@ export class TwoFactorService {
     if (!verifyTotpCode(row.Secret, code)) {
       throw new UnauthorizedException('Código de verificación incorrecto');
     }
-    const now = new Date();
-    await this.prisma.$executeRaw`
-      UPDATE ars_platform."TUserTwoFactor"
-      SET "IndEnabled" = true, "UsrModification" = ${SELF_SERVICE_ACTOR}, "TstModification" = ${now}
-      WHERE "IdeUser" = ${userId}::uuid
-    `;
+    await this.prisma.tUserTwoFactor.update({
+      where: { IdeUser: userId },
+      data: {
+        IndEnabled: true,
+        UsrModification: SELF_SERVICE_ACTOR,
+        TstModification: new Date(),
+      },
+    });
     return this.regenerateBackupCodes(userId);
   }
 
   /** Apaga 2FA para este usuario y borra sus códigos de respaldo. El controller ya validó contraseña + código antes de llamar acá. */
   async disable(userId: string): Promise<void> {
-    await this.prisma.$executeRaw`
-      DELETE FROM ars_platform."TUserTwoFactor" WHERE "IdeUser" = ${userId}::uuid
-    `;
-    await this.prisma.$executeRaw`
-      DELETE FROM ars_platform."TUserBackupCode" WHERE "IdeUser" = ${userId}::uuid
-    `;
+    await this.prisma.tUserTwoFactor.deleteMany({ where: { IdeUser: userId } });
+    await this.prisma.tUserBackupCode.deleteMany({ where: { IdeUser: userId } });
   }
 
   /** Código TOTP válido, o código de respaldo sin usar (lo consume si matchea). */
@@ -134,36 +113,36 @@ export class TwoFactorService {
   }
 
   private async regenerateBackupCodes(userId: string): Promise<string[]> {
-    await this.prisma.$executeRaw`
-      DELETE FROM ars_platform."TUserBackupCode" WHERE "IdeUser" = ${userId}::uuid
-    `;
+    await this.prisma.tUserBackupCode.deleteMany({ where: { IdeUser: userId } });
     const now = new Date();
     const codes = Array.from({ length: BACKUP_CODE_COUNT }, () => generateBackupCode());
-    for (const code of codes) {
-      const codeHash = await hash(code, 10);
-      await this.prisma.$executeRaw`
-        INSERT INTO ars_platform."TUserBackupCode"
-          ("IdeUserBackupCode", "IdeUser", "CodeHash", "IndUsed",
-           "UsrCreation", "TstCreation", "UsrModification", "TstModification")
-        VALUES (gen_random_uuid(), ${userId}::uuid, ${codeHash}, false,
-                ${SELF_SERVICE_ACTOR}, ${now}, ${SELF_SERVICE_ACTOR}, ${now})
-      `;
-    }
+    const hashes = await Promise.all(codes.map((code) => hash(code, 10)));
+    await this.prisma.tUserBackupCode.createMany({
+      data: hashes.map((codeHash) => ({
+        IdeUser: userId,
+        CodeHash: codeHash,
+        IndUsed: false,
+        UsrCreation: SELF_SERVICE_ACTOR,
+        TstCreation: now,
+        UsrModification: SELF_SERVICE_ACTOR,
+        TstModification: now,
+      })),
+    });
     return codes;
   }
 
   private async consumeBackupCode(userId: string, code: string): Promise<boolean> {
-    const rows = await this.prisma.$queryRaw<BackupCodeRow[]>`
-      SELECT "IdeUserBackupCode", "CodeHash" FROM ars_platform."TUserBackupCode"
-      WHERE "IdeUser" = ${userId}::uuid AND "IndUsed" = false
-    `;
+    const rows: Pick<TUserBackupCode, 'IdeUserBackupCode' | 'CodeHash'>[] =
+      await this.prisma.tUserBackupCode.findMany({
+        where: { IdeUser: userId, IndUsed: false },
+        select: { IdeUserBackupCode: true, CodeHash: true },
+      });
     for (const row of rows) {
       if (await compare(code, row.CodeHash)) {
-        await this.prisma.$executeRaw`
-          UPDATE ars_platform."TUserBackupCode"
-          SET "IndUsed" = true, "TstModification" = ${new Date()}
-          WHERE "IdeUserBackupCode" = ${row.IdeUserBackupCode}::uuid
-        `;
+        await this.prisma.tUserBackupCode.update({
+          where: { IdeUserBackupCode: row.IdeUserBackupCode },
+          data: { IndUsed: true, TstModification: new Date() },
+        });
         return true;
       }
     }
