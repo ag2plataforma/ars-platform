@@ -3266,14 +3266,12 @@ model TUserCredential {
   @@index([IdeUser], map: "IX_TUserCredential_TUser")
 }
 
-/**
- * 2FA (TOTP) -- feature nueva de cero, v1 no tenia esto (ver
- * db/migrations/002_two_factor_auth.sql). Uno por usuario (`@unique` en
- * IdeUser). `IndEnabled` es un booleano simple a proposito: no es una
- * entidad de negocio con transiciones via SStateRule, es una bandera
- * interna de "ya confirmo el enrolamiento". `Secret` queda en texto
- * plano -- decision explicita del usuario, ver docs/02-roadmap.md.
- */
+// 2FA (TOTP) -- feature nueva de cero, v1 no tenia esto (ver
+// db/migrations/002_two_factor_auth.sql). Uno por usuario (@unique en
+// IdeUser). IndEnabled es un booleano simple a proposito: no es una
+// entidad de negocio con transiciones via SStateRule, es una bandera
+// interna de "ya confirmo el enrolamiento". Secret queda en texto
+// plano -- decision explicita del usuario, ver docs/02-roadmap.md.
 model TUserTwoFactor {
   IdeUserTwoFactor String   @id(map: "PK_TUserTwoFactor") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   IdeUser          String   @unique(map: "UK_TUserTwoFactor_01") @db.Uuid
@@ -3288,11 +3286,9 @@ model TUserTwoFactor {
   @@index([IdeUser], map: "IX_TUserTwoFactor_TUser")
 }
 
-/**
- * Codigos de respaldo de un solo uso para 2FA -- se guardan hasheados
- * (bcrypt, igual que TUserCredential.Credential) porque solo hace falta
- * compararlos, nunca recuperarlos. `IndUsed` marca el consumo.
- */
+// Codigos de respaldo de un solo uso para 2FA -- se guardan hasheados
+// (bcrypt, igual que TUserCredential.Credential) porque solo hace falta
+// compararlos, nunca recuperarlos. IndUsed marca el consumo.
 model TUserBackupCode {
   IdeUserBackupCode String   @id(map: "PK_TUserBackupCode") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   IdeUser           String   @db.Uuid
