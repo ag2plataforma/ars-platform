@@ -28,18 +28,17 @@
           </div>
 
           @if (errorMessage()) {
-            <p-message severity="error">{{ errorMessage() }}</p-message>
+            <p-message severity="error" [text]="errorMessage()!" />
           }
 
           <button
             pButton
             type="submit"
+            label="Ingresar"
             class="mt-2 w-full justify-center"
             [loading]="loading()"
             [disabled]="credentialsForm.invalid"
-          >
-            Ingresar
-          </button>
+          ></button>
         </form>
       } @else {
         <h1 class="mb-1 text-xl font-semibold text-slate-900">Verificación en dos pasos</h1>
@@ -54,28 +53,26 @@
           </div>
 
           @if (errorMessage()) {
-            <p-message severity="error">{{ errorMessage() }}</p-message>
+            <p-message severity="error" [text]="errorMessage()!" />
           }
 
           <button
             pButton
             type="submit"
+            label="Verificar"
             class="mt-2 w-full justify-center"
             [loading]="loading()"
             [disabled]="codeForm.invalid"
-          >
-            Verificar
-          </button>
+          ></button>
           <button
             pButton
             type="button"
+            label="Volver"
             severity="secondary"
             [text]="true"
             class="w-full justify-center"
             (click)="backToCredentials()"
-          >
-            Volver
-          </button>
+          ></button>
         </form>
       }
     </div>
