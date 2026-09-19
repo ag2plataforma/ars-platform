@@ -55,9 +55,18 @@ trabajo donde se escribió no tiene salida a internet hacia el registro de
 npm (misma restricción ya documentada para `prisma generate`, ver
 `db/README.md`). Desde tu propia terminal (con internet normal):
 
+**Angular 22 exige Node 22.22.3+ / 24.15.0+ / 26+** -- más nuevo que el
+Node 20 que pide el `.nvmrc` de la raíz del monorepo (ese es para el
+backend, no lo tocamos). Como tenés `nvm` instalado, es un solo comando
+extra la primera vez:
+
 ```bash
 # Desde la raíz del monorepo (instala TODO, backend + este frontend, en un solo paso)
 npm install
+
+# Node más nuevo, solo para correr este frontend (no afecta al backend)
+nvm install 24
+nvm use 24
 
 # Levantar el backoffice en modo desarrollo
 npm run start --workspace=apps/backoffice
@@ -67,7 +76,12 @@ npm run start --workspace=apps/backoffice
 Se abre en `http://localhost:4200`. Antes necesitás el `gateway` y
 `iam-service` corriendo (`npm run start:gateway`, `npm run start:iam`, o
 sus variantes `:watch`) -- `src/environments/environment.ts` apunta a
-`http://localhost:3000` (el gateway) en desarrollo.
+`http://localhost:3000` (el gateway) en desarrollo. Esos dos comandos sí
+podés seguir corriéndolos con Node 20 (`nvm use` en la raíz vuelve a
+tomar el `.nvmrc` de ahí) -- los binarios nativos que ya instaló `npm
+install` (`lightningcss`, `esbuild`) no dependen de la versión exacta de
+Node, así que no hace falta reinstalar nada al cambiar de versión con
+`nvm`.
 
 Si `npm install` tira un error de dependencias (versión de Angular/PrimeNG/
 TypeScript que no calzan entre sí -- elegidas por versión más reciente
