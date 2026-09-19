@@ -2,15 +2,18 @@
   <span class="text-sm font-medium text-slate-500">Backoffice</span>
   <div class="flex items-center gap-4">
     <span class="text-sm text-slate-600">{{ userCode() }}</span>
-    <p-avatar [label]="userInitial()" shape="circle" styleClass="bg-slate-900 text-white" />
+    <p-avatar [label]="userInitial()" shape="circle" class="bg-slate-900 text-white" />
     <button
       pButton
-      icon="pi pi-sign-out"
+      type="button"
       [text]="true"
+      [iconOnly]="true"
       severity="secondary"
       pTooltip="Cerrar sesión"
       tooltipPosition="bottom"
       (click)="logout()"
-    ></button>
+    >
+      <i class="pi pi-sign-out"></i>
+    </button>
   </div>
 </header>

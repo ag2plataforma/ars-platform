@@ -6,7 +6,8 @@
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
-    "watch": "ng build --watch --configuration development"
+    "watch": "ng build --watch --configuration development",
+    "type-check": "ngc -p tsconfig.app.json --noEmit"
   },
   "dependencies": {
     "@angular/animations": "^22.0.0",
