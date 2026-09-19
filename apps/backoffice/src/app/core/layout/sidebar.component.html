@@ -17,6 +17,15 @@
     <span>Catálogos</span>
   </a>
 
+  <a
+    routerLink="/ubicaciones"
+    routerLinkActive="bg-slate-800 text-white"
+    class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-300 transition-colors hover:bg-slate-800 hover:text-white"
+  >
+    <i class="pi pi-map-marker text-base"></i>
+    <span>Ubicaciones</span>
+  </a>
+
   @for (item of items(); track item.Orden + item.Titulo) {
     <app-sidebar-nav-item [node]="item" />
   }

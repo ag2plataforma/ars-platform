@@ -1,0 +1,144 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex flex-col gap-4">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-lg font-semibold text-slate-900">Ubicaciones</h1>
+      <p class="text-sm text-slate-500">Divisiones geográficas, jerárquicas y por país.</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <p-select
+        [options]="countries()"
+        optionLabel="DesCountry"
+        optionValue="CodCountry"
+        [ngModel]="countryFilter()"
+        (ngModelChange)="onCountryFilterChange($event)"
+        [showClear]="true"
+        placeholder="Todos los países"
+        styleClass="w-56"
+      />
+      <button pButton type="button" icon="pi pi-plus" label="Nueva ubicación" (click)="openCreate()"></button>
+    </div>
+  </div>
+
+  <p-breadcrumb [model]="breadcrumbModel" [home]="home" />
+
+  <p-table
+    [value]="rows()"
+    [loading]="loading()"
+    dataKey="IdeLocation"
+    [paginator]="true"
+    [rows]="10"
+    [rowsPerPageOptions]="[10, 25, 50]"
+    styleClass="p-datatable-sm"
+  >
+    <ng-template #header>
+      <tr>
+        <th>Código</th>
+        <th>Descripción</th>
+        <th>País</th>
+        <th>Estado</th>
+        <th class="w-44">Acciones</th>
+      </tr>
+    </ng-template>
+    <ng-template #body let-row>
+      <tr>
+        <td>{{ row.CodLocation }}</td>
+        <td>{{ row.DesLocation }}</td>
+        <td>{{ countryName(row) }}</td>
+        <td>
+          <p-tag
+            [value]="isActive(row) ? 'Activo' : 'Inactivo'"
+            [severity]="isActive(row) ? 'success' : 'danger'"
+          />
+        </td>
+        <td>
+          <div class="flex gap-1">
+            <button
+              pButton
+              type="button"
+              icon="pi pi-folder-open"
+              [text]="true"
+              severity="secondary"
+              pTooltip="Ver hijos"
+              tooltipPosition="top"
+              (click)="drillInto(row)"
+            ></button>
+            <button
+              pButton
+              type="button"
+              icon="pi pi-pencil"
+              [text]="true"
+              severity="secondary"
+              pTooltip="Editar"
+              tooltipPosition="top"
+              (click)="openEdit(row)"
+            ></button>
+            <button
+              pButton
+              type="button"
+              [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'"
+              [text]="true"
+              [severity]="isActive(row) ? 'danger' : 'success'"
+              pTooltip="{{ isActive(row) ? 'Inactivar' : 'Activar' }}"
+              tooltipPosition="top"
+              (click)="toggleState(row)"
+            ></button>
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="5" class="text-center text-slate-500">No hay ubicaciones en este nivel todavía.</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-dialog
+  [header]="dialogMode() === 'create' ? 'Nueva ubicación' : 'Editar ubicación'"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  [style]="{ width: '28rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    @if (dialogMode() === 'create' && path().length) {
+      <p class="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">
+        Se va a crear dentro de: <strong>{{ path()[path().length - 1].des }}</strong>
+      </p>
+    }
+    <div class="flex flex-col gap-2">
+      <label for="cod" class="text-sm font-medium text-slate-700">Código</label>
+      <input pInputText id="cod" formControlName="cod" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label for="des" class="text-sm font-medium text-slate-700">Descripción</label>
+      <input pInputText id="des" formControlName="des" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">País</label>
+      @if (dialogMode() === 'create') {
+        <p-select
+          formControlName="codCountry"
+          [options]="countries()"
+          optionLabel="DesCountry"
+          optionValue="CodCountry"
+          [showClear]="true"
+          placeholder="Sin país"
+          styleClass="w-full"
+        />
+      } @else {
+        <input pInputText formControlName="codCountry" class="w-full" />
+        <p class="text-xs text-slate-500">El país no se puede cambiar una vez creada la ubicación.</p>
+      }
+    </div>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" label="Cancelar" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" label="Guardar"></button>
+    </div>
+  </form>
+</p-dialog>

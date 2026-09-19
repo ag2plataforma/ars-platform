@@ -81,6 +81,18 @@ identidad visual nueva, la estructura de la app) no cambia en nada.
   ya usaba `application-roles.service.ts` con `SApplication`), no rompe
   nada existente. Los códigos de estado usados son los mismos ya
   documentados en `iam-service` (`ACTIVO`/`INACTIVO`), no inventados acá.
+- **Ubicaciones** (`features/locations`) -- pantalla propia para
+  `SLocation` (no encaja en el componente genérico de Catálogos: unicidad
+  compuesta `CodLocation`+`IdeCountry`, jerarquía propia vía
+  `codLocationParent`). Navegación por breadcrumb: cada nivel pide solo
+  sus hijos directos (`GET /locations?codLocationParent=<cod o ''>`),
+  filtro que ya expone el backend -- no arma un árbol completo del lado
+  del cliente. Filtro opcional por país, alta/edición/activar-inactivar.
+  **Deliberadamente afuera todavía**: reasignar el país o mover una
+  ubicación a otro padre (el backend sí soporta lo segundo vía
+  `codLocationParent` en el update, pero armar un selector de "ubicación
+  padre" con búsqueda entre potencialmente miles de filas es una pantalla
+  aparte).
 
 **Verificado en pantalla por el usuario, de punta a punta**: `npm install`,
 login real, entrada al dashboard, y confirmado que el cartel de licencia
@@ -121,12 +133,6 @@ rápido.
 
 ## Qué sigue
 
-- **Ubicaciones (`SLocation`)**: deliberadamente afuera de la pantalla de
-  Catálogos actual -- jerárquico (`codLocationParent`) y con unicidad
-  compuesta (`CodLocation`+`IdeCountry`, no un código único global), no
-  encaja en el componente genérico de catálogo plano. Amerita una
-  pantalla propia (selector de país + árbol/lista de ubicaciones hijas),
-  fast-follow natural de este mismo módulo.
 - **Configuración de menú (`SetupModule`)**: `SApplication`/
   `SApplicationRole`/`SSiteMap`/`SSiteMapRole` -- cargar datos reales acá
   haría que el sidebar deje de mostrar el aviso de "sin secciones

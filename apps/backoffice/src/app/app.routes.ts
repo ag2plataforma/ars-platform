@@ -22,6 +22,11 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/catalogs/catalogs.component').then((m) => m.CatalogsComponent),
       },
+      {
+        path: 'ubicaciones',
+        loadComponent: () =>
+          import('./features/locations/locations.component').then((m) => m.LocationsComponent),
+      },
     ],
   },
   { path: '**', redirectTo: 'login' },
