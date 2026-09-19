@@ -10,6 +10,8 @@ import { UpdateGenderDto } from './dto/update-gender.dto';
  * propia) -- mismo patrón `CatalogCrudService` que los 8 catálogos
  * simples de `product-rating-service` (ver `docs/02-roadmap.md`).
  */
+const INCLUDE = { SState: true } as const;
+
 @Injectable()
 export class GendersService {
   private readonly crud: CatalogCrudService<SGender>;
@@ -24,6 +26,7 @@ export class GendersService {
       'DesGender',
       'IdeGender',
       'género',
+      INCLUDE,
     );
   }
 

@@ -10,6 +10,8 @@ import { UpdateContactClassDto } from './dto/update-contact-class.dto';
  * propia) -- mismo patrón `CatalogCrudService` que los 8 catálogos
  * simples de `product-rating-service` (ver `docs/02-roadmap.md`).
  */
+const INCLUDE = { SState: true } as const;
+
 @Injectable()
 export class ContactClassesService {
   private readonly crud: CatalogCrudService<SContactClass>;
@@ -24,6 +26,7 @@ export class ContactClassesService {
       'DesContactClass',
       'IdeContactClass',
       'clase de contacto',
+      INCLUDE,
     );
   }
 

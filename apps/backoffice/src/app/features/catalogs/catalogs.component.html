@@ -1,0 +1,140 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex h-full gap-6">
+  <!-- Menú de catálogos -->
+  <aside class="w-64 shrink-0">
+    <h1 class="mb-1 text-lg font-semibold text-slate-900">Catálogos</h1>
+    <p class="mb-4 text-sm text-slate-500">Catálogos comunes de referencia.</p>
+    <nav class="flex flex-col gap-0.5">
+      @for (catalog of catalogs; track catalog.key) {
+        <button
+          type="button"
+          (click)="selectCatalog(catalog)"
+          class="rounded-lg px-3 py-2 text-left text-sm transition-colors"
+          [class.bg-slate-900]="selected().key === catalog.key"
+          [class.text-white]="selected().key === catalog.key"
+          [class.text-slate-600]="selected().key !== catalog.key"
+          [class.hover:bg-slate-100]="selected().key !== catalog.key"
+        >
+          {{ catalog.label }}
+        </button>
+      }
+    </nav>
+  </aside>
+
+  <!-- Tabla del catálogo seleccionado -->
+  <section class="min-w-0 flex-1">
+    <div class="mb-4 flex items-center justify-between">
+      <h2 class="text-xl font-semibold text-slate-900">{{ selected().label }}</h2>
+      <button pButton type="button" icon="pi pi-plus" label="Nuevo" (click)="openCreate()"></button>
+    </div>
+
+    <p-table
+      [value]="rows()"
+      [loading]="loading()"
+      [dataKey]="selected().idField"
+      [paginator]="true"
+      [rows]="10"
+      [rowsPerPageOptions]="[10, 25, 50]"
+      styleClass="p-datatable-sm"
+    >
+      <ng-template #header>
+        <tr>
+          <th>Código</th>
+          <th>Descripción</th>
+          @for (field of selected().extraFields ?? []; track field.key) {
+            <th>{{ field.label }}</th>
+          }
+          <th>Estado</th>
+          <th class="w-32">Acciones</th>
+        </tr>
+      </ng-template>
+      <ng-template #body let-row>
+        <tr>
+          <td>{{ row[selected().codField] }}</td>
+          <td>{{ row[selected().desField] }}</td>
+          @for (field of selected().extraFields ?? []; track field.key) {
+            <td>{{ extraColumnValue(row, field) }}</td>
+          }
+          <td>
+            <p-tag
+              [value]="isActive(row) ? 'Activo' : 'Inactivo'"
+              [severity]="isActive(row) ? 'success' : 'danger'"
+            />
+          </td>
+          <td>
+            <div class="flex gap-1">
+              <button
+                pButton
+                type="button"
+                icon="pi pi-pencil"
+                [text]="true"
+                severity="secondary"
+                (click)="openEdit(row)"
+              ></button>
+              <button
+                pButton
+                type="button"
+                [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'"
+                [text]="true"
+                [severity]="isActive(row) ? 'danger' : 'success'"
+                (click)="toggleState(row)"
+              ></button>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template #emptymessage>
+        <tr>
+          <td [attr.colspan]="4 + (selected().extraFields?.length ?? 0)" class="text-center text-slate-500">
+            No hay registros todavía.
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </section>
+</div>
+
+<p-dialog
+  [header]="dialogTitle()"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  [style]="{ width: '28rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-2">
+      <label for="cod" class="text-sm font-medium text-slate-700">Código</label>
+      <input pInputText id="cod" formControlName="cod" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label for="des" class="text-sm font-medium text-slate-700">Descripción</label>
+      <input pInputText id="des" formControlName="des" class="w-full" />
+    </div>
+
+    @for (field of selected().extraFields ?? []; track field.key) {
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ field.label }}</label>
+        @if (field.type === 'text') {
+          <input pInputText [formControl]="getExtraControl(field.key)" class="w-full" />
+        } @else {
+          <p-select
+            [formControl]="getExtraControl(field.key)"
+            [options]="extraFieldOptions()[field.key]"
+            [optionLabel]="field.optionDesField!"
+            [optionValue]="field.optionCodField!"
+            [showClear]="!field.required"
+            placeholder="Seleccioná una opción"
+            styleClass="w-full"
+          />
+        }
+      </div>
+    }
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" label="Cancelar" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" label="Guardar"></button>
+    </div>
+  </form>
+</p-dialog>

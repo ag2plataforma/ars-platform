@@ -5,7 +5,7 @@ import { CreateLocationDto } from './dto/create-location.dto';
 import { UpdateLocationDto } from './dto/update-location.dto';
 import { ListLocationsDto } from './dto/list-locations.dto';
 
-const INCLUDE = { SCountry: true } as const;
+const INCLUDE = { SCountry: true, SState: true } as const;
 
 /**
  * `SLocation` (divisiones geográficas -- región/estado/ciudad, jerárquica

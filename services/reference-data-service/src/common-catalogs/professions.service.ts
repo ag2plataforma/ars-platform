@@ -10,6 +10,8 @@ import { UpdateProfessionDto } from './dto/update-profession.dto';
  * propia) -- mismo patrón `CatalogCrudService` que los 8 catálogos
  * simples de `product-rating-service` (ver `docs/02-roadmap.md`).
  */
+const INCLUDE = { SState: true } as const;
+
 @Injectable()
 export class ProfessionsService {
   private readonly crud: CatalogCrudService<SProfession>;
@@ -24,6 +26,7 @@ export class ProfessionsService {
       'DesProfession',
       'IdeProfession',
       'profesión',
+      INCLUDE,
     );
   }
 

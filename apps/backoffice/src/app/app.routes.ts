@@ -17,6 +17,11 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
       },
+      {
+        path: 'catalogos',
+        loadComponent: () =>
+          import('./features/catalogs/catalogs.component').then((m) => m.CatalogsComponent),
+      },
     ],
   },
   { path: '**', redirectTo: 'login' },

@@ -5,6 +5,8 @@ import { CatalogCrudService } from '@ars-platform/shared-common';
 import { CreateCountryDto } from './dto/create-country.dto';
 import { UpdateCountryDto } from './dto/update-country.dto';
 
+const INCLUDE = { SState: true, SLanguage: true } as const;
+
 @Injectable()
 export class CountriesService {
   private readonly crud: CatalogCrudService<SCountry>;
@@ -19,6 +21,7 @@ export class CountriesService {
       'DesCountry',
       'IdeCountry',
       'país',
+      INCLUDE,
     );
   }
 

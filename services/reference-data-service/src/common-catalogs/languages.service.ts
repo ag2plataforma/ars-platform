@@ -10,6 +10,8 @@ import { UpdateLanguageDto } from './dto/update-language.dto';
  * propia) -- mismo patrón `CatalogCrudService` que los 8 catálogos
  * simples de `product-rating-service` (ver `docs/02-roadmap.md`).
  */
+const INCLUDE = { SState: true } as const;
+
 @Injectable()
 export class LanguagesService {
   private readonly crud: CatalogCrudService<SLanguage>;
@@ -24,6 +26,7 @@ export class LanguagesService {
       'DesLanguage',
       'IdeLanguage',
       'idioma',
+      INCLUDE,
     );
   }
 

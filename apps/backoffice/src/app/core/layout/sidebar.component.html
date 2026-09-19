@@ -8,14 +8,23 @@
     <span>Inicio</span>
   </a>
 
+  <a
+    routerLink="/catalogos"
+    routerLinkActive="bg-slate-800 text-white"
+    class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-300 transition-colors hover:bg-slate-800 hover:text-white"
+  >
+    <i class="pi pi-book text-base"></i>
+    <span>Catálogos</span>
+  </a>
+
   @for (item of items(); track item.Orden + item.Titulo) {
     <app-sidebar-nav-item [node]="item" />
   }
 
   @if (!loading() && items().length === 0) {
     <p class="px-3 pt-4 text-xs leading-relaxed text-slate-500">
-      Todavía no hay secciones configuradas en el menú (SApplicationRole / SSiteMap). Van a aparecer acá en
-      cuanto se den de alta desde Catálogos.
+      Todavía no hay más secciones configuradas en el menú (SApplicationRole / SSiteMap) más allá de las
+      fijas de arriba.
     </p>
   }
 </nav>

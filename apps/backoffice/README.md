@@ -60,6 +60,27 @@ identidad visual nueva, la estructura de la app) no cambia en nada.
   árbol de hasta 3 niveles con un componente recursivo
   (`sidebar-nav-item.component.ts`).
 - Dashboard placeholder (`features/dashboard`).
+- **Catálogos comunes** (`features/catalogs`) -- CRUD real contra
+  `CommonCatalogsModule` de `reference-data-service`: idiomas, géneros,
+  estado civil, profesiones, actividad económica, tipos de identificación,
+  parentescos, tipos de contacto y países (con su idioma por defecto como
+  select). Un solo componente genérico (`CatalogsComponent`, configurado
+  por `core/catalogs/catalog.model.ts::CATALOG_REGISTRY`) reutilizado para
+  los 9 -- alta, edición, activar/inactivar con confirmación, todo contra
+  el `CatalogCrudService` real del backend. `SLocation` queda
+  deliberadamente afuera (ver "Qué sigue" más abajo): es jerárquico y su
+  unicidad es compuesta (`CodLocation`+`IdeCountry`), amerita una pantalla
+  propia en vez de este componente de catálogo plano.
+  **Cambio de contrato acompañante en el backend** (no pedido
+  explícitamente, hecho porque era necesario para poder mostrar
+  Activo/Inactivo real en la tabla): se agregó `include: { SState: true }`
+  (y `SLanguage: true` para países) a los `CatalogCrudService` de
+  `CommonCatalogsModule` -- antes esos catálogos devolvían `IdeState` como
+  UUID crudo, sin forma de saber si era "ACTIVO" o no sin otra llamada.
+  Es un agregado puramente aditivo al JSON de respuesta (mismo patrón que
+  ya usaba `application-roles.service.ts` con `SApplication`), no rompe
+  nada existente. Los códigos de estado usados son los mismos ya
+  documentados en `iam-service` (`ACTIVO`/`INACTIVO`), no inventados acá.
 
 **Verificado en pantalla por el usuario, de punta a punta**: `npm install`,
 login real, entrada al dashboard, y confirmado que el cartel de licencia
@@ -67,12 +88,12 @@ de PrimeNG ya no aparece (bajamos a v21 justamente por eso, ver arriba).
 
 **Limitación conocida, no un bug**: `SApplicationRole`/`SSiteMap`/
 `SSiteMapRole` todavía no tienen datos reales cargados en la base (nunca se
-configuraron), así que el sidebar hoy va a mostrar solo "Inicio" con un
-aviso -- es el comportamiento real y esperado del endpoint contra una BD sin
-ese catálogo configurado, no algo simulado. Se resuelve solo una vez demos
-de alta esas filas -- naturalmente, cuando construyamos el módulo de
-Catálogos (próximo paso del roadmap), que va a incluir pantallas para
-gestionar justamente eso.
+configuraron), así que el sidebar hoy va a mostrar "Inicio" y "Catálogos"
+(fijos, hardcodeados en `sidebar.component.html`) más un aviso debajo -- es
+el comportamiento real y esperado del endpoint contra una BD sin ese
+catálogo configurado, no algo simulado. Se resuelve solo una vez demos de
+alta esas filas, probablemente construyendo una pantalla de "Configuración
+de menú" (`SetupModule`) más adelante -- ver "Qué sigue".
 
 ## Cómo correrlo
 
@@ -100,7 +121,15 @@ rápido.
 
 ## Qué sigue
 
-Primer módulo de negocio real sobre este esqueleto: Catálogos/diccionario
-(`reference-data-service`) -- decidido explícitamente con el usuario como
-punto de partida por ser el patrón CRUD más simple y repetido, antes de ir
-a flujos más complejos (cotización, contratación).
+- **Ubicaciones (`SLocation`)**: deliberadamente afuera de la pantalla de
+  Catálogos actual -- jerárquico (`codLocationParent`) y con unicidad
+  compuesta (`CodLocation`+`IdeCountry`, no un código único global), no
+  encaja en el componente genérico de catálogo plano. Amerita una
+  pantalla propia (selector de país + árbol/lista de ubicaciones hijas),
+  fast-follow natural de este mismo módulo.
+- **Configuración de menú (`SetupModule`)**: `SApplication`/
+  `SApplicationRole`/`SSiteMap`/`SSiteMapRole` -- cargar datos reales acá
+  haría que el sidebar deje de mostrar el aviso de "sin secciones
+  configuradas" y empiece a reflejar navegación real por rol.
+- Después de esos dos: flujos de negocio más complejos (cotización,
+  contratación).

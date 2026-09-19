@@ -37,6 +37,13 @@ Todos los `POST`/`PATCH` de `AttributeEngineModule` requieren rol `ADMIN`, igual
 
 ### `CommonCatalogsModule` — catálogos comunes
 
+Los ocho catálogos simples y `SCountry` incluyen `SState` (y `SLanguage` en
+el caso de `SCountry`) en las respuestas de `findAll`/`findOne`/`create`/
+`update`/`setState` -- agregado al construir la pantalla de Catálogos del
+backoffice (`apps/backoffice`), para que el frontend pueda mostrar
+Activo/Inactivo real sin una llamada aparte. Aditivo, no rompe el contrato
+anterior.
+
 Ocho catálogos simples con `CatalogCrudService` genérico (`GET`, `GET /:id`, `POST` `ADMIN`, `PATCH /:id` `ADMIN`, `PATCH /:id/state` `ADMIN`): `GET /languages`, `GET /genders`, `GET /marital-statuses`, `GET /professions`, `GET /business-activities`, `GET /identification-types`, `GET /relationships`, `GET /contact-classes`.
 
 Dos catálogos con lógica extra:
