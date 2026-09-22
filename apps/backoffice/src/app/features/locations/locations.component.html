@@ -4,21 +4,22 @@
 <div class="flex flex-col gap-4">
   <div class="flex items-center justify-between">
     <div>
-      <h1 class="text-lg font-semibold text-slate-900">Ubicaciones</h1>
-      <p class="text-sm text-slate-500">Divisiones geográficas, jerárquicas y por país.</p>
+      <h1 class="text-lg font-semibold text-slate-900">{{ 'locations.title' | transloco }}</h1>
+      <p class="text-sm text-slate-500">{{ 'locations.subtitle' | transloco }}</p>
     </div>
     <div class="flex items-center gap-3">
       <p-select
+        appendTo="body"
         [options]="countries()"
         optionLabel="DesCountry"
         optionValue="CodCountry"
         [ngModel]="countryFilter()"
         (ngModelChange)="onCountryFilterChange($event)"
         [showClear]="true"
-        placeholder="Todos los países"
+        [placeholder]="'locations.allCountriesPlaceholder' | transloco"
         styleClass="w-56"
       />
-      <button pButton type="button" icon="pi pi-plus" label="Nueva ubicación" (click)="openCreate()"></button>
+      <button pButton type="button" icon="pi pi-plus" [label]="'locations.newButton' | transloco" (click)="openCreate()"></button>
     </div>
   </div>
 
@@ -35,11 +36,11 @@
   >
     <ng-template #header>
       <tr>
-        <th>Código</th>
-        <th>Descripción</th>
-        <th>País</th>
-        <th>Estado</th>
-        <th class="w-44">Acciones</th>
+        <th>{{ 'catalogs.codeColumn' | transloco }}</th>
+        <th>{{ 'catalogs.descriptionColumn' | transloco }}</th>
+        <th>{{ 'locations.countryColumn' | transloco }}</th>
+        <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+        <th class="w-44">{{ 'catalogs.actionsColumn' | transloco }}</th>
       </tr>
     </ng-template>
     <ng-template #body let-row>
@@ -49,7 +50,7 @@
         <td>{{ countryName(row) }}</td>
         <td>
           <p-tag
-            [value]="isActive(row) ? 'Activo' : 'Inactivo'"
+            [value]="(isActive(row) ? 'common.active' : 'common.inactive') | transloco"
             [severity]="isActive(row) ? 'success' : 'danger'"
           />
         </td>
@@ -61,7 +62,7 @@
               icon="pi pi-folder-open"
               [text]="true"
               severity="secondary"
-              pTooltip="Ver hijos"
+              [pTooltip]="'locations.viewChildrenTooltip' | transloco"
               tooltipPosition="top"
               (click)="drillInto(row)"
             ></button>
@@ -71,7 +72,7 @@
               icon="pi pi-pencil"
               [text]="true"
               severity="secondary"
-              pTooltip="Editar"
+              [pTooltip]="'locations.editTooltip' | transloco"
               tooltipPosition="top"
               (click)="openEdit(row)"
             ></button>
@@ -81,7 +82,7 @@
               [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'"
               [text]="true"
               [severity]="isActive(row) ? 'danger' : 'success'"
-              pTooltip="{{ isActive(row) ? 'Inactivar' : 'Activar' }}"
+              [pTooltip]="(isActive(row) ? 'catalogs.deactivateHeader' : 'catalogs.activateHeader') | transloco"
               tooltipPosition="top"
               (click)="toggleState(row)"
             ></button>
@@ -91,14 +92,14 @@
     </ng-template>
     <ng-template #emptymessage>
       <tr>
-        <td colspan="5" class="text-center text-slate-500">No hay ubicaciones en este nivel todavía.</td>
+        <td colspan="5" class="text-center text-slate-500">{{ 'locations.emptyState' | transloco }}</td>
       </tr>
     </ng-template>
   </p-table>
 </div>
 
 <p-dialog
-  [header]="dialogMode() === 'create' ? 'Nueva ubicación' : 'Editar ubicación'"
+  [header]="(dialogMode() === 'create' ? 'locations.createDialogTitle' : 'locations.editDialogTitle') | transloco"
   [visible]="dialogVisible()"
   [modal]="true"
   [style]="{ width: '28rem' }"
@@ -107,38 +108,39 @@
   <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
     @if (dialogMode() === 'create' && path().length) {
       <p class="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">
-        Se va a crear dentro de: <strong>{{ path()[path().length - 1].des }}</strong>
+        {{ 'locations.createInsideHint' | transloco }} <strong>{{ path()[path().length - 1].des }}</strong>
       </p>
     }
     <div class="flex flex-col gap-2">
-      <label for="cod" class="text-sm font-medium text-slate-700">Código</label>
+      <label for="cod" class="text-sm font-medium text-slate-700">{{ 'catalogs.codeColumn' | transloco }}</label>
       <input pInputText id="cod" formControlName="cod" class="w-full" />
     </div>
     <div class="flex flex-col gap-2">
-      <label for="des" class="text-sm font-medium text-slate-700">Descripción</label>
+      <label for="des" class="text-sm font-medium text-slate-700">{{ 'catalogs.descriptionColumn' | transloco }}</label>
       <input pInputText id="des" formControlName="des" class="w-full" />
     </div>
     <div class="flex flex-col gap-2">
-      <label class="text-sm font-medium text-slate-700">País</label>
+      <label class="text-sm font-medium text-slate-700">{{ 'locations.countryColumn' | transloco }}</label>
       @if (dialogMode() === 'create') {
         <p-select
+          appendTo="body"
           formControlName="codCountry"
           [options]="countries()"
           optionLabel="DesCountry"
           optionValue="CodCountry"
           [showClear]="true"
-          placeholder="Sin país"
+          [placeholder]="'locations.noCountry' | transloco"
           styleClass="w-full"
         />
       } @else {
         <input pInputText formControlName="codCountry" class="w-full" />
-        <p class="text-xs text-slate-500">El país no se puede cambiar una vez creada la ubicación.</p>
+        <p class="text-xs text-slate-500">{{ 'locations.countryLockedHint' | transloco }}</p>
       }
     </div>
 
     <div class="mt-2 flex justify-end gap-2">
-      <button pButton type="button" label="Cancelar" severity="secondary" [text]="true" (click)="closeDialog()"></button>
-      <button pButton type="submit" label="Guardar"></button>
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
     </div>
   </form>
 </p-dialog>

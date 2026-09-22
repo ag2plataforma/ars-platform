@@ -13,6 +13,7 @@ import { TooltipModule } from 'primeng/tooltip';
 import { ToastModule } from 'primeng/toast';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { MessageService, ConfirmationService, MenuItem } from 'primeng/api';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { CatalogService } from '../../core/catalogs/catalog.service';
 import { CatalogRow } from '../../core/catalogs/catalog.model';
 
@@ -56,6 +57,7 @@ interface Crumb {
     TooltipModule,
     ToastModule,
     ConfirmDialogModule,
+    TranslocoPipe,
   ],
   providers: [MessageService, ConfirmationService],
   templateUrl: './locations.component.html',
@@ -65,6 +67,7 @@ export class LocationsComponent {
   private readonly catalogService = inject(CatalogService);
   private readonly messages = inject(MessageService);
   private readonly confirm = inject(ConfirmationService);
+  private readonly transloco = inject(TranslocoService);
 
   readonly countries = signal<CatalogRow[]>([]);
   readonly countryFilter = signal<string>('');
@@ -77,7 +80,7 @@ export class LocationsComponent {
 
   readonly home: MenuItem = {
     icon: 'pi pi-map',
-    label: 'Ubicaciones',
+    label: this.transloco.translate('locations.title'),
     command: () => this.goToRoot(),
   };
 
@@ -138,7 +141,11 @@ export class LocationsComponent {
       },
       error: () => {
         this.loading.set(false);
-        this.messages.add({ severity: 'error', summary: 'Error', detail: 'No se pudieron cargar las ubicaciones.' });
+        this.messages.add({
+          severity: 'error',
+          summary: this.transloco.translate('common.error'),
+          detail: this.transloco.translate('locations.loadErrorDetail'),
+        });
       },
     });
   }
@@ -149,7 +156,7 @@ export class LocationsComponent {
 
   countryName(row: CatalogRow): string {
     const country = row['SCountry'] as Record<string, unknown> | undefined;
-    return country ? String(country['DesCountry'] ?? '') : 'Sin país';
+    return country ? String(country['DesCountry'] ?? '') : this.transloco.translate('locations.noCountry');
   }
 
   openCreate(): void {
@@ -196,7 +203,11 @@ export class LocationsComponent {
       if (this.path().length) body['codLocationParent'] = this.path()[this.path().length - 1].cod;
       this.catalogService.create(LOCATIONS_PATH, body).subscribe({
         next: () => {
-          this.messages.add({ severity: 'success', summary: 'Listo', detail: `Se creó "${raw.des}".` });
+          this.messages.add({
+            severity: 'success',
+            summary: this.transloco.translate('common.done'),
+            detail: this.transloco.translate('catalogs.createdDetail', { item: raw.des }),
+          });
           this.closeDialog();
           this.loadRows();
         },
@@ -206,7 +217,11 @@ export class LocationsComponent {
       const id = String(this.editingRow!['IdeLocation']);
       this.catalogService.update(LOCATIONS_PATH, id, { desLocation: raw.des }).subscribe({
         next: () => {
-          this.messages.add({ severity: 'success', summary: 'Listo', detail: `Se actualizó "${raw.des}".` });
+          this.messages.add({
+            severity: 'success',
+            summary: this.transloco.translate('common.done'),
+            detail: this.transloco.translate('catalogs.updatedDetail', { item: raw.des }),
+          });
           this.closeDialog();
           this.loadRows();
         },
@@ -219,8 +234,13 @@ export class LocationsComponent {
     const nextState = this.isActive(row) ? 'INACTIVO' : 'ACTIVO';
     const desc = String(row['DesLocation'] ?? '');
     this.confirm.confirm({
-      header: nextState === 'ACTIVO' ? 'Activar' : 'Inactivar',
-      message: `¿Confirmás ${nextState === 'ACTIVO' ? 'activar' : 'inactivar'} "${desc}"?`,
+      header: this.transloco.translate(nextState === 'ACTIVO' ? 'catalogs.activateHeader' : 'catalogs.deactivateHeader'),
+      message: this.transloco.translate('catalogs.toggleConfirm', {
+        action: this.transloco.translate(
+          nextState === 'ACTIVO' ? 'catalogs.toggleActivateAction' : 'catalogs.toggleDeactivateAction',
+        ),
+        item: desc,
+      }),
       icon: 'pi pi-exclamation-triangle',
       accept: () => {
         const id = String(row['IdeLocation']);
@@ -228,8 +248,11 @@ export class LocationsComponent {
           next: () => {
             this.messages.add({
               severity: 'success',
-              summary: 'Listo',
-              detail: `"${desc}" ahora está ${nextState === 'ACTIVO' ? 'activo' : 'inactivo'}.`,
+              summary: this.transloco.translate('common.done'),
+              detail: this.transloco.translate('catalogs.toggledDetail', {
+                item: desc,
+                state: this.transloco.translate(nextState === 'ACTIVO' ? 'common.active' : 'common.inactive').toLowerCase(),
+              }),
             });
             this.loadRows();
           },
@@ -243,7 +266,7 @@ export class LocationsComponent {
     const detail =
       (err.error && typeof err.error === 'object' && 'message' in err.error
         ? String((err.error as { message: unknown }).message)
-        : null) ?? 'Ocurrió un error inesperado.';
-    this.messages.add({ severity: 'error', summary: 'Error', detail });
+        : null) ?? this.transloco.translate<string>('common.unexpectedError');
+    this.messages.add({ severity: 'error', summary: this.transloco.translate('common.error'), detail });
   }
 }

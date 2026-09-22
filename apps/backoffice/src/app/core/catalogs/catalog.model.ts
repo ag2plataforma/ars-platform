@@ -6,7 +6,7 @@ export interface CatalogRow {
   [key: string]: unknown;
 }
 
-export type CatalogFieldType = 'text' | 'select';
+export type CatalogFieldType = 'text' | 'textarea' | 'select';
 
 /** Campo adicional (más allá de código/descripción) que necesitan algunos
  * catálogos -- hoy solo `SCountry` (código DDI + idioma). El resto de los
@@ -17,6 +17,10 @@ export interface CatalogExtraField {
   label: string;
   type: CatalogFieldType;
   required?: boolean;
+  /** Si es `true`, el campo se edita en el formulario pero no se muestra
+   * como columna en la tabla del listado (pensado para `desLarge`: texto
+   * largo que ensuciaría la tabla, ver punto 2 en docs/02-roadmap.md). */
+  hideInList?: boolean;
   /** Solo para `type: 'select'`: catálogo (por `path`) del que salen las opciones. */
   optionsPath?: string;
   optionCodField?: string;
@@ -62,12 +66,17 @@ export function extraRowField(field: CatalogExtraField): string {
  * `SLocation` queda deliberadamente afuera de este registro -- ver
  * `docs/02-roadmap.md`: es jerárquico y su unicidad es compuesta
  * (`CodLocation`+`IdeCountry`), amerita una pantalla propia en vez de este
- * componente genérico de catálogo plano. */
-export const CATALOG_REGISTRY: CatalogConfig[] = [
+ * componente genérico de catálogo plano. Catálogos de referencia
+ * transversales (no específicos de producto) -- pantalla "Catálogos"
+ * (`/catalogos`). Los catálogos propios de la configuración de un
+ * producto viven aparte, en `PRODUCT_CATALOG_REGISTRY` más abajo --
+ * decisión explícita del usuario al notar que mezclar los 23 en una sola
+ * pantalla la volvía inmanejable (ver `docs/02-roadmap.md`). */
+export const COMMON_CATALOG_REGISTRY: CatalogConfig[] = [
   {
     key: 'languages',
-    label: 'Idiomas',
-    singular: 'idioma',
+    label: 'catalogsRegistry.languages.label',
+    singular: 'catalogsRegistry.languages.singular',
     path: '/reference-data/languages',
     codField: 'CodLanguage',
     desField: 'DesLanguage',
@@ -75,8 +84,8 @@ export const CATALOG_REGISTRY: CatalogConfig[] = [
   },
   {
     key: 'genders',
-    label: 'Géneros',
-    singular: 'género',
+    label: 'catalogsRegistry.genders.label',
+    singular: 'catalogsRegistry.genders.singular',
     path: '/reference-data/genders',
     codField: 'CodGender',
     desField: 'DesGender',
@@ -84,8 +93,8 @@ export const CATALOG_REGISTRY: CatalogConfig[] = [
   },
   {
     key: 'marital-statuses',
-    label: 'Estado civil',
-    singular: 'estado civil',
+    label: 'catalogsRegistry.marital-statuses.label',
+    singular: 'catalogsRegistry.marital-statuses.singular',
     path: '/reference-data/marital-statuses',
     codField: 'CodMaritalStatus',
     desField: 'DesMaritalStatus',
@@ -93,8 +102,8 @@ export const CATALOG_REGISTRY: CatalogConfig[] = [
   },
   {
     key: 'professions',
-    label: 'Profesiones',
-    singular: 'profesión',
+    label: 'catalogsRegistry.professions.label',
+    singular: 'catalogsRegistry.professions.singular',
     path: '/reference-data/professions',
     codField: 'CodProfession',
     desField: 'DesProfession',
@@ -102,8 +111,8 @@ export const CATALOG_REGISTRY: CatalogConfig[] = [
   },
   {
     key: 'business-activities',
-    label: 'Actividad económica',
-    singular: 'actividad económica',
+    label: 'catalogsRegistry.business-activities.label',
+    singular: 'catalogsRegistry.business-activities.singular',
     path: '/reference-data/business-activities',
     codField: 'CodBusinessActivity',
     desField: 'DesBusinessActivity',
@@ -111,8 +120,8 @@ export const CATALOG_REGISTRY: CatalogConfig[] = [
   },
   {
     key: 'identification-types',
-    label: 'Tipos de identificación',
-    singular: 'tipo de identificación',
+    label: 'catalogsRegistry.identification-types.label',
+    singular: 'catalogsRegistry.identification-types.singular',
     path: '/reference-data/identification-types',
     codField: 'CodIdentificationType',
     desField: 'DesIdentificationType',
@@ -120,8 +129,8 @@ export const CATALOG_REGISTRY: CatalogConfig[] = [
   },
   {
     key: 'relationships',
-    label: 'Parentescos',
-    singular: 'parentesco',
+    label: 'catalogsRegistry.relationships.label',
+    singular: 'catalogsRegistry.relationships.singular',
     path: '/reference-data/relationships',
     codField: 'CodRelationship',
     desField: 'DesRelationship',
@@ -129,8 +138,8 @@ export const CATALOG_REGISTRY: CatalogConfig[] = [
   },
   {
     key: 'contact-classes',
-    label: 'Tipos de contacto',
-    singular: 'tipo de contacto',
+    label: 'catalogsRegistry.contact-classes.label',
+    singular: 'catalogsRegistry.contact-classes.singular',
     path: '/reference-data/contact-classes',
     codField: 'CodContactClass',
     desField: 'DesContactClass',
@@ -138,23 +147,243 @@ export const CATALOG_REGISTRY: CatalogConfig[] = [
   },
   {
     key: 'countries',
-    label: 'Países',
-    singular: 'país',
+    label: 'catalogsRegistry.countries.label',
+    singular: 'catalogsRegistry.countries.singular',
     path: '/reference-data/countries',
     codField: 'CodCountry',
     desField: 'DesCountry',
     idField: 'IdeCountry',
     extraFields: [
-      { key: 'codDDI', label: 'Código DDI', type: 'text', required: false },
+      { key: 'codDDI', label: 'catalogFields.codDDI', type: 'text', required: false },
       {
         key: 'codLanguage',
-        label: 'Idioma',
+        label: 'catalogFields.codLanguage',
         type: 'select',
         required: true,
         optionsPath: '/reference-data/languages',
         optionCodField: 'CodLanguage',
         optionDesField: 'DesLanguage',
         columnRelation: 'SLanguage',
+      },
+    ],
+  },
+];
+
+/** Catálogos propios de la configuración de un producto: los 8 simples +
+ * Coberturas de `product-rating-service`, Conceptos/Tipos de concepto de
+ * `reference-data-service` (requeridos por `SCalculationRule.CodConcept`)
+ * y canal/vía de distribución de `party-service`. Separado de
+ * `COMMON_CATALOG_REGISTRY` -- pantalla "Catálogos de producto"
+ * (`/configuracion-productos/catalogos`), agrupada en el menú bajo
+ * "Configuración de productos" junto con Productos y Tablas de tarifa.
+ * Decisión explícita del usuario: la pantalla de Catálogos genérica se
+ * había vuelto inmanejable con los 23 catálogos juntos. */
+export const PRODUCT_CATALOG_REGISTRY: CatalogConfig[] = [
+  // --- product-rating-service: 8 catálogos simples + Coberturas (ver su
+  // README, sección "CRUD real de los 8 catálogos simples"/"7 entidades
+  // de dominio"). Prerequisito de Cotización (docs/02-roadmap.md). ---
+  {
+    key: 'risk-levels',
+    label: 'catalogsRegistry.risk-levels.label',
+    singular: 'catalogsRegistry.risk-levels.singular',
+    path: '/product-rating/risk-levels',
+    codField: 'CodRiskLevel',
+    desField: 'DesRiskLevel',
+    idField: 'IdeRiskLevel',
+    extraFields: [
+      { key: 'desShort', label: 'catalogFields.desShort', type: 'text', required: false },
+      { key: 'desLarge', label: 'catalogFields.desLarge', type: 'textarea', required: false, hideInList: true },
+    ],
+  },
+  {
+    key: 'risks',
+    label: 'catalogsRegistry.risks.label',
+    singular: 'catalogsRegistry.risks.singular',
+    path: '/product-rating/risks',
+    codField: 'CodRisk',
+    desField: 'DesRisk',
+    idField: 'IdeRisk',
+    extraFields: [
+      {
+        key: 'codRiskLevel',
+        label: 'catalogFields.codRiskLevel',
+        type: 'select',
+        required: true,
+        optionsPath: '/product-rating/risk-levels',
+        optionCodField: 'CodRiskLevel',
+        optionDesField: 'DesRiskLevel',
+        columnRelation: 'SRiskLevel',
+      },
+    ],
+  },
+  {
+    key: 'risk-types',
+    label: 'catalogsRegistry.risk-types.label',
+    singular: 'catalogsRegistry.risk-types.singular',
+    path: '/product-rating/risk-types',
+    codField: 'CodRiskType',
+    desField: 'DesRiskType',
+    idField: 'IdeRiskType',
+  },
+  {
+    key: 'currencies',
+    label: 'catalogsRegistry.currencies.label',
+    singular: 'catalogsRegistry.currencies.singular',
+    path: '/product-rating/currencies',
+    codField: 'CodCurrency',
+    desField: 'DesCurrency',
+    idField: 'IdeCurrency',
+    extraFields: [{ key: 'symbolCurrency', label: 'catalogFields.symbolCurrency', type: 'text', required: true }],
+  },
+  {
+    key: 'insurance-areas',
+    label: 'catalogsRegistry.insurance-areas.label',
+    singular: 'catalogsRegistry.insurance-areas.singular',
+    path: '/product-rating/insurance-areas',
+    codField: 'CodInsuranceArea',
+    desField: 'DesInsuranceArea',
+    idField: 'IdeInsuranceArea',
+    extraFields: [
+      { key: 'desShort', label: 'catalogFields.desShort', type: 'text', required: false },
+      { key: 'desLarge', label: 'catalogFields.desLarge', type: 'textarea', required: false, hideInList: true },
+    ],
+  },
+  {
+    key: 'insurance-lines',
+    label: 'catalogsRegistry.insurance-lines.label',
+    singular: 'catalogsRegistry.insurance-lines.singular',
+    path: '/product-rating/insurance-lines',
+    codField: 'CodInsuranceLine',
+    desField: 'DesInsuranceLine',
+    idField: 'IdeInsuranceLine',
+    extraFields: [
+      {
+        key: 'codInsuranceArea',
+        label: 'catalogFields.codInsuranceArea',
+        type: 'select',
+        required: true,
+        optionsPath: '/product-rating/insurance-areas',
+        optionCodField: 'CodInsuranceArea',
+        optionDesField: 'DesInsuranceArea',
+        columnRelation: 'SInsuranceArea',
+      },
+      { key: 'desShort', label: 'catalogFields.desShort', type: 'text', required: false },
+      { key: 'desLarge', label: 'catalogFields.desLarge', type: 'textarea', required: false, hideInList: true },
+    ],
+  },
+  {
+    key: 'deductible-types',
+    label: 'catalogsRegistry.deductible-types.label',
+    singular: 'catalogsRegistry.deductible-types.singular',
+    path: '/product-rating/deductible-types',
+    codField: 'CodDeductibleType',
+    desField: 'DesDeductibleType',
+    idField: 'IdeDeductibleType',
+  },
+  {
+    key: 'limit-types',
+    label: 'catalogsRegistry.limit-types.label',
+    singular: 'catalogsRegistry.limit-types.singular',
+    path: '/product-rating/limit-types',
+    codField: 'CodLimitType',
+    desField: 'DesLimitType',
+    idField: 'IdeLimitType',
+  },
+  {
+    key: 'coverages',
+    label: 'catalogsRegistry.coverages.label',
+    singular: 'catalogsRegistry.coverages.singular',
+    path: '/product-rating/coverages',
+    codField: 'CodCoverage',
+    desField: 'DesCoverage',
+    idField: 'IdeCoverage',
+    extraFields: [
+      {
+        key: 'codInsuranceLine',
+        label: 'catalogFields.codInsuranceLine',
+        type: 'select',
+        required: true,
+        optionsPath: '/product-rating/insurance-lines',
+        optionCodField: 'CodInsuranceLine',
+        optionDesField: 'DesInsuranceLine',
+        columnRelation: 'SInsuranceLine',
+      },
+    ],
+  },
+
+  // --- reference-data-service: SConceptType/SConcept, prerequisito de
+  // SCalculationRule.CodConcept (ver CommonCatalogsModule). ---
+  {
+    key: 'concept-types',
+    label: 'catalogsRegistry.concept-types.label',
+    singular: 'catalogsRegistry.concept-types.singular',
+    path: '/reference-data/concept-types',
+    codField: 'CodConceptType',
+    desField: 'DesConceptType',
+    idField: 'IdeConceptType',
+  },
+  {
+    key: 'concepts',
+    label: 'catalogsRegistry.concepts.label',
+    singular: 'catalogsRegistry.concepts.singular',
+    path: '/reference-data/concepts',
+    codField: 'CodConcept',
+    desField: 'DesConcept',
+    idField: 'IdeConcept',
+    extraFields: [
+      {
+        key: 'codConceptType',
+        label: 'catalogFields.codConceptType',
+        type: 'select',
+        required: true,
+        optionsPath: '/reference-data/concept-types',
+        optionCodField: 'CodConceptType',
+        optionDesField: 'DesConceptType',
+        columnRelation: 'SConceptType',
+      },
+      { key: 'desShort', label: 'catalogFields.desShort', type: 'text', required: false },
+      { key: 'desLarge', label: 'catalogFields.desLarge', type: 'textarea', required: false, hideInList: true },
+    ],
+  },
+
+  // --- party-service: catálogos de distribución (canal/vía), el otro
+  // prerequisito de Cotización -- ver DistributionModule. ---
+  {
+    key: 'channel-types',
+    label: 'catalogsRegistry.channel-types.label',
+    singular: 'catalogsRegistry.channel-types.singular',
+    path: '/party/channel-types',
+    codField: 'CodChannelType',
+    desField: 'DesChannelType',
+    idField: 'IdeChannelType',
+  },
+  {
+    key: 'distribution-ways',
+    label: 'catalogsRegistry.distribution-ways.label',
+    singular: 'catalogsRegistry.distribution-ways.singular',
+    path: '/party/distribution-ways',
+    codField: 'CodDistributionWay',
+    desField: 'DesDistributionWay',
+    idField: 'IdeDistributionWay',
+  },
+  {
+    key: 'distribution-channels',
+    label: 'catalogsRegistry.distribution-channels.label',
+    singular: 'catalogsRegistry.distribution-channels.singular',
+    path: '/party/distribution-channels',
+    codField: 'CodDistributionChannel',
+    desField: 'DesDistributionChannel',
+    idField: 'IdeDistributionChannel',
+    extraFields: [
+      {
+        key: 'codChannelType',
+        label: 'catalogFields.codChannelType',
+        type: 'select',
+        required: false,
+        optionsPath: '/party/channel-types',
+        optionCodField: 'CodChannelType',
+        optionDesField: 'DesChannelType',
+        columnRelation: 'SChannelType',
       },
     ],
   },

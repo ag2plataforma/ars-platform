@@ -1,8 +1,6 @@
 <div class="max-w-3xl">
-  <h1 class="text-2xl font-semibold text-slate-900">Hola, {{ userCode() }}</h1>
+  <h1 class="text-2xl font-semibold text-slate-900">{{ 'dashboard.greeting' | transloco: { code: userCode() } }}</h1>
   <p class="mt-2 text-slate-500">
-    Este es el nuevo backoffice de ARS. Todavía es un esqueleto: acá van a ir apareciendo los módulos de
-    negocio (catálogos, productos, cotización, contratación, comisiones, siniestros) a medida que los
-    migremos.
+    {{ 'dashboard.intro' | transloco }}
   </p>
 </div>

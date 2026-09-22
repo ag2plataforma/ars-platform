@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth/auth.guard';
+import { PRODUCT_CATALOG_REGISTRY } from './core/catalogs/catalog.model';
 
 export const routes: Routes = [
   {
@@ -18,6 +19,34 @@ export const routes: Routes = [
           import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
       },
       {
+        // Listado (landing) + wizard, separados en dos rutas hijas --
+        // pedido explícito del usuario: `GET /quotes` (plural) para
+        // listar/retomar una cotización existente, ver
+        // `docs/02-roadmap.md`. Orden importante: 'nueva' (segmento
+        // literal) debe declararse ANTES que ':id' (parámetro) -- si no,
+        // ':id' matchea primero y navegar a "nueva" la trataría como un
+        // id de cotización cualquiera.
+        path: 'cotizacion',
+        children: [
+          {
+            path: '',
+            pathMatch: 'full',
+            loadComponent: () =>
+              import('./features/quotes/quotes-list.component').then((m) => m.QuotesListComponent),
+          },
+          {
+            path: 'nueva',
+            loadComponent: () =>
+              import('./features/quotes/quotes.component').then((m) => m.QuotesComponent),
+          },
+          {
+            path: ':id',
+            loadComponent: () =>
+              import('./features/quotes/quotes.component').then((m) => m.QuotesComponent),
+          },
+        ],
+      },
+      {
         path: 'catalogos',
         loadComponent: () =>
           import('./features/catalogs/catalogs.component').then((m) => m.CatalogsComponent),
@@ -26,6 +55,43 @@ export const routes: Routes = [
         path: 'ubicaciones',
         loadComponent: () =>
           import('./features/locations/locations.component').then((m) => m.LocationsComponent),
+      },
+      {
+        path: 'configuracion-menu',
+        loadComponent: () =>
+          import('./features/menu-config/menu-config.component').then((m) => m.MenuConfigComponent),
+      },
+      {
+        // "Configuración de productos" -- ítem padre en el sidebar (ver
+        // packages/database/scripts/seed-menu-config.js) con 3 hijos:
+        // Catálogos de producto, Productos y Tablas de tarifa. Antes
+        // "Productos"/"Tarifas" eran ítems raíz separados y los 14
+        // catálogos de producto vivían mezclados con los 9 comunes en
+        // "Catálogos" -- decisión explícita del usuario, al notar que esa
+        // pantalla única con 23 catálogos quedaba desorganizada.
+        path: 'configuracion-productos',
+        children: [
+          {
+            path: 'catalogos',
+            loadComponent: () =>
+              import('./features/catalogs/catalogs.component').then((m) => m.CatalogsComponent),
+            data: {
+              registry: PRODUCT_CATALOG_REGISTRY,
+              pageTitle: 'catalogs.productsPageTitle',
+              pageSubtitle: 'catalogs.productsPageSubtitle',
+            },
+          },
+          {
+            path: 'productos',
+            loadComponent: () =>
+              import('./features/products/products.component').then((m) => m.ProductsComponent),
+          },
+          {
+            path: 'tarifas',
+            loadComponent: () =>
+              import('./features/rate-tables/rate-tables.component').then((m) => m.RateTablesComponent),
+          },
+        ],
       },
     ],
   },

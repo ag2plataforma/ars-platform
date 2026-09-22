@@ -1,13 +1,21 @@
 import { Component, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../auth/auth.service';
 import { SiteMapService, MenuNode } from './site-map.service';
 import { SidebarNavItemComponent } from './sidebar-nav-item.component';
+import { TranslocoPipe } from '@jsverse/transloco';
 
+/** El sidebar es 100% dinámico, armado desde `GET /site-map-menu`
+ * (`SApplication`/`SApplicationRole`/`SSiteMap`/`SSiteMapRole`, ver
+ * "Configuración de menú") -- ya no tiene links fijos hardcodeados acá,
+ * decisión explícita del usuario (antes tenía 4 links fijos + esta
+ * sección dinámica aparte, lo que iba a duplicar entradas apenas se
+ * cargaran esas mismas pantallas en `SSiteMap`). Ver
+ * `packages/database/scripts/seed-menu-config.js` para poblar las 4
+ * pantallas base. */
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [RouterLink, RouterLinkActive, SidebarNavItemComponent],
+  imports: [SidebarNavItemComponent, TranslocoPipe],
   templateUrl: './sidebar.component.html',
 })
 export class SidebarComponent {

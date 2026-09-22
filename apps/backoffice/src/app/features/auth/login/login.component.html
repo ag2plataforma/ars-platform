@@ -3,20 +3,20 @@
     <div class="mx-auto w-full max-w-sm">
       <div class="mb-10">
         <div class="text-2xl font-bold tracking-tight text-slate-900">ARS</div>
-        <div class="mt-1 text-sm text-slate-500">Backoffice</div>
+        <div class="mt-1 text-sm text-slate-500">{{ 'shell.backofficeLabel' | transloco }}</div>
       </div>
 
       @if (step() === 'credentials') {
-        <h1 class="mb-1 text-xl font-semibold text-slate-900">Iniciar sesión</h1>
-        <p class="mb-8 text-sm text-slate-500">Ingresá tus credenciales para continuar.</p>
+        <h1 class="mb-1 text-xl font-semibold text-slate-900">{{ 'login.title' | transloco }}</h1>
+        <p class="mb-8 text-sm text-slate-500">{{ 'login.subtitle' | transloco }}</p>
 
         <form [formGroup]="credentialsForm" (ngSubmit)="submitCredentials()" class="flex flex-col gap-5">
           <div class="flex flex-col gap-2">
-            <label for="userName" class="text-sm font-medium text-slate-700">Usuario</label>
+            <label for="userName" class="text-sm font-medium text-slate-700">{{ 'login.usernameLabel' | transloco }}</label>
             <input pInputText id="userName" formControlName="userName" class="w-full" autocomplete="username" />
           </div>
           <div class="flex flex-col gap-2">
-            <label for="password" class="text-sm font-medium text-slate-700">Contraseña</label>
+            <label for="password" class="text-sm font-medium text-slate-700">{{ 'login.passwordLabel' | transloco }}</label>
             <input
               pInputText
               id="password"
@@ -34,21 +34,21 @@
           <button
             pButton
             type="submit"
-            label="Ingresar"
+            [label]="'login.submitLabel' | transloco"
             class="mt-2 w-full justify-center"
             [loading]="loading()"
             [disabled]="credentialsForm.invalid"
           ></button>
         </form>
       } @else {
-        <h1 class="mb-1 text-xl font-semibold text-slate-900">Verificación en dos pasos</h1>
+        <h1 class="mb-1 text-xl font-semibold text-slate-900">{{ 'login.twoFactorTitle' | transloco }}</h1>
         <p class="mb-8 text-sm text-slate-500">
-          Ingresá el código de tu app autenticadora, o uno de tus códigos de respaldo.
+          {{ 'login.twoFactorSubtitle' | transloco }}
         </p>
 
         <form [formGroup]="codeForm" (ngSubmit)="submitCode()" class="flex flex-col gap-5">
           <div class="flex flex-col gap-2">
-            <label for="code" class="text-sm font-medium text-slate-700">Código</label>
+            <label for="code" class="text-sm font-medium text-slate-700">{{ 'login.codeLabel' | transloco }}</label>
             <input pInputText id="code" formControlName="code" class="w-full" autocomplete="one-time-code" />
           </div>
 
@@ -59,7 +59,7 @@
           <button
             pButton
             type="submit"
-            label="Verificar"
+            [label]="'login.verifyLabel' | transloco"
             class="mt-2 w-full justify-center"
             [loading]="loading()"
             [disabled]="codeForm.invalid"
@@ -67,7 +67,7 @@
           <button
             pButton
             type="button"
-            label="Volver"
+            [label]="'login.backLabel' | transloco"
             severity="secondary"
             [text]="true"
             class="w-full justify-center"
@@ -80,8 +80,8 @@
 
   <div class="hidden flex-col items-center justify-center bg-slate-900 p-16 text-white lg:flex">
     <div class="max-w-md">
-      <div class="mb-4 text-3xl font-bold">Gestión aseguradora, en un solo lugar.</div>
-      <p class="text-slate-300">Cotización, contratación, comisiones y siniestros -- todo conectado en tiempo real.</p>
+      <div class="mb-4 text-3xl font-bold">{{ 'login.heroTitle' | transloco }}</div>
+      <p class="text-slate-300">{{ 'login.heroSubtitle' | transloco }}</p>
     </div>
   </div>
 </div>

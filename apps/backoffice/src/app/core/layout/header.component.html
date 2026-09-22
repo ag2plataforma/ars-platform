@@ -1,5 +1,5 @@
-<header class="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-6">
-  <span class="text-sm font-medium text-slate-500">Backoffice</span>
+<header class="flex h-28 items-center justify-between border-b border-slate-200 bg-white px-6">
+  <span class="text-sm font-medium text-slate-500">{{ 'shell.backofficeLabel' | transloco }}</span>
   <div class="flex items-center gap-4">
     <span class="text-sm text-slate-600">{{ userCode() }}</span>
     <p-avatar [label]="userInitial()" shape="circle" styleClass="bg-slate-900 text-white" />
@@ -9,7 +9,7 @@
       icon="pi pi-sign-out"
       [text]="true"
       severity="secondary"
-      pTooltip="Cerrar sesión"
+      [pTooltip]="'header.logoutTooltip' | transloco"
       tooltipPosition="bottom"
       (click)="logout()"
     ></button>

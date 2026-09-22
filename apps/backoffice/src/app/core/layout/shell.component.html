@@ -1,9 +1,23 @@
 <div class="flex h-screen bg-slate-50">
   <aside class="flex w-64 shrink-0 flex-col bg-slate-900">
-    <div class="flex h-16 items-center px-6">
-      <span class="text-lg font-bold tracking-tight text-white">ARS</span>
+    <!-- Logo real del usuario (public/brand/logo.png), ahora con
+         transparencia real -- ver conversión en docs/02-roadmap.md.
+         Barra a h-28 (antes h-20) para que el logo entre más grande
+         (96px, casi el doble del anterior de 56px) sin quedar apretado
+         -- misma altura que la barra del header (ver
+         header.component.html) para que la línea entre ambas quede
+         alineada. -->
+    <div class="flex h-28 items-center gap-3 px-4">
+      <img src="/brand/logo.png" alt="ARS" class="h-24 w-24" />
+      <div class="flex flex-col leading-tight">
+        <span class="text-2xl font-bold tracking-tight text-white">ARS</span>
+        <span class="text-sm font-medium uppercase tracking-wider text-slate-500">{{ 'shell.backofficeLabel' | transloco }}</span>
+      </div>
     </div>
     <app-sidebar class="flex-1 overflow-y-auto" />
+    <div class="border-t border-slate-800 px-6 py-3">
+      <span class="text-xs text-slate-600">v{{ appVersion }}</span>
+    </div>
   </aside>
   <div class="flex min-w-0 flex-1 flex-col">
     <app-header />

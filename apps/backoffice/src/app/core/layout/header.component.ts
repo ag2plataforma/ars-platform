@@ -2,12 +2,13 @@ import { Component, computed } from '@angular/core';
 import { ButtonModule } from 'primeng/button';
 import { AvatarModule } from 'primeng/avatar';
 import { TooltipModule } from 'primeng/tooltip';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { AuthService } from '../auth/auth.service';
 
 @Component({
   selector: 'app-header',
   standalone: true,
-  imports: [ButtonModule, AvatarModule, TooltipModule],
+  imports: [ButtonModule, AvatarModule, TooltipModule, TranslocoPipe],
   templateUrl: './header.component.html',
 })
 export class HeaderComponent {

@@ -1,39 +1,13 @@
 <nav class="flex flex-col gap-1 overflow-y-auto px-3 py-4">
-  <a
-    routerLink="/dashboard"
-    routerLinkActive="bg-slate-800 text-white"
-    class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-300 transition-colors hover:bg-slate-800 hover:text-white"
-  >
-    <i class="pi pi-home text-base"></i>
-    <span>Inicio</span>
-  </a>
-
-  <a
-    routerLink="/catalogos"
-    routerLinkActive="bg-slate-800 text-white"
-    class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-300 transition-colors hover:bg-slate-800 hover:text-white"
-  >
-    <i class="pi pi-book text-base"></i>
-    <span>Catálogos</span>
-  </a>
-
-  <a
-    routerLink="/ubicaciones"
-    routerLinkActive="bg-slate-800 text-white"
-    class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-300 transition-colors hover:bg-slate-800 hover:text-white"
-  >
-    <i class="pi pi-map-marker text-base"></i>
-    <span>Ubicaciones</span>
-  </a>
-
   @for (item of items(); track item.Orden + item.Titulo) {
     <app-sidebar-nav-item [node]="item" />
   }
 
   @if (!loading() && items().length === 0) {
     <p class="px-3 pt-4 text-xs leading-relaxed text-slate-500">
-      Todavía no hay más secciones configuradas en el menú (SApplicationRole / SSiteMap) más allá de las
-      fijas de arriba.
+      {{ 'sidebar.emptyStatePart1' | transloco }}
+      <code class="font-mono">npm run db:seed-menu-config</code>
+      {{ 'sidebar.emptyStatePart2' | transloco }}
     </p>
   }
 </nav>

@@ -4,18 +4,20 @@ import { Router } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { MessageModule } from 'primeng/message';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { AuthService } from '../../../core/auth/auth.service';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [ReactiveFormsModule, ButtonModule, InputTextModule, MessageModule],
+  imports: [ReactiveFormsModule, ButtonModule, InputTextModule, MessageModule, TranslocoPipe],
   templateUrl: './login.component.html',
 })
 export class LoginComponent {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly transloco = inject(TranslocoService);
 
   readonly step = signal<'credentials' | 'twoFactor'>('credentials');
   readonly loading = signal(false);
@@ -46,7 +48,7 @@ export class LoginComponent {
         await this.router.navigateByUrl('/dashboard');
       }
     } catch {
-      this.errorMessage.set('Usuario o contraseña incorrectos.');
+      this.errorMessage.set(this.transloco.translate('login.credentialsError'));
     } finally {
       this.loading.set(false);
     }
@@ -61,7 +63,7 @@ export class LoginComponent {
       await this.auth.verifyTwoFactor(this.twoFactorToken, code);
       await this.router.navigateByUrl('/dashboard');
     } catch {
-      this.errorMessage.set('Código incorrecto.');
+      this.errorMessage.set(this.transloco.translate('login.codeError'));
     } finally {
       this.loading.set(false);
     }
