@@ -19,6 +19,7 @@ export class CurrenciesService {
       'DesCurrency',
       'IdeCurrency',
       'moneda',
+      { SState: true },
     );
   }
 

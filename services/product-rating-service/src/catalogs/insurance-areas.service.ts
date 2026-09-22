@@ -19,6 +19,7 @@ export class InsuranceAreasService {
       'DesInsuranceArea',
       'IdeInsuranceArea',
       'ramo de seguro',
+      { SState: true },
     );
   }
 

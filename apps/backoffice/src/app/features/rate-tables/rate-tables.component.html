@@ -1,0 +1,283 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex flex-col gap-6">
+  <div>
+    <div class="mb-4 flex items-center justify-between">
+      <div>
+        <h1 class="text-lg font-semibold text-slate-900">{{ 'rateTables.title' | transloco }}</h1>
+        <p class="text-sm text-slate-500">{{ 'rateTables.subtitle' | transloco }}</p>
+      </div>
+      <button pButton type="button" icon="pi pi-plus" [label]="'rateTables.newTableButton' | transloco" (click)="openCreate()"></button>
+    </div>
+
+    <p-table [value]="rows()" [loading]="loading()" dataKey="IdeRateTable" styleClass="p-datatable-sm">
+      <ng-template #header>
+        <tr>
+          <th>{{ 'catalogs.codeColumn' | transloco }}</th>
+          <th>{{ 'catalogs.descriptionColumn' | transloco }}</th>
+          <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+          <th class="w-56">{{ 'catalogs.actionsColumn' | transloco }}</th>
+        </tr>
+      </ng-template>
+      <ng-template #body let-row>
+        <tr [class.bg-slate-50]="selectedTable() && selectedTable()!['IdeRateTable'] === row['IdeRateTable']">
+          <td>{{ row.CodRateTable }}</td>
+          <td>{{ row.DesRateTable }}</td>
+          <td>
+            <p-tag [value]="(isActive(row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isActive(row) ? 'success' : 'danger'" />
+          </td>
+          <td>
+            <div class="flex gap-1">
+              <button pButton type="button" [label]="'products.configureButton' | transloco" icon="pi pi-cog" [text]="true" (click)="configure(row)"></button>
+              <button pButton type="button" icon="pi pi-pencil" [text]="true" severity="secondary" (click)="openEdit(row)"></button>
+              <button
+                pButton
+                type="button"
+                [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'"
+                [text]="true"
+                [severity]="isActive(row) ? 'danger' : 'success'"
+                (click)="toggleState(row)"
+              ></button>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template #emptymessage>
+        <tr>
+          <td colspan="4" class="text-center text-slate-500">{{ 'rateTables.emptyState' | transloco }}</td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+
+  @if (selectedTable(); as table) {
+    <div class="rounded-lg border border-slate-200 p-4">
+      <div class="mb-4 flex items-center justify-between">
+        <div>
+          <h2 class="text-base font-semibold text-slate-900">
+            {{ 'products.configuringTitle' | transloco: { des: table['DesRateTable'], cod: table['CodRateTable'] } }}
+          </h2>
+          <p class="text-sm text-slate-500">{{ 'rateTables.detailSubtitle' | transloco }}</p>
+        </div>
+        <button pButton type="button" icon="pi pi-times" [label]="'products.closeButton' | transloco" [text]="true" severity="secondary" (click)="closeDetail()"></button>
+      </div>
+
+      <div class="flex flex-col gap-6">
+        <!-- Factores -->
+        <div>
+          <div class="mb-2 flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-slate-900">{{ 'rateTables.factorsHeading' | transloco }}</h3>
+            <button
+              pButton
+              type="button"
+              icon="pi pi-plus"
+              [label]="'rateTables.newFactorButton' | transloco"
+              [text]="true"
+              [disabled]="factors().length >= 5"
+              (click)="openCreateFactor()"
+            ></button>
+          </div>
+          <p-table [value]="factors()" [loading]="factorsLoading()" dataKey="IdeRateFactor" styleClass="p-datatable-sm">
+            <ng-template #header>
+              <tr>
+                <th class="w-24">{{ 'rateTables.positionColumn' | transloco }}</th>
+                <th>{{ 'rateTables.fieldColumn' | transloco }}</th>
+                <th class="w-20">{{ 'catalogs.actionsColumn' | transloco }}</th>
+              </tr>
+            </ng-template>
+            <ng-template #body let-row>
+              <tr>
+                <td>{{ 'rateTables.factorPrefix' | transloco: { num: row.NumOrder } }}</td>
+                <td>{{ row.SFieldDictionary ? row.SFieldDictionary.DesFieldDictionary : ('common.dash' | transloco) }}</td>
+                <td>
+                  <button pButton type="button" icon="pi pi-pencil" [text]="true" severity="secondary" (click)="openEditFactor(row)"></button>
+                </td>
+              </tr>
+            </ng-template>
+            <ng-template #emptymessage>
+              <tr>
+                <td colspan="3" class="text-center text-slate-500">{{ 'rateTables.noFactorsYet' | transloco }}</td>
+              </tr>
+            </ng-template>
+          </p-table>
+        </div>
+
+        <!-- Valores -->
+        <div>
+          <div class="mb-2 flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-slate-900">{{ 'rateTables.valuesHeading' | transloco }}</h3>
+            <button pButton type="button" icon="pi pi-plus" [label]="'rateTables.newValueButton' | transloco" [text]="true" (click)="openCreateValue()"></button>
+          </div>
+          <p-table
+            [value]="values()"
+            [loading]="valuesLoading()"
+            dataKey="IdeRateValue"
+            [paginator]="true"
+            [rows]="10"
+            [rowsPerPageOptions]="[10, 25, 50]"
+            styleClass="p-datatable-sm"
+          >
+            <ng-template #header>
+              <tr>
+                <th>{{ factorLabels()[1] ?? ('rateTables.factorPrefix' | transloco: { num: 1 }) }}</th>
+                <th>{{ factorLabels()[2] ?? ('rateTables.factorPrefix' | transloco: { num: 2 }) }}</th>
+                <th>{{ factorLabels()[3] ?? ('rateTables.factorPrefix' | transloco: { num: 3 }) }}</th>
+                <th>{{ factorLabels()[4] ?? ('rateTables.factorPrefix' | transloco: { num: 4 }) }}</th>
+                <th>{{ factorLabels()[5] ?? ('rateTables.factorPrefix' | transloco: { num: 5 }) }}</th>
+                <th>{{ 'rateTables.valueColumn' | transloco }}</th>
+                <th>{{ 'rateTables.validityColumn' | transloco }}</th>
+                <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+                <th class="w-32">{{ 'catalogs.actionsColumn' | transloco }}</th>
+              </tr>
+            </ng-template>
+            <ng-template #body let-row>
+              <tr>
+                <td>{{ row.Factor1 || ('common.dash' | transloco) }}</td>
+                <td>{{ row.Factor2 || ('common.dash' | transloco) }}</td>
+                <td>{{ row.Factor3 || ('common.dash' | transloco) }}</td>
+                <td>{{ row.Factor4 || ('common.dash' | transloco) }}</td>
+                <td>{{ row.Factor5 || ('common.dash' | transloco) }}</td>
+                <td>{{ row.Value || ('common.dash' | transloco) }}</td>
+                <td>{{ row.TstInit | slice: 0 : 10 }} — {{ row.TstEnd | slice: 0 : 10 }}</td>
+                <td>
+                  <p-tag [value]="(isValueActive(row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isValueActive(row) ? 'success' : 'danger'" />
+                </td>
+                <td>
+                  <div class="flex gap-1">
+                    <button pButton type="button" icon="pi pi-pencil" [text]="true" severity="secondary" (click)="openEditValue(row)"></button>
+                    <button
+                      pButton
+                      type="button"
+                      [icon]="isValueActive(row) ? 'pi pi-ban' : 'pi pi-check'"
+                      [text]="true"
+                      [severity]="isValueActive(row) ? 'danger' : 'success'"
+                      (click)="toggleValueState(row)"
+                    ></button>
+                  </div>
+                </td>
+              </tr>
+            </ng-template>
+            <ng-template #emptymessage>
+              <tr>
+                <td colspan="9" class="text-center text-slate-500">{{ 'rateTables.noValuesYet' | transloco }}</td>
+              </tr>
+            </ng-template>
+          </p-table>
+        </div>
+      </div>
+    </div>
+  }
+</div>
+
+<!-- Diálogo: tabla de tarifa -->
+<p-dialog
+  [header]="(dialogMode() === 'create' ? 'rateTables.createDialogTitle' : 'rateTables.editDialogTitle') | transloco"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  [style]="{ width: '28rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'catalogs.codeColumn' | transloco }}</label>
+      <input pInputText formControlName="cod" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'catalogs.descriptionColumn' | transloco }}</label>
+      <input pInputText formControlName="des" class="w-full" />
+    </div>
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
+    </div>
+  </form>
+</p-dialog>
+
+<!-- Diálogo: factor -->
+<p-dialog
+  [header]="(factorDialogMode() === 'create' ? 'rateTables.factorCreateDialogTitle' : 'rateTables.factorEditDialogTitle') | transloco"
+  [visible]="factorDialogVisible()"
+  [modal]="true"
+  [style]="{ width: '28rem' }"
+  (visibleChange)="!$event && closeFactorDialog()"
+>
+  <form [formGroup]="factorForm" (ngSubmit)="submitFactor()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'rateTables.positionLabel' | transloco }}</label>
+      <input pInputText type="number" min="1" max="5" formControlName="numOrder" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'rateTables.fieldLabel' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codFieldDictionary"
+        [options]="fieldDictionary()"
+        optionLabel="DesFieldDictionary"
+        optionValue="CodFieldDictionary"
+        [showClear]="true"
+        [placeholder]="'rateTables.fieldPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeFactorDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
+    </div>
+  </form>
+</p-dialog>
+
+<!-- Diálogo: valor -->
+<p-dialog
+  [header]="(valueDialogMode() === 'create' ? 'rateTables.valueCreateDialogTitle' : 'rateTables.valueEditDialogTitle') | transloco"
+  [visible]="valueDialogVisible()"
+  [modal]="true"
+  [style]="{ width: '32rem' }"
+  (visibleChange)="!$event && closeValueDialog()"
+>
+  <form [formGroup]="valueForm" (ngSubmit)="submitValue()" class="flex flex-col gap-4 pt-2">
+    <div class="grid grid-cols-2 gap-4">
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ factorLabels()[1] ?? ('rateTables.factorPrefix' | transloco: { num: 1 }) }}</label>
+        <input pInputText formControlName="factor1" class="w-full" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ factorLabels()[2] ?? ('rateTables.factorPrefix' | transloco: { num: 2 }) }}</label>
+        <input pInputText formControlName="factor2" class="w-full" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ factorLabels()[3] ?? ('rateTables.factorPrefix' | transloco: { num: 3 }) }}</label>
+        <input pInputText formControlName="factor3" class="w-full" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ factorLabels()[4] ?? ('rateTables.factorPrefix' | transloco: { num: 4 }) }}</label>
+        <input pInputText formControlName="factor4" class="w-full" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ factorLabels()[5] ?? ('rateTables.factorPrefix' | transloco: { num: 5 }) }}</label>
+        <input pInputText formControlName="factor5" class="w-full" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'rateTables.valueColumn' | transloco }}</label>
+        <input pInputText formControlName="value" class="w-full" />
+      </div>
+    </div>
+    <div class="flex gap-4">
+      <div class="flex flex-1 flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.validFromLabel' | transloco }}</label>
+        <input pInputText type="date" formControlName="tstInit" class="w-full" />
+      </div>
+      <div class="flex flex-1 flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'rateTables.validToLabel' | transloco }}</label>
+        <input pInputText type="date" formControlName="tstEnd" class="w-full" />
+      </div>
+    </div>
+
+    <p class="text-xs text-slate-500">{{ 'rateTables.wildcardHint' | transloco }}</p>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeValueDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
+    </div>
+  </form>
+</p-dialog>

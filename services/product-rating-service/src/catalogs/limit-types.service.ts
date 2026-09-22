@@ -19,6 +19,7 @@ export class LimitTypesService {
       'DesLimitType',
       'IdeLimitType',
       'tipo de límite',
+      { SState: true },
     );
   }
 

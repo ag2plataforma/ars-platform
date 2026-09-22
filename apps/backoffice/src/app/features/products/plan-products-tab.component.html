@@ -1,0 +1,91 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex flex-col gap-4">
+  <div class="flex items-center justify-between">
+    <p class="text-sm text-slate-500">{{ 'products.planProducts.subtitle' | transloco }}</p>
+    <button pButton type="button" icon="pi pi-plus" [label]="'products.planProducts.newButton' | transloco" (click)="openCreate()"></button>
+  </div>
+
+  <p-table [value]="rows()" [loading]="loading()" dataKey="IdePlanProduct" styleClass="p-datatable-sm">
+    <ng-template #header>
+      <tr>
+        <th>{{ 'catalogs.codeColumn' | transloco }}</th>
+        <th>{{ 'catalogs.descriptionColumn' | transloco }}</th>
+        <th>{{ 'products.planProducts.validityColumn' | transloco }}</th>
+        <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+        <th class="w-32">{{ 'catalogs.actionsColumn' | transloco }}</th>
+      </tr>
+    </ng-template>
+    <ng-template #body let-row>
+      <tr>
+        <td>{{ row.CodPlanProduct }}</td>
+        <td>{{ row.DesPlanProduct }}</td>
+        <td>{{ row.TstInitial | slice: 0 : 10 }} — {{ row.TstEnd ? (row.TstEnd | slice: 0 : 10) : ('common.noEndDate' | transloco) }}</td>
+        <td>
+          <p-tag [value]="(isActive(row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isActive(row) ? 'success' : 'danger'" />
+        </td>
+        <td>
+          <div class="flex gap-1">
+            <button pButton type="button" icon="pi pi-pencil" [text]="true" severity="secondary" (click)="openEdit(row)"></button>
+            <button
+              pButton
+              type="button"
+              [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'"
+              [text]="true"
+              [severity]="isActive(row) ? 'danger' : 'success'"
+              (click)="toggleState(row)"
+            ></button>
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="5" class="text-center text-slate-500">{{ 'products.planProducts.emptyState' | transloco }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-dialog
+  [header]="(dialogMode() === 'create' ? 'products.planProducts.createDialogTitle' : 'products.planProducts.editDialogTitle') | transloco"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  [style]="{ width: '28rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'catalogs.codeColumn' | transloco }}</label>
+      <input pInputText formControlName="cod" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'catalogs.descriptionColumn' | transloco }}</label>
+      <input pInputText formControlName="des" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'products.shortDescriptionLabel' | transloco }}</label>
+      <input pInputText formControlName="desShort" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'products.longDescriptionLabel' | transloco }}</label>
+      <textarea pTextarea rows="3" formControlName="desLarge" class="w-full"></textarea>
+    </div>
+    <div class="flex gap-4">
+      <div class="flex flex-1 flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.validFromLabel' | transloco }}</label>
+        <input pInputText type="date" formControlName="tstInitial" class="w-full" />
+      </div>
+      <div class="flex flex-1 flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.validToLabel' | transloco }}</label>
+        <input pInputText type="date" formControlName="tstEnd" class="w-full" />
+      </div>
+    </div>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
+    </div>
+  </form>
+</p-dialog>

@@ -1,0 +1,250 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex flex-col gap-4">
+  <div class="flex max-w-md flex-col gap-2">
+    <label class="text-sm font-medium text-slate-700">{{ 'products.coveragePlans.planRiskLabel' | transloco }}</label>
+    <p-select
+      appendTo="body"
+      [options]="planProductRisks()"
+      optionLabel="IdePlanProductRisk"
+      optionValue="IdePlanProductRisk"
+      [ngModel]="selectedPlanProductRiskId()"
+      (ngModelChange)="onSelectPlanProductRisk($event)"
+      [showClear]="true"
+      [placeholder]="'products.coveragePlans.planRiskPlaceholder' | transloco"
+      styleClass="w-full"
+    >
+      <ng-template let-item #selectedItem>{{ planProductRiskLabel(item) }}</ng-template>
+      <ng-template let-item #item>{{ planProductRiskLabel(item) }}</ng-template>
+    </p-select>
+    @if (planProductRisks().length === 0) {
+      <p class="text-xs text-slate-500">{{ 'products.coveragePlans.noPlanRiskYet' | transloco }}</p>
+    }
+  </div>
+
+  @if (selectedPlanProductRiskId()) {
+    <div class="flex items-center justify-between">
+      <p class="text-sm text-slate-500">{{ 'products.coveragePlans.subtitle' | transloco }}</p>
+      <button pButton type="button" icon="pi pi-plus" [label]="'products.coveragePlans.newButton' | transloco" (click)="openCreate()"></button>
+    </div>
+
+    <p-table [value]="rows()" [loading]="loading()" dataKey="IdeCoveragePlan" styleClass="p-datatable-sm">
+      <ng-template #header>
+        <tr>
+          <th>{{ 'products.coveragePlans.orderColumn' | transloco }}</th>
+          <th>{{ 'products.coveragePlans.coverageColumn' | transloco }}</th>
+          <th>{{ 'products.coveragePlans.mandatoryColumn' | transloco }}</th>
+          <th>{{ 'products.coveragePlans.amountColumn' | transloco }}</th>
+          <th>{{ 'products.coveragePlans.validityColumn' | transloco }}</th>
+          <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+          <th class="w-32">{{ 'catalogs.actionsColumn' | transloco }}</th>
+        </tr>
+      </ng-template>
+      <ng-template #body let-row>
+        <tr>
+          <td>{{ row.Order }}</td>
+          <td>{{ coverageName(row) }}</td>
+          <td>{{ row.IndMandatory ? ('common.yes' | transloco) : ('common.no' | transloco) }}</td>
+          <td>{{ row.LowerAmount }} — {{ row.UpperAmount }}</td>
+          <td>{{ row.TstInitial | slice: 0 : 10 }} — {{ row.TstEnd ? (row.TstEnd | slice: 0 : 10) : ('common.noEndDate' | transloco) }}</td>
+          <td>
+            <p-tag [value]="(isActive(row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isActive(row) ? 'success' : 'danger'" />
+          </td>
+          <td>
+            <div class="flex gap-1">
+              <button pButton type="button" icon="pi pi-pencil" [text]="true" severity="secondary" (click)="openEdit(row)"></button>
+              <button
+                pButton
+                type="button"
+                [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'"
+                [text]="true"
+                [severity]="isActive(row) ? 'danger' : 'success'"
+                (click)="toggleState(row)"
+              ></button>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template #emptymessage>
+        <tr>
+          <td colspan="7" class="text-center text-slate-500">{{ 'products.coveragePlans.emptyState' | transloco }}</td>
+        </tr>
+      </ng-template>
+    </p-table>
+  }
+</div>
+
+<p-dialog
+  [header]="(dialogMode() === 'create' ? 'products.coveragePlans.createDialogTitle' : 'products.coveragePlans.editDialogTitle') | transloco"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  [style]="{ width: '44rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="grid grid-cols-2 gap-4">
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.coveragePlans.coverageLabel' | transloco }}</label>
+        <p-select
+          appendTo="body"
+          formControlName="codCoverage"
+          [options]="coverages()"
+          optionLabel="DesCoverage"
+          optionValue="CodCoverage"
+          [placeholder]="'products.coveragePlans.coveragePlaceholder' | transloco"
+          styleClass="w-full"
+        />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.coveragePlans.orderLabel' | transloco }}</label>
+        <input pInputText type="number" formControlName="order" class="w-full" />
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.shortDescriptionLabel' | transloco }}</label>
+        <input pInputText formControlName="desShort" class="w-full" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.longDescriptionLabel' | transloco }}</label>
+        <textarea pTextarea rows="2" formControlName="desLarge" class="w-full"></textarea>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.coveragePlans.deductibleTypeLabel' | transloco }}</label>
+        <p-select
+          appendTo="body"
+          formControlName="codDeductibleType"
+          [options]="deductibleTypes()"
+          optionLabel="DesDeductibleType"
+          optionValue="CodDeductibleType"
+          [placeholder]="'products.coveragePlans.deductibleTypePlaceholder' | transloco"
+          styleClass="w-full"
+        />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.coveragePlans.deductibleValueLabel' | transloco }}</label>
+        <input pInputText type="number" formControlName="deductibleTypeValue" class="w-full" />
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.coveragePlans.limitTypeLabel' | transloco }}</label>
+        <p-select
+          appendTo="body"
+          formControlName="codLimitType"
+          [options]="limitTypes()"
+          optionLabel="DesLimitType"
+          optionValue="CodLimitType"
+          [placeholder]="'products.coveragePlans.limitTypePlaceholder' | transloco"
+          styleClass="w-full"
+        />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.coveragePlans.limitValueLabel' | transloco }}</label>
+        <input pInputText type="number" formControlName="limitTypeValue" class="w-full" />
+      </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-4">
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="indFixedAmount" formControlName="indFixedAmount" />
+        <label for="indFixedAmount" class="text-sm text-slate-700">{{ 'products.coveragePlans.fixedAmountLabel' | transloco }}</label>
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="text-xs text-slate-500">{{ 'products.coveragePlans.lowerAmountLabel' | transloco }}</label>
+        <input pInputText type="number" formControlName="lowerAmount" class="w-full" />
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="text-xs text-slate-500">{{ 'products.coveragePlans.upperAmountLabel' | transloco }}</label>
+        <input pInputText type="number" formControlName="upperAmount" class="w-full" />
+      </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-4">
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="indFixedRate" formControlName="indFixedRate" />
+        <label for="indFixedRate" class="text-sm text-slate-700">{{ 'products.coveragePlans.fixedRateLabel' | transloco }}</label>
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="text-xs text-slate-500">{{ 'products.coveragePlans.lowerRateLabel' | transloco }}</label>
+        <input pInputText type="number" formControlName="lowerRate" class="w-full" />
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="text-xs text-slate-500">{{ 'products.coveragePlans.upperRateLabel' | transloco }}</label>
+        <input pInputText type="number" formControlName="upperRate" class="w-full" />
+      </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-4">
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="indFixedPrime" formControlName="indFixedPrime" />
+        <label for="indFixedPrime" class="text-sm text-slate-700">{{ 'products.coveragePlans.fixedPrimeLabel' | transloco }}</label>
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="text-xs text-slate-500">{{ 'products.coveragePlans.lowerPrimeLabel' | transloco }}</label>
+        <input pInputText type="number" formControlName="lowerPrime" class="w-full" />
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="text-xs text-slate-500">{{ 'products.coveragePlans.upperPrimeLabel' | transloco }}</label>
+        <input pInputText type="number" formControlName="upperPrime" class="w-full" />
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-x-4 gap-y-2">
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="indMandatory" formControlName="indMandatory" />
+        <label for="indMandatory" class="text-sm text-slate-700">{{ 'products.coveragePlans.mandatoryLabel' | transloco }}</label>
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="indSplitPayment" formControlName="indSplitPayment" />
+        <label for="indSplitPayment" class="text-sm text-slate-700">{{ 'products.coveragePlans.splitPaymentLabel' | transloco }}</label>
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="getPrime" formControlName="getPrime" />
+        <label for="getPrime" class="text-sm text-slate-700">{{ 'products.coveragePlans.getPrimeLabel' | transloco }}</label>
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="indPayPerUse" formControlName="indPayPerUse" />
+        <label for="indPayPerUse" class="text-sm text-slate-700">{{ 'products.coveragePlans.payPerUseLabel' | transloco }}</label>
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="refundPrime" formControlName="refundPrime" />
+        <label for="refundPrime" class="text-sm text-slate-700">{{ 'products.coveragePlans.refundPrimeLabel' | transloco }}</label>
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="proratedGetPrime" formControlName="proratedGetPrime" />
+        <label for="proratedGetPrime" class="text-sm text-slate-700">{{ 'products.coveragePlans.proratedGetPrimeLabel' | transloco }}</label>
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="proratedRefundPrime" formControlName="proratedRefundPrime" />
+        <label for="proratedRefundPrime" class="text-sm text-slate-700">{{ 'products.coveragePlans.proratedRefundPrimeLabel' | transloco }}</label>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-4">
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.coveragePlans.waitingPeriodLabel' | transloco }}</label>
+        <input pInputText type="number" formControlName="numMonthsWaitingPeriod" class="w-full" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.validFromLabel' | transloco }}</label>
+        <input pInputText type="date" formControlName="tstInitial" class="w-full" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.validToLabel' | transloco }}</label>
+        <input pInputText type="date" formControlName="tstEnd" class="w-full" />
+      </div>
+    </div>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
+    </div>
+  </form>
+</p-dialog>

@@ -13,10 +13,14 @@ import { RateValuesService } from './rate-values.service';
  * CRUD de configuración de `SRateTable`/`SRateFactor`/`SRateValue`
  * (tablas de tarifa multidimensional, hasta 5 factores) + `getRateValue`
  * (equivalente exacto a `FGetRateValue`, ver `rate-values.service.ts`).
- * `PrismaRateValueResolver` se registra también acá (además de en
- * `ProductRatingRulesEngineModule`, donde se enlaza al motor de reglas
- * como `RATE_VALUE_RESOLVER`) para que `RateValuesService` lo inyecte
- * directamente y no duplique la lógica de búsqueda.
+ * `PrismaRateValueResolver` se registra directamente acá para que
+ * `RateValuesService` lo inyecte sin duplicar la lógica de búsqueda --
+ * `underwriting-service` tiene su propio binding independiente como
+ * `RATE_VALUE_RESOLVER` (`UnderwritingRulesEngineModule`) para el motor
+ * de reglas real; el `ProductRatingRulesEngineModule`/`/rules-engine/*`
+ * de prueba que existía acá se retiró (ver docs/02-roadmap.md), ya
+ * cumplida la condición de su propio doc-comment: "se retira cuando
+ * exista el CRUD real de cotización/cobertura que lo use".
  */
 @Module({
   imports: [ProductRatingStateMachineModule],

@@ -1,0 +1,190 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex flex-col gap-6">
+  <div>
+    <div class="mb-4 flex items-center justify-between">
+      <div>
+        <h1 class="text-lg font-semibold text-slate-900">{{ 'products.title' | transloco }}</h1>
+        <p class="text-sm text-slate-500">
+          {{ 'products.subtitle' | transloco }}
+        </p>
+      </div>
+      <button pButton type="button" icon="pi pi-plus" [label]="'products.newButton' | transloco" (click)="openCreate()"></button>
+    </div>
+
+    <p-table
+      [value]="rows()"
+      [loading]="loading()"
+      dataKey="IdeProduct"
+      [paginator]="true"
+      [rows]="10"
+      [rowsPerPageOptions]="[10, 25, 50]"
+      styleClass="p-datatable-sm"
+    >
+      <ng-template #header>
+        <tr>
+          <th>{{ 'catalogs.codeColumn' | transloco }}</th>
+          <th>{{ 'catalogs.descriptionColumn' | transloco }}</th>
+          <th>{{ 'products.areaColumn' | transloco }}</th>
+          <th>{{ 'products.currencyColumn' | transloco }}</th>
+          <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+          <th class="w-56">{{ 'catalogs.actionsColumn' | transloco }}</th>
+        </tr>
+      </ng-template>
+      <ng-template #body let-row>
+        <tr [class.bg-slate-50]="selectedProduct() && selectedProduct()!['IdeProduct'] === row['IdeProduct']">
+          <td>{{ row.CodProduct }}</td>
+          <td>{{ row.DesProduct }}</td>
+          <td>{{ areaName(row) }}</td>
+          <td>{{ currencyName(row) }}</td>
+          <td>
+            <p-tag [value]="(isActive(row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isActive(row) ? 'success' : 'danger'" />
+          </td>
+          <td>
+            <div class="flex gap-1">
+              <button pButton type="button" [label]="'products.configureButton' | transloco" icon="pi pi-cog" [text]="true" (click)="configure(row)"></button>
+              <button pButton type="button" icon="pi pi-pencil" [text]="true" severity="secondary" (click)="openEdit(row)"></button>
+              <button
+                pButton
+                type="button"
+                [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'"
+                [text]="true"
+                [severity]="isActive(row) ? 'danger' : 'success'"
+                (click)="toggleState(row)"
+              ></button>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template #emptymessage>
+        <tr>
+          <td colspan="6" class="text-center text-slate-500">{{ 'products.emptyState' | transloco }}</td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+
+  @if (selectedProduct(); as product) {
+    <div class="rounded-lg border border-slate-200 p-4">
+      <div class="mb-4 flex items-center justify-between">
+        <div>
+          <h2 class="text-base font-semibold text-slate-900">
+            {{ 'products.configuringTitle' | transloco: { des: product['DesProduct'], cod: product['CodProduct'] } }}
+          </h2>
+          <p class="text-sm text-slate-500">{{ 'products.configuringSubtitle' | transloco }}</p>
+        </div>
+        <button pButton type="button" icon="pi pi-times" [label]="'products.closeButton' | transloco" [text]="true" severity="secondary" (click)="closeDetail()"></button>
+      </div>
+
+      <p-tabs [value]="activeChildTab()" (valueChange)="activeChildTab.set($event ?? 'risk-products')">
+        <p-tablist>
+          <p-tab value="risk-products">{{ 'products.riskProductsTab' | transloco }}</p-tab>
+          <p-tab value="plan-products">{{ 'products.planProductsTab' | transloco }}</p-tab>
+          <p-tab value="plan-product-risks">{{ 'products.planProductRisksTab' | transloco }}</p-tab>
+          <p-tab value="coverage-plans">{{ 'products.coveragePlansTab' | transloco }}</p-tab>
+          <p-tab value="calculation-rules">{{ 'products.calculationRulesTab' | transloco }}</p-tab>
+        </p-tablist>
+        <p-tabpanels>
+          <p-tabpanel value="risk-products">
+            <app-risk-products-tab [product]="product" />
+          </p-tabpanel>
+          <p-tabpanel value="plan-products">
+            <app-plan-products-tab [product]="product" />
+          </p-tabpanel>
+          <p-tabpanel value="plan-product-risks">
+            <app-plan-product-risks-tab [product]="product" />
+          </p-tabpanel>
+          <p-tabpanel value="coverage-plans">
+            <app-coverage-plans-tab [product]="product" />
+          </p-tabpanel>
+          <p-tabpanel value="calculation-rules">
+            <app-calculation-rules-tab [product]="product" />
+          </p-tabpanel>
+        </p-tabpanels>
+      </p-tabs>
+    </div>
+  }
+</div>
+
+<p-dialog
+  [header]="(dialogMode() === 'create' ? 'products.createDialogTitle' : 'products.editDialogTitle') | transloco"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  [style]="{ width: '32rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'catalogs.codeColumn' | transloco }}</label>
+      <input pInputText formControlName="cod" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'catalogs.descriptionColumn' | transloco }}</label>
+      <input pInputText formControlName="des" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'products.shortDescriptionLabel' | transloco }}</label>
+      <input pInputText formControlName="desShort" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'products.longDescriptionLabel' | transloco }}</label>
+      <textarea pTextarea rows="3" formControlName="desLarge" class="w-full"></textarea>
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'products.insuranceAreaLabel' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codInsuranceArea"
+        [options]="insuranceAreas()"
+        optionLabel="DesInsuranceArea"
+        optionValue="CodInsuranceArea"
+        [placeholder]="'products.insuranceAreaPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'products.currencyLabel' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codCurrency"
+        [options]="currencies()"
+        optionLabel="DesCurrency"
+        optionValue="CodCurrency"
+        [placeholder]="'products.currencyPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'products.startTimeCodeLabel' | transloco }}</label>
+      <input pInputText formControlName="codStartTime" placeholder="ej. EMISSION" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'products.validityDaysLabel' | transloco }}</label>
+      <input pInputText type="number" formControlName="validityDays" class="w-full" />
+    </div>
+    <div class="flex items-center gap-2">
+      <input type="checkbox" id="indGenerateAllFraction" formControlName="indGenerateAllFraction" />
+      <label for="indGenerateAllFraction" class="text-sm text-slate-700">{{ 'products.generateAllFractionLabel' | transloco }}</label>
+    </div>
+    <div class="flex items-center gap-2">
+      <input type="checkbox" id="indProportionalPrime" formControlName="indProportionalPrime" />
+      <label for="indProportionalPrime" class="text-sm text-slate-700">{{ 'products.proportionalPrimeLabel' | transloco }}</label>
+    </div>
+    <div class="flex gap-4">
+      <div class="flex flex-1 flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.validFromLabel' | transloco }}</label>
+        <input pInputText type="date" formControlName="tstInitial" class="w-full" />
+      </div>
+      <div class="flex flex-1 flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.validToLabel' | transloco }}</label>
+        <input pInputText type="date" formControlName="tstEnd" class="w-full" />
+      </div>
+    </div>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
+    </div>
+  </form>
+</p-dialog>

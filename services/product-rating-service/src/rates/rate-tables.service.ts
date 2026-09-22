@@ -38,7 +38,7 @@ export class RateTablesService {
       'DesRateTable',
       'IdeRateTable',
       'tabla de tarifa',
-      { SRateFactor: { orderBy: { NumOrder: 'asc' }, include: { SFieldDictionary: true } } },
+      { SRateFactor: { orderBy: { NumOrder: 'asc' }, include: { SFieldDictionary: true } }, SState: true },
     );
   }
 

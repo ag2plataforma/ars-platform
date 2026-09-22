@@ -1,0 +1,170 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex flex-col gap-4">
+  <div class="grid grid-cols-2 gap-4">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'products.coveragePlans.planRiskLabel' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        [options]="planProductRisks()"
+        optionLabel="IdePlanProductRisk"
+        optionValue="IdePlanProductRisk"
+        [ngModel]="selectedPlanProductRiskId()"
+        (ngModelChange)="onSelectPlanProductRisk($event)"
+        [showClear]="true"
+        [placeholder]="'products.coveragePlans.planRiskPlaceholder' | transloco"
+        styleClass="w-full"
+      >
+        <ng-template let-item #selectedItem>{{ planProductRiskLabel(item) }}</ng-template>
+        <ng-template let-item #item>{{ planProductRiskLabel(item) }}</ng-template>
+      </p-select>
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'products.calculationRules.coveragePlanLabel' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        [options]="coveragePlans()"
+        optionLabel="IdeCoveragePlan"
+        optionValue="IdeCoveragePlan"
+        [ngModel]="selectedCoveragePlanId()"
+        (ngModelChange)="onSelectCoveragePlan($event)"
+        [showClear]="true"
+        [disabled]="!selectedPlanProductRiskId()"
+        [placeholder]="'products.calculationRules.coveragePlanPlaceholder' | transloco"
+        styleClass="w-full"
+      >
+        <ng-template let-item #selectedItem>{{ coveragePlanLabel(item) }}</ng-template>
+        <ng-template let-item #item>{{ coveragePlanLabel(item) }}</ng-template>
+      </p-select>
+    </div>
+  </div>
+
+  @if (selectedCoveragePlanId()) {
+    <div class="flex items-center justify-between">
+      <p class="text-sm text-slate-500">{{ 'products.calculationRules.subtitle' | transloco }}</p>
+      <button pButton type="button" icon="pi pi-plus" [label]="'products.calculationRules.newButton' | transloco" (click)="openCreate()"></button>
+    </div>
+
+    <p-table [value]="rows()" [loading]="loading()" dataKey="IdeCalculationRule" styleClass="p-datatable-sm">
+      <ng-template #header>
+        <tr>
+          <th>{{ 'products.calculationRules.orderColumn' | transloco }}</th>
+          <th>{{ 'catalogs.codeColumn' | transloco }}</th>
+          <th>{{ 'catalogs.descriptionColumn' | transloco }}</th>
+          <th>{{ 'products.calculationRules.conceptColumn' | transloco }}</th>
+          <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+          <th class="w-32">{{ 'catalogs.actionsColumn' | transloco }}</th>
+        </tr>
+      </ng-template>
+      <ng-template #body let-row>
+        <tr>
+          <td>{{ row.Order }}</td>
+          <td>{{ row.CodCalculationRule }}</td>
+          <td>{{ row.DesCalculationRule }}</td>
+          <td>{{ conceptName(row) }}</td>
+          <td>
+            <p-tag [value]="(isActive(row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isActive(row) ? 'success' : 'danger'" />
+          </td>
+          <td>
+            <div class="flex gap-1">
+              <button pButton type="button" icon="pi pi-pencil" [text]="true" severity="secondary" (click)="openEdit(row)"></button>
+              <button
+                pButton
+                type="button"
+                [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'"
+                [text]="true"
+                [severity]="isActive(row) ? 'danger' : 'success'"
+                (click)="toggleState(row)"
+              ></button>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template #emptymessage>
+        <tr>
+          <td colspan="6" class="text-center text-slate-500">{{ 'products.calculationRules.emptyState' | transloco }}</td>
+        </tr>
+      </ng-template>
+    </p-table>
+  }
+</div>
+
+<p-dialog
+  [header]="(dialogMode() === 'create' ? 'products.calculationRules.createDialogTitle' : 'products.calculationRules.editDialogTitle') | transloco"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  [style]="{ width: '36rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="grid grid-cols-2 gap-4">
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'catalogs.codeColumn' | transloco }}</label>
+        <input pInputText formControlName="cod" class="w-full" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.calculationRules.orderLabel' | transloco }}</label>
+        <input pInputText type="number" formControlName="order" class="w-full" />
+      </div>
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'catalogs.descriptionColumn' | transloco }}</label>
+      <input pInputText formControlName="des" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'products.calculationRules.conceptLabel' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codConcept"
+        [options]="concepts()"
+        optionLabel="DesConcept"
+        optionValue="CodConcept"
+        [placeholder]="'products.calculationRules.conceptPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+
+    <div class="rounded-md border border-slate-200 p-3">
+      <p class="mb-2 text-xs text-slate-500">
+        {{ 'products.calculationRules.formulaHintPart1' | transloco }}
+        <code>RulesEngineService</code>
+        {{ 'products.calculationRules.formulaHintPart2' | transloco }}
+        <code>rule('COD')</code>
+        {{ 'products.calculationRules.formulaHintPart3' | transloco }}
+        <code>FGetRateValue(...)</code>
+        {{ 'products.calculationRules.formulaHintPart4' | transloco }}
+      </p>
+      <div class="flex flex-col gap-3">
+        <div class="flex flex-col gap-1">
+          <label class="text-sm font-medium text-slate-700">IF</label>
+          <input pInputText formControlName="formulaIf" class="w-full font-mono text-sm" />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-sm font-medium text-slate-700">THEN</label>
+          <input pInputText formControlName="formulaThen" class="w-full font-mono text-sm" />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-sm font-medium text-slate-700">ELSE</label>
+          <input pInputText formControlName="formulaElse" class="w-full font-mono text-sm" />
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.calculationRules.entityCodeLabel' | transloco }}</label>
+        <input pInputText formControlName="codEntityReference" class="w-full" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.calculationRules.columnNameLabel' | transloco }}</label>
+        <input pInputText formControlName="desColumnName" class="w-full" />
+      </div>
+    </div>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
+    </div>
+  </form>
+</p-dialog>

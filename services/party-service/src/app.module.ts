@@ -7,13 +7,16 @@ import { HealthController } from './health/health.controller';
 import { PersonsModule } from './persons/persons.module';
 import { ConsentModule } from './consent/consent.module';
 import { BrokersModule } from './brokers/brokers.module';
+import { DistributionModule } from './distribution/distribution.module';
 
 /**
  * Alcance real ya en marcha (ver docs/02-roadmap.md y el README de este
  * servicio para el detalle de alcance/lo deliberadamente diferido):
  * personas y consentimiento GDPR (PersonsModule/ConsentModule), y
  * brokers/comisiones por canal (BrokersModule -- TBroker/SCommissionTree/
- * SCommissionTable/SCommission).
+ * SCommissionTable/SCommission), y catálogos de distribución
+ * (DistributionModule -- SChannelType/SDistributionChannel/
+ * SDistributionWay, prerequisito real de Cotización, ver su comentario).
  */
 @Module({
   imports: [
@@ -29,6 +32,7 @@ import { BrokersModule } from './brokers/brokers.module';
     PersonsModule,
     ConsentModule,
     BrokersModule,
+    DistributionModule,
   ],
   controllers: [HealthController],
 })

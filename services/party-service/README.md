@@ -41,6 +41,14 @@ Equivalente a `FConsent`, confirmado contra el código real. **Corrección delib
 
 **Deliberadamente afuera de esta fase**: la asociación persona+rol+cotización (`TQuotePerson`) -- eso vive naturalmente del lado de `underwriting-service` (mutación sobre el agregado cotización, mismo patrón que `selectPlan`/`toggleCoverage`), y es el siguiente ítem del roadmap (resumen y aceptación de cotización).
 
+### `DistributionModule` -- catálogos de distribución (fase "Catálogos de producto")
+
+`SChannelType`/`SDistributionChannel`/`SDistributionWay` -- sin CRUD en ningún servicio hasta esta fase (`BrokersModule` ya los daba por "asumidos sembrados", igual que `SBrokerType`). Prerequisito real de Cotización: `CreateQuoteDto.codDistributionChannel`/`codDistributionWay` (`underwriting-service`/`quotes.service.ts`) los resuelve por código contra estas mismas tablas, y hasta ahora no había ninguna forma de darlos de alta salvo a mano en la base. Van acá y no en `product-rating-service` porque `SDistributionChannel` referencia `TBroker`/`TPerson`, que este servicio ya resuelve localmente sin llamada HTTP entre servicios (mismo criterio que `BrokersModule`).
+
+- `GET/POST /channel-types`, `GET/PATCH /channel-types/:id`, `PATCH /channel-types/:id/state` (`ADMIN` para mutaciones) -- catálogo simple `SChannelType`.
+- `GET/POST /distribution-ways`, `GET/PATCH /distribution-ways/:id`, `PATCH /distribution-ways/:id/state` -- catálogo simple `SDistributionWay`.
+- `GET/POST /distribution-channels`, `GET/PATCH /distribution-channels/:id`, `PATCH /distribution-channels/:id/state` -- `SDistributionChannel`; resuelve `codChannelType`→`SChannelType`, `codDistributionChannelParent`→`SDistributionChannel` (jerarquía opcional, mismo criterio `''`=desasociar/código=resolver/omitido=intacto que `SRiskLevel` en product-rating-service), `codBroker`→`TBroker` y valida que `idePerson`→`TPerson` exista si se envía.
+
 ## Cómo correrlo
 
 ```bash

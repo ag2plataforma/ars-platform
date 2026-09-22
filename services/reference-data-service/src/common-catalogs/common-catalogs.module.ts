@@ -20,6 +20,10 @@ import { CountriesController } from './countries.controller';
 import { CountriesService } from './countries.service';
 import { LocationsController } from './locations.controller';
 import { LocationsService } from './locations.service';
+import { ConceptTypesController } from './concept-types.controller';
+import { ConceptTypesService } from './concept-types.service';
+import { ConceptsController } from './concepts.controller';
+import { ConceptsService } from './concepts.service';
 
 /**
  * Catálogos comunes que menciona el alcance original del README de este
@@ -36,7 +40,9 @@ import { LocationsService } from './locations.service';
  * escribe a mano porque su unicidad real es compuesta
  * (`CodLocation`+`IdeCountry`, no un código único global) y tiene
  * jerarquía propia -- ver el comentario de cabecera de
- * `locations.service.ts`.
+ * `locations.service.ts`. `SConceptType`/`SConcept` son la excepción
+ * más nueva: sin CRUD en ningún servicio hasta esta fase, prerequisito
+ * real de `SCalculationRule.CodConcept` (ver `concepts.service.ts`).
  */
 @Module({
   imports: [ReferenceDataStateMachineModule],
@@ -51,6 +57,8 @@ import { LocationsService } from './locations.service';
     ContactClassesController,
     CountriesController,
     LocationsController,
+    ConceptTypesController,
+    ConceptsController,
   ],
   providers: [
     LanguagesService,
@@ -63,6 +71,8 @@ import { LocationsService } from './locations.service';
     ContactClassesService,
     CountriesService,
     LocationsService,
+    ConceptTypesService,
+    ConceptsService,
   ],
 })
 export class CommonCatalogsModule {}

@@ -5,6 +5,8 @@ import { CatalogCrudService } from '@ars-platform/shared-common';
 import { CreateRiskDto } from './dto/create-risk.dto';
 import { UpdateRiskDto } from './dto/update-risk.dto';
 
+const INCLUDE = { SRiskLevel: true, SState: true } as const;
+
 @Injectable()
 export class RisksService {
   private readonly crud: CatalogCrudService<SRisk>;
@@ -19,6 +21,7 @@ export class RisksService {
       'DesRisk',
       'IdeRisk',
       'riesgo',
+      INCLUDE,
     );
   }
 

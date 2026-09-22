@@ -6,7 +6,7 @@ import { UpdateRateValueDto } from './dto/update-rate-value.dto';
 import { ListRateValuesDto } from './dto/list-rate-values.dto';
 import { GetRateValueDto } from './dto/get-rate-value.dto';
 
-const INCLUDE = { SRateTable: true } as const;
+const INCLUDE = { SRateTable: true, SState: true } as const;
 
 /**
  * `SRateValue` — una fila de una tabla de tarifa: valores concretos para

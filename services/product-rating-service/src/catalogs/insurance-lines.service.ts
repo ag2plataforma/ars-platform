@@ -5,6 +5,8 @@ import { CatalogCrudService } from '@ars-platform/shared-common';
 import { CreateInsuranceLineDto } from './dto/create-insurance-line.dto';
 import { UpdateInsuranceLineDto } from './dto/update-insurance-line.dto';
 
+const INCLUDE = { SInsuranceArea: true, SState: true } as const;
+
 @Injectable()
 export class InsuranceLinesService {
   private readonly crud: CatalogCrudService<SInsuranceLine>;
@@ -19,6 +21,7 @@ export class InsuranceLinesService {
       'DesInsuranceLine',
       'IdeInsuranceLine',
       'línea de seguro',
+      INCLUDE,
     );
   }
 

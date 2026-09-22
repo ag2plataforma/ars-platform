@@ -19,6 +19,7 @@ export class RiskTypesService {
       'DesRiskType',
       'IdeRiskType',
       'tipo de riesgo',
+      { SState: true },
     );
   }
 

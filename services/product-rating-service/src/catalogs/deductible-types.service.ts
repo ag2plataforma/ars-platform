@@ -19,6 +19,7 @@ export class DeductibleTypesService {
       'DesDeductibleType',
       'IdeDeductibleType',
       'tipo de deducible',
+      { SState: true },
     );
   }
 

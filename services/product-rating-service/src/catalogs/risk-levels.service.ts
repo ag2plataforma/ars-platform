@@ -19,6 +19,7 @@ export class RiskLevelsService {
       'DesRiskLevel',
       'IdeRiskLevel',
       'nivel de riesgo',
+      { SState: true },
     );
   }
 
