@@ -28,6 +28,21 @@ export interface EvaluationContext {
    *  sobre la que se aplican las reglas y se resuelven referencias
    *  `rule(...)`. */
   ideCoverageOrMovement: string;
+  /**
+   * Handle opaco de la transacción activa del llamador (si hay una),
+   * reenviado tal cual a `AttributeValueResolver`/`RuleValueResolver` --
+   * `shared-common` no depende de Prisma (ver el doc-comment de
+   * `calculation-rule.interface.ts`), así que este motor nunca lo
+   * interpreta, solo lo pasa. Necesario para el caso de `origin: 'Contract'`
+   * cuando `evaluateChain` se invoca DENTRO de una transacción que todavía
+   * no hizo commit de los datos que estos resolvers necesitan leer
+   * (`TFileRisk.RiskAttributeValue`, `TMovementConcept`) -- ver
+   * `ContractsService.createInitialMovements` y el fix documentado en
+   * docs/02-roadmap.md: sin esto, esos resolvers leen por su propia
+   * conexión Prisma no-transaccional y, bajo READ COMMITTED, no ven filas
+   * que la transacción activa escribió pero todavía no confirmó.
+   */
+  dbTransaction?: unknown;
 }
 
 export interface EvaluationResult {
@@ -160,6 +175,7 @@ export class RulesEngineService {
           context.origin,
           context.ideOriginRisk,
           token.ideAttribute,
+          context.dbTransaction,
         );
         result = result.replace(new RegExp(boundaryPattern, 'g'), value);
       }
@@ -183,6 +199,7 @@ export class RulesEngineService {
             context.origin,
             context.ideCoverageOrMovement,
             codCalculationRule,
+            context.dbTransaction,
           );
       result = result.replace(match[0], String(value));
     }
@@ -199,9 +216,20 @@ export class RulesEngineService {
    * argumentos siempre): cada argumento es un texto entre comillas simples
    * (puede contener un token de custom field, ya sustituido por
    * `substituteFieldTokens` antes de llegar acá — por eso este paso corre
-   * DESPUÉS de esa sustitución) o la palabra `NULL` (sin comillas) para
-   * omitir esa dimensión, igual que se escribiría en SQL. `codRateTable` y
-   * `factor1` no admiten `NULL` (ver `RateValueResolver`).
+   * DESPUÉS de esa sustitución) o la palabra `NULL` (sin comillas, en
+   * cualquier combinación de mayúsculas/minúsculas) para omitir esa
+   * dimensión, igual que se escribiría en SQL. `codRateTable` y `factor1`
+   * no admiten `NULL` (ver `RateValueResolver`).
+   *
+   * Tolera además la sintaxis de SQL dinámico del original tal cual sale
+   * migrada del esquema legado -- ej. `entity."FGetRateValue"(...)` (alias
+   * de schema + nombre entre comillas dobles) -- decisión explícita del
+   * usuario al migrar datos reales de `SCalculationRule`: en vez de exigir
+   * reescribir cada fórmula migrada a la forma "pelada", el patrón acepta
+   * un prefijo `alias.` opcional y comillas dobles opcionales alrededor
+   * del nombre de la función, así una fórmula copiada literal del esquema
+   * viejo funciona sin edición manual. No cambia ningún valor ni algoritmo
+   * calculado -- solo qué tan flexible es el reconocimiento del llamado.
    *
    * OJO al configurar una fórmula: un custom field usado como argumento
    * SIEMPRE debe ir entre comillas (ej. `FGetRateValue('TARIFA_EDAD',
@@ -212,7 +240,7 @@ export class RulesEngineService {
    * método lo rechaza con un error claro en vez de fallar en silencio.
    */
   private async substituteRateValueReferences(expr: string): Promise<string> {
-    const pattern = /FGetRateValue\(([^()]*)\)/gi;
+    const pattern = /(?:[A-Za-z_][A-Za-z0-9_]*\.)?"?FGetRateValue"?\(([^()]*)\)/gi;
     let result = expr;
     const matches = [...expr.matchAll(pattern)];
     for (const match of matches) {

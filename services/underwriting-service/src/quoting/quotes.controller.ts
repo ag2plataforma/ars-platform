@@ -1,10 +1,11 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { CurrentUser, JwtPayload } from '@ars-platform/shared-common';
 import { QuotesService } from './quotes.service';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { ToggleCoverageDto } from './dto/toggle-coverage.dto';
 import { SetQuotePersonDto } from './dto/set-quote-person.dto';
 import { TransitionQuoteStateDto } from './dto/transition-quote-state.dto';
+import { ListQuotesDto } from './dto/list-quotes.dto';
 
 /**
  * Fase 1 del motor de cotización real (ver el comentario de cabecera de
@@ -27,6 +28,16 @@ export class QuotesController {
   @Post()
   create(@Body() dto: CreateQuoteDto, @CurrentUser() actor: JwtPayload) {
     return this.service.create(dto, actor.code);
+  }
+
+  /**
+   * Listado paginado/filtrable (ver `ListQuotesDto`) -- no colisiona con
+   * `GET :id` de abajo (rutas de distinta longitud, `/quotes` vs
+   * `/quotes/:id`), así que el orden de declaración no importa acá.
+   */
+  @Get()
+  findAll(@Query() query: ListQuotesDto, @CurrentUser() actor: JwtPayload) {
+    return this.service.findAll(query, actor.code);
   }
 
   @Get(':id')

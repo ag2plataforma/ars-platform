@@ -7,25 +7,44 @@
  * §3.4): las fórmulas originales son fragmentos de expresión SQL en texto
  * plano (ej. `TRUE`, `100 > 50`, `100 * 0.05`), después de que
  * `RulesEngineService` ya sustituyó los custom fields y las referencias
- * `rule('COD')` por sus valores. Para cuando llegan aquí solo quedan
- * números, operadores aritméticos/de comparación, paréntesis y
- * opcionalmente `TRUE`/`FALSE`/`AND`/`OR`/`NOT`.
+ * `rule('COD')` por sus valores. Para cuando llegan acá solo quedan
+ * números, operadores aritméticos/de comparación, paréntesis,
+ * opcionalmente `TRUE`/`FALSE`/`AND`/`OR`/`NOT`, y opcionalmente `round(...)`
+ * (ver más abajo) -- `FGetRateValue(...)` en cambio se resuelve ANTES, en
+ * `RulesEngineService.substituteRateValueReferences`, así que nunca llega
+ * hasta acá.
  *
  * Implementación: tokenizer + parser recursivo-descendente -> AST ->
  * evaluación del AST. Nada de código se ejecuta como JS/SQL: cada
  * carácter de la fórmula pasa por un tokenizer cerrado (solo reconoce
- * números, los operadores de esta lista y las cinco palabras clave) antes
- * de construirse el árbol, así que no hay superficie de inyección.
+ * números, los operadores de esta lista, `round`/`,` y las cinco palabras
+ * clave) antes de construirse el árbol, así que no hay superficie de
+ * inyección.
  *
  * Soporta también `=` (estilo SQL, como en los datos originales) además
  * de `==`, y `<>` además de `!=`.
+ *
+ * `round(x)` / `round(x, decimales)`: confirmado contra 62 filas reales de
+ * `SCalculationRule.FormulaJSON` (todas con la forma
+ * `round(<expresión con rule(...)>, 2)`, ver docs/02-roadmap.md) que la
+ * fórmula original usa la función SQL estándar `ROUND` de Postgres, no
+ * una función de negocio propia -- por eso no hizo falta confirmar nada
+ * contra código PL/pgSQL propio, solo replicar el `ROUND(numeric,
+ * integer)` real de Postgres: redondeo "half away from zero" (0.5 se
+ * redondea siempre alejándose de cero, ej. 2.5->3 y -2.5->-3), DISTINTO
+ * del "banker's rounding"/half-to-even que usan otros motores, y también
+ * distinto de `Math.round` de JS para negativos (`Math.round(-2.5)` da
+ * -2, no -3). El segundo argumento (decimales) es opcional -- si se omite
+ * se redondea a entero, igual que el `ROUND(numeric)` de un solo
+ * argumento de Postgres -- aunque las 62 fórmulas reales encontradas
+ * siempre lo pasan explícito (`, 2`).
  */
 
 type Token =
   | { type: 'NUMBER'; value: string }
   | { type: 'COMPOP'; value: '=' | '!=' | '>' | '>=' | '<' | '<=' }
-  | { type: 'TRUE' | 'FALSE' | 'AND' | 'OR' | 'NOT' }
-  | { type: '+' | '-' | '*' | '/' | '%' | '^' | '(' | ')' }
+  | { type: 'TRUE' | 'FALSE' | 'AND' | 'OR' | 'NOT' | 'ROUND' }
+  | { type: '+' | '-' | '*' | '/' | '%' | '^' | '(' | ')' | ',' }
   | { type: 'EOF' };
 
 type AstNode =
@@ -35,7 +54,8 @@ type AstNode =
   | { kind: 'binary'; op: '+' | '-' | '*' | '/' | '%' | '^'; left: AstNode; right: AstNode }
   | { kind: 'compare'; op: '=' | '!=' | '>' | '>=' | '<' | '<='; left: AstNode; right: AstNode }
   | { kind: 'and' | 'or'; left: AstNode; right: AstNode }
-  | { kind: 'not'; operand: AstNode };
+  | { kind: 'not'; operand: AstNode }
+  | { kind: 'round'; value: AstNode; decimals: AstNode | null };
 
 const KEYWORDS = new Set(['TRUE', 'FALSE', 'AND', 'OR', 'NOT']);
 
@@ -68,6 +88,11 @@ function tokenize(source: string): Token[] {
       let j = i + 1;
       while (j < n && /[A-Za-z0-9_]/.test(source[j])) j++;
       const word = source.slice(i, j).toUpperCase();
+      if (word === 'ROUND') {
+        tokens.push({ type: 'ROUND' });
+        i = j;
+        continue;
+      }
       if (!KEYWORDS.has(word)) {
         throw new Error(
           `Expresión de regla no soportada: identificador "${source.slice(i, j)}" sin resolver ` +
@@ -92,8 +117,8 @@ function tokenize(source: string): Token[] {
       continue;
     }
 
-    if ('+-*/%^()'.includes(ch)) {
-      tokens.push({ type: ch as '+' | '-' | '*' | '/' | '%' | '^' | '(' | ')' });
+    if ('+-*/%^(),'.includes(ch)) {
+      tokens.push({ type: ch as '+' | '-' | '*' | '/' | '%' | '^' | '(' | ')' | ',' });
       i += 1;
       continue;
     }
@@ -195,6 +220,18 @@ function parse(tokens: Token[]): AstNode {
       advance();
       return { kind: 'boolean', value: false };
     }
+    if (token.type === 'ROUND') {
+      advance();
+      expect('(');
+      const value = parseOr();
+      let decimals: AstNode | null = null;
+      if (peek().type === ',') {
+        advance();
+        decimals = parseOr();
+      }
+      expect(')');
+      return { kind: 'round', value, decimals };
+    }
     if (token.type === '(') {
       advance();
       const node = parseOr();
@@ -263,12 +300,33 @@ function evaluateAst(node: AstNode): number | boolean {
       return Boolean(evaluateAst(node.left)) || Boolean(evaluateAst(node.right));
     case 'not':
       return !evaluateAst(node.operand);
+    case 'round': {
+      const value = asNumber(evaluateAst(node.value));
+      const decimals = node.decimals === null ? 0 : Math.trunc(asNumber(evaluateAst(node.decimals)));
+      return roundHalfAwayFromZero(value, decimals);
+    }
   }
   throw new Error('Expresión de regla inválida: nodo no soportado');
 }
 
 function asNumber(value: number | boolean): number {
   return typeof value === 'boolean' ? (value ? 1 : 0) : value;
+}
+
+/**
+ * Redondeo "half away from zero" (2.5 -> 3, -2.5 -> -3), igual que
+ * `ROUND(numeric, integer)` de Postgres -- DISTINTO de `Math.round` nativo
+ * de JS para negativos (`Math.round(-2.5)` da -2, no -3) y del
+ * "banker's rounding" (half-to-even). El `toPrecision(15)` antes de
+ * `Math.round` corrige artefactos de punto flotante conocidos (ej.
+ * `1.005 * 100` da `100.49999999999999` en JS, no `100.5`, lo que sin
+ * esta corrección redondearía mal para abajo).
+ */
+function roundHalfAwayFromZero(value: number, decimals: number): number {
+  const factor = Math.pow(10, decimals);
+  const sign = value < 0 ? -1 : 1;
+  const shifted = Number((Math.abs(value) * factor).toPrecision(15));
+  return (sign * Math.round(shifted)) / factor;
 }
 
 function evaluate(source: string): number | boolean {

@@ -24,6 +24,16 @@ import { PrismaService } from '../prisma.service';
  * original fallaría en tiempo de ejecución (`too_many_rows`, sin capturar);
  * aquí simplemente se toma la primera — mismo comportamiento frágil,
  * documentado, no una regla de negocio a preservar.
+ *
+ * `dbTransaction` (opcional, opaco en la interfaz de `shared-common`): si
+ * viene informado se castea a `Prisma.TransactionClient` y se usa esa
+ * conexión en vez de `this.prisma` -- necesario cuando `ideOriginRisk`
+ * (para origin=Contract, un `TFileRisk`) fue creado por la MISMA
+ * transacción activa y todavía no hizo commit (ver
+ * `ContractsService.copyRisksAndCoverages`/`createInitialMovements` y
+ * docs/02-roadmap.md): sin esto, `this.prisma` -- una conexión aparte --
+ * no ve esa fila bajo READ COMMITTED y el método cae en el fallback `'0'`
+ * como si el dato no existiera.
  */
 @Injectable()
 export class PrismaAttributeValueResolver implements AttributeValueResolver {
@@ -33,18 +43,25 @@ export class PrismaAttributeValueResolver implements AttributeValueResolver {
     origin: RuleOrigin,
     ideOriginRisk: string,
     ideAttribute: string,
+    dbTransaction?: unknown,
   ): Promise<string> {
-    const property = await this.prisma.sAttributeProperty.findFirst({
+    const db = (dbTransaction as Prisma.TransactionClient | undefined) ?? this.prisma;
+
+    const property = await db.sAttributeProperty.findFirst({
       where: { IdeAttribute: ideAttribute },
       select: { IdeAttributeProperty: true },
     });
-    if (!property) return '0';
+    if (!property) {
+      return '0';
+    }
 
-    const riskAttributeValue = await this.getRiskAttributeValue(origin, ideOriginRisk);
+    const riskAttributeValue = await this.getRiskAttributeValue(origin, ideOriginRisk, db);
     const ideFieldValue = extractJsonStringValue(riskAttributeValue, property.IdeAttributeProperty);
-    if (!ideFieldValue) return '0';
+    if (!ideFieldValue) {
+      return '0';
+    }
 
-    const fieldValue = await this.prisma.sFieldValue.findFirst({
+    const fieldValue = await db.sFieldValue.findFirst({
       where: { IdeFieldValue: ideFieldValue },
       select: { CodFieldValue: true },
     });
@@ -54,15 +71,16 @@ export class PrismaAttributeValueResolver implements AttributeValueResolver {
   private async getRiskAttributeValue(
     origin: RuleOrigin,
     ideOriginRisk: string,
+    db: Prisma.TransactionClient,
   ): Promise<Prisma.JsonValue | null> {
     if (origin === 'Quote') {
-      const risk = await this.prisma.tQuoteRisk.findUnique({
+      const risk = await db.tQuoteRisk.findUnique({
         where: { IdeQuoteRisk: ideOriginRisk },
         select: { RiskAttributeValue: true },
       });
       return risk?.RiskAttributeValue ?? null;
     }
-    const risk = await this.prisma.tFileRisk.findUnique({
+    const risk = await db.tFileRisk.findUnique({
       where: { IdeFileRisk: ideOriginRisk },
       select: { RiskAttributeValue: true },
     });

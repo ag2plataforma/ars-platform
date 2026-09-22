@@ -15,6 +15,17 @@ import { CancelContractDto } from './dto/cancel-contract.dto';
 const CANCEL_TRANSACTION_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutos
 
 /**
+ * Timeout de la transacción que envuelve `create()`. Más corto que el de
+ * `cancel()` porque acá no hay un prorrateo día a día de toda la vigencia
+ * (eso solo existe en `setCancelPrime`) -- la cascada de alta es una
+ * cantidad acotada de escrituras por riesgo/cobertura (normalmente unas
+ * pocas), pero se deja generoso igual por los mismos motivos (pooler
+ * remoto, varios round-trips por `RulesEngineService.evaluateChain` en
+ * `createInitialMovements`).
+ */
+const CREATE_TRANSACTION_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutos
+
+/**
  * Cascada de creación de contrato, equivalente a `FContract('CONTRACTNEW', ...)`
  * -- "el trabajo de mayor riesgo del proyecto" (ver README de este servicio
  * y docs/02-roadmap.md). Confirmado contra el código real de `FContract`
@@ -76,11 +87,20 @@ export class ContractsService {
   ) {}
 
   /**
-   * Punto de entrada de toda la cascada. Ejecuta cada paso dentro de su
-   * propia operación de Prisma (igual criterio que `QuotesService`, que
-   * tampoco envuelve toda la cascada de cotización en una única
-   * transacción) -- una futura revisión podría envolver esto en
-   * `$transaction` si se confirma que el original es atómico.
+   * Punto de entrada de toda la cascada. Las precondiciones de solo
+   * lectura (cotización existe/no tiene contrato previo/está "Aceptado",
+   * personas listas para emisión) corren ANTES de abrir transacción, igual
+   * criterio que `cancel()`. Desde `buildContract` en adelante, TODA la
+   * cascada corre en UNA transacción de Postgres (`this.prisma.$transaction`,
+   * mismo patrón ya usado por `cancel()` más abajo) -- antes de este cambio,
+   * un fallo a mitad de camino (confirmado en la práctica: faltaba
+   * `SStateRule.IndInitialState` para `TContractRequirement` en una BD real)
+   * dejaba un `TContract` huérfano grabado, y como la precondición de este
+   * método revisa `quote.TContract.length > 0`, un reintento fallaba
+   * incorrectamente con "ya tiene un contrato asociado" en vez de poder
+   * reintentar limpio. `this.stateMachine`/`this.rulesEngine` se dejan
+   * FUERA de la transacción a propósito (mismo razonamiento documentado en
+   * `cancel()`): solo leen catálogo que esta cascada nunca escribe.
    */
   async create(ideQuote: string, dto: CreateContractDto, actor: string) {
     const quote = await this.prisma.tQuote.findUnique({
@@ -101,28 +121,38 @@ export class ContractsService {
       );
     }
 
-    const contract = await this.buildContract(quote, dto, actor);
-    await this.setContractPersons(quote.IdeQuote, contract.IdeContract, actor);
-    await this.setContractDistributionChannel(quote.IdeDistributionChannel, quote.IdeProduct, contract, actor);
-    await this.setContractBilling(contract, actor);
+    await this.assertPersonsReadyForIssuance(quote.IdeQuote);
 
-    const contractFile = await this.createContractFile(contract, actor);
-    await this.createInitialContractOperation(contract.IdeContract, actor);
+    const ideContract = await this.prisma.$transaction(
+      async (tx) => {
+        const contract = await this.buildContract(quote, dto, actor, tx);
+        await this.setContractPersons(quote.IdeQuote, contract.IdeContract, actor, tx);
+        await this.setContractDistributionChannel(quote.IdeDistributionChannel, quote.IdeProduct, contract, actor, tx);
+        await this.setContractBilling(contract, actor, tx);
 
-    const riskCoverages = await this.copyRisksAndCoverages(
-      quote.IdeQuote,
-      contract.IdeProduct,
-      contractFile.IdeContractFile,
-      actor,
+        const contractFile = await this.createContractFile(contract, actor, tx);
+        await this.createInitialContractOperation(contract.IdeContract, actor, tx);
+
+        const riskCoverages = await this.copyRisksAndCoverages(
+          quote.IdeQuote,
+          contract.IdeProduct,
+          contractFile.IdeContractFile,
+          actor,
+          tx,
+        );
+        await this.createInitialMovements(riskCoverages, actor, tx);
+        await this.setNetPrime(contractFile.IdeContractFile, actor, tx);
+        await this.generateReceipts(contract.IdeContract, null, actor, tx);
+
+        await this.activateContractTree(contract.IdeContract, actor, tx);
+        await this.quotesService.transitionState(quote.IdeQuote, 'Contratar', actor, tx);
+
+        return contract.IdeContract;
+      },
+      { timeout: CREATE_TRANSACTION_TIMEOUT_MS, maxWait: 10_000 },
     );
-    await this.createInitialMovements(riskCoverages, actor);
-    await this.setNetPrime(contractFile.IdeContractFile, actor);
-    await this.generateReceipts(contract.IdeContract, null, actor);
 
-    await this.activateContractTree(contract.IdeContract, actor);
-    await this.quotesService.transitionState(quote.IdeQuote, 'Contratar', actor);
-
-    return this.findOne(contract.IdeContract);
+    return this.findOne(ideContract);
   }
 
   /**
@@ -255,8 +285,12 @@ export class ContractsService {
     return this.findOne(ideContract);
   }
 
-  private async activateContractTree(ideContract: string, actor: string): Promise<void> {
-    await this.applyStateCascade(ideContract, 'Activar', actor);
+  private async activateContractTree(
+    ideContract: string,
+    actor: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ): Promise<void> {
+    await this.applyStateCascade(ideContract, 'Activar', actor, tx);
   }
 
   private async applyStateCascade(
@@ -357,8 +391,9 @@ export class ContractsService {
     quote: { IdeQuote: string; IdeProduct: string; IdeDistributionChannel: string },
     dto: CreateContractDto,
     actor: string,
+    tx: Prisma.TransactionClient = this.prisma,
   ) {
-    const productValidityType = await this.prisma.sProductValidityType.findFirst({
+    const productValidityType = await tx.sProductValidityType.findFirst({
       where: { IdeProduct: quote.IdeProduct },
       select: { IdeValidityType: true },
     });
@@ -366,10 +401,10 @@ export class ContractsService {
       throw new NotFoundException(`El producto "${quote.IdeProduct}" no tiene un tipo de vigencia configurado`);
     }
 
-    const idePaymentFraction = await this.resolvePaymentFraction(quote.IdeProduct, dto.codPaymentFraction);
+    const idePaymentFraction = await this.resolvePaymentFraction(quote.IdeProduct, dto.codPaymentFraction, tx);
     const [ideContractInitial, numContract] = await Promise.all([
       this.stateMachine.getInitialState('TContract'),
-      this.generateNumContract(),
+      this.generateNumContract(tx),
     ]);
 
     const now = new Date();
@@ -377,7 +412,7 @@ export class ContractsService {
     const tstEnd = new Date(tstInitial);
     tstEnd.setFullYear(tstEnd.getFullYear() + 1); // ver comentario de cabecera: placeholder confirmado igual al original para tipos de vigencia no anuales.
 
-    return this.prisma.tContract.create({
+    return tx.tContract.create({
       data: {
         NumContract: numContract,
         IdeQuote: quote.IdeQuote,
@@ -412,17 +447,21 @@ export class ContractsService {
    * `CONT-<Año>-<N>` razonable y estable, documentado como decisión de
    * esta implementación (no una réplica literal del formato original).
    */
-  private async generateNumContract(): Promise<string> {
-    const result = await this.prisma.$queryRaw<{ nextval: number }[]>`
+  private async generateNumContract(tx: Prisma.TransactionClient = this.prisma): Promise<string> {
+    const result = await tx.$queryRaw<{ nextval: number }[]>`
       SELECT nextval('ars_platform."SeqTContractNumber"')::int AS nextval
     `;
     const year = new Date().getFullYear();
     return `CONT-${year}-${result[0].nextval}`;
   }
 
-  private async resolvePaymentFraction(ideProduct: string, codPaymentFraction?: string): Promise<string> {
+  private async resolvePaymentFraction(
+    ideProduct: string,
+    codPaymentFraction: string | undefined,
+    tx: Prisma.TransactionClient = this.prisma,
+  ): Promise<string> {
     if (codPaymentFraction) {
-      const row = await this.prisma.sProductPaymentFraction.findFirst({
+      const row = await tx.sProductPaymentFraction.findFirst({
         where: { IdeProduct: ideProduct, SPaymentFraction: { CodPaymentFraction: codPaymentFraction } },
         select: { IdePaymentFraction: true },
       });
@@ -434,7 +473,7 @@ export class ContractsService {
       return row.IdePaymentFraction;
     }
 
-    const productFractions = await this.prisma.sProductPaymentFraction.findMany({
+    const productFractions = await tx.sProductPaymentFraction.findMany({
       where: { IdeProduct: ideProduct },
       include: { SPaymentFraction: { select: { NumOrder: true } } },
     });
@@ -460,8 +499,63 @@ export class ContractsService {
    * son responsabilidad de `TFileRiskPerson`/`TContractFilePerson` a nivel
    * de riesgo/archivo, no de `TContractPerson`.
    */
-  private async setContractPersons(ideQuote: string, ideContract: string, actor: string): Promise<void> {
+  /**
+   * Requisito de negocio agregado explícitamente por el usuario (no
+   * exigido por ningún `FContract` original -- el legado no validaba
+   * esto): Tomador y Titular deben tener al menos una dirección activa
+   * (`TAddress`) y al menos un dato de contacto activo de clase
+   * `MOBILE_PHONE` (`TContactData`/`SContactClass`, código real
+   * confirmado explícitamente con el usuario) antes de poder generar el
+   * contrato -- decisión explícita: bloquear tanto en el frontend
+   * (`QuotesComponent`, botón "Generar contrato" deshabilitado) COMO
+   * acá, para que un llamado directo a la API no pueda saltarse el
+   * requisito. Mismo criterio de roles que `setContractPersons`
+   * (`SPersonRol.CodPersonRol` en `TOMADOR`/`TITULAR`) -- si la
+   * cotización todavía no tiene ninguna persona asociada a esos roles,
+   * no valida nada acá (se comporta igual que `setContractPersons`, que
+   * tampoco falla en ese caso -- no es un requisito nuevo introducir esa
+   * validación).
+   */
+  private async assertPersonsReadyForIssuance(ideQuote: string): Promise<void> {
+    const activeStateId = await this.stateMachine.getStateByCode('ACTIVO');
     const quotePersons = await this.prisma.tQuotePerson.findMany({
+      where: { IdeQuote: ideQuote, SPersonRol: { CodPersonRol: { in: ['TOMADOR', 'TITULAR'] } } },
+      include: { SPersonRol: true, TPerson: { select: { DesFirstName: true } } },
+    });
+
+    const missing: string[] = [];
+    for (const quotePerson of quotePersons) {
+      const [addressCount, mobilePhoneCount] = await Promise.all([
+        this.prisma.tAddress.count({
+          where: { IdePerson: quotePerson.IdePerson, IdeState: activeStateId },
+        }),
+        this.prisma.tContactData.count({
+          where: {
+            IdePerson: quotePerson.IdePerson,
+            IdeState: activeStateId,
+            SContactClass: { CodContactClass: 'MOBILE_PHONE' },
+          },
+        }),
+      ]);
+      const personLabel = `${quotePerson.TPerson.DesFirstName} (${quotePerson.SPersonRol.CodPersonRol})`;
+      if (addressCount === 0) missing.push(`${personLabel}: falta dirección`);
+      if (mobilePhoneCount === 0) missing.push(`${personLabel}: falta teléfono móvil`);
+    }
+
+    if (missing.length > 0) {
+      throw new ConflictException(
+        `No se puede generar el contrato -- faltan datos obligatorios: ${missing.join('; ')}`,
+      );
+    }
+  }
+
+  private async setContractPersons(
+    ideQuote: string,
+    ideContract: string,
+    actor: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ): Promise<void> {
+    const quotePersons = await tx.tQuotePerson.findMany({
       where: { IdeQuote: ideQuote, SPersonRol: { CodPersonRol: { in: ['TOMADOR', 'TITULAR'] } } },
     });
     if (quotePersons.length === 0) return;
@@ -470,7 +564,7 @@ export class ContractsService {
     const now = new Date();
 
     for (const quotePerson of quotePersons) {
-      await this.prisma.tContractPerson.create({
+      await tx.tContractPerson.create({
         data: {
           IdeContract: ideContract,
           IdePerson: quotePerson.IdePerson,
@@ -483,7 +577,7 @@ export class ContractsService {
           TstModification: now,
         },
       });
-      await this.prisma.tPerson.update({
+      await tx.tPerson.update({
         where: { IdePerson: quotePerson.IdePerson },
         data: { IndClient: true, TstRelationshipStart: now, UsrModification: actor, TstModification: now },
       });
@@ -519,13 +613,14 @@ export class ContractsService {
     ideProduct: string,
     contract: { IdeContract: string; TstInitial: Date; TstEnd: Date | null },
     actor: string,
+    tx: Prisma.TransactionClient = this.prisma,
   ): Promise<void> {
     const ideStateInitial = await this.stateMachine.getInitialState('TContractDistributionChannel');
     const ideActivo = await this.stateMachine.getStateByCode('Activo');
     const now = new Date();
     const tstEnd = contract.TstEnd ?? contract.TstInitial;
 
-    const splitConfig = await this.prisma.sCommissionProduct.findMany({
+    const splitConfig = await tx.sCommissionProduct.findMany({
       where: {
         IdeDistributionChannelOrigin: ideDistributionChannel,
         IdeProduct: ideProduct,
@@ -543,7 +638,7 @@ export class ContractsService {
         : [{ IdeDistributionChannel: ideDistributionChannel, Percentaje: new Prisma.Decimal(100), IndMain: true }];
 
     for (const channel of channelsToCreate) {
-      await this.prisma.tContractDistributionChannel.create({
+      await tx.tContractDistributionChannel.create({
         data: {
           IdeContract: contract.IdeContract,
           IdeDistributionChannel: channel.IdeDistributionChannel,
@@ -575,8 +670,9 @@ export class ContractsService {
   private async setContractBilling(
     contract: { IdeContract: string; TstInitial: Date; TstEnd: Date | null; IdePaymentFraction: string },
     actor: string,
+    tx: Prisma.TransactionClient = this.prisma,
   ): Promise<void> {
-    const paymentFraction = await this.prisma.sPaymentFraction.findUniqueOrThrow({
+    const paymentFraction = await tx.sPaymentFraction.findUniqueOrThrow({
       where: { IdePaymentFraction: contract.IdePaymentFraction },
     });
     const ideStateInitial = await this.stateMachine.getInitialState('TContractBilling');
@@ -598,7 +694,7 @@ export class ContractsService {
       UsrModification: actor,
       TstModification: now,
     }));
-    await this.prisma.tContractBilling.createMany({ data: periods });
+    await tx.tContractBilling.createMany({ data: periods });
   }
 
   /**
@@ -610,10 +706,11 @@ export class ContractsService {
   private async createContractFile(
     contract: { IdeContract: string; TstInitial: Date; TstEnd: Date | null },
     actor: string,
+    tx: Prisma.TransactionClient = this.prisma,
   ) {
     const ideStateInitial = await this.stateMachine.getInitialState('TContractFile');
     const now = new Date();
-    return this.prisma.tContractFile.create({
+    return tx.tContractFile.create({
       data: {
         IdeContract: contract.IdeContract,
         NumContractFile: 1,
@@ -638,9 +735,13 @@ export class ContractsService {
    * `FContractOperation` con otros códigos: la operación de anulación
    * resuelta por endoso y `RECEGENE` para el recibo).
    */
-  private async createInitialContractOperation(ideContract: string, actor: string) {
-    const contract = await this.prisma.tContract.findUniqueOrThrow({ where: { IdeContract: ideContract } });
-    return this.createContractOperation(ideContract, contract.IdeProduct, 'CONTGENE', actor);
+  private async createInitialContractOperation(
+    ideContract: string,
+    actor: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const contract = await tx.tContract.findUniqueOrThrow({ where: { IdeContract: ideContract } });
+    return this.createContractOperation(ideContract, contract.IdeProduct, 'CONTGENE', actor, tx);
   }
 
   /**
@@ -658,8 +759,9 @@ export class ContractsService {
     ideProduct: string,
     ideContractFile: string,
     actor: string,
+    tx: Prisma.TransactionClient = this.prisma,
   ) {
-    const quoteRisks = await this.prisma.tQuoteRisk.findMany({
+    const quoteRisks = await tx.tQuoteRisk.findMany({
       where: { IdeQuote: ideQuote },
       include: {
         TQuoteRiskPlan: {
@@ -676,7 +778,7 @@ export class ContractsService {
       this.stateMachine.getInitialState('TContractRequirement'),
     ]);
     const now = new Date();
-    const contractFile = await this.prisma.tContractFile.findUniqueOrThrow({
+    const contractFile = await tx.tContractFile.findUniqueOrThrow({
       where: { IdeContractFile: ideContractFile },
     });
 
@@ -695,7 +797,7 @@ export class ContractsService {
       if (!selectedPlan) continue; // riesgo sin plan seleccionado: no se contrata (mismo criterio que FFileRisk real).
       numFileRisk += 1;
 
-      const fileRisk = await this.prisma.tFileRisk.create({
+      const fileRisk = await tx.tFileRisk.create({
         data: {
           IdeContractFile: ideContractFile,
           NumFileRisk: numFileRisk,
@@ -714,7 +816,7 @@ export class ContractsService {
       });
 
       for (const requirement of quoteRisk.TQuoteRequirement.filter((r) => !r.IdeQuoteCoverage)) {
-        await this.prisma.tContractRequirement.create({
+        await tx.tContractRequirement.create({
           data: {
             IdeFileRisk: fileRisk.IdeFileRisk,
             IdeProductRequirement: requirement.IdeProductRequirement,
@@ -729,7 +831,7 @@ export class ContractsService {
       }
 
       for (const coverage of selectedPlan.TQuoteCoverage) {
-        const riskCoverage = await this.prisma.tRiskCoverage.create({
+        const riskCoverage = await tx.tRiskCoverage.create({
           data: {
             IdeFileRisk: fileRisk.IdeFileRisk,
             IdeCoveragePlan: coverage.IdeCoveragePlan,
@@ -758,7 +860,7 @@ export class ContractsService {
           (r) => r.IdeQuoteCoverage === coverage.IdeQuoteCoverage,
         );
         for (const requirement of coverageRequirements) {
-          await this.prisma.tContractRequirement.create({
+          await tx.tContractRequirement.create({
             data: {
               IdeFileRisk: fileRisk.IdeFileRisk,
               IdeRiskCoverage: riskCoverage.IdeRiskCoverage,
@@ -788,11 +890,19 @@ export class ContractsService {
    * por cada `TRiskCoverage` recién creado, un único movimiento inicial
    * (`NumCoverageMovement=1`) atado a la operación de generación del
    * contrato, con el mismo motor de reglas ya usado del lado de cotización
-   * (`RulesEngineService.evaluateChain`, `origin: 'Contract'` -- confirmado
-   * que no requiere cambios de código, ver el doc-comment de
-   * `EvaluationContext` en `@ars-platform/shared-common`). `ConceptNetValue`
-   * queda acá igual al bruto como valor provisorio -- `setNetPrime` (llamado
-   * después, ver `create()`) lo recalcula de verdad.
+   * (`RulesEngineService.evaluateChain`, `origin: 'Contract'`).
+   * `ConceptNetValue` queda acá igual al bruto como valor provisorio --
+   * `setNetPrime` (llamado después, ver `create()`) lo recalcula de verdad.
+   *
+   * Importante: se le pasa `dbTransaction: tx` a `evaluateChain` (ver
+   * `EvaluationContext` en `@ars-platform/shared-common`) porque
+   * `TFileRisk` (leído por `AttributeValueResolver` para resolver custom
+   * fields) y `TMovementConcept` (leído por `RuleValueResolver` para
+   * referencias `rule('COD')` a otra cobertura) son escritos por esta MISMA
+   * transacción -- sin pasar `tx`, esos resolvers leen por su propia
+   * conexión Prisma no-transaccional y, bajo READ COMMITTED, no ven filas
+   * que la transacción activa escribió pero todavía no confirmó (bug real
+   * encontrado y corregido -- ver docs/02-roadmap.md).
    */
   private async createInitialMovements(
     riskCoverages: {
@@ -804,19 +914,20 @@ export class ContractsService {
       prime: number;
     }[],
     actor: string,
+    tx: Prisma.TransactionClient = this.prisma,
   ): Promise<void> {
     const [ideMovementInitial, ideMovementConceptInitial, primaTotalConcept] = await Promise.all([
       this.stateMachine.getInitialState('TCoverageMovement'),
       this.stateMachine.getInitialState('TMovementConcept'),
-      this.prisma.sConcept.findFirst({ where: { CodConcept: 'PrimaTotal' } }),
+      tx.sConcept.findFirst({ where: { CodConcept: 'PrimaTotal' } }),
     ]);
     const now = new Date();
 
     for (const riskCoverage of riskCoverages) {
-      const coverage = await this.prisma.tRiskCoverage.findUniqueOrThrow({
+      const coverage = await tx.tRiskCoverage.findUniqueOrThrow({
         where: { IdeRiskCoverage: riskCoverage.ideRiskCoverage },
       });
-      const movement = await this.prisma.tCoverageMovement.create({
+      const movement = await tx.tCoverageMovement.create({
         data: {
           IdeRiskCoverage: riskCoverage.ideRiskCoverage,
           NumCoverageMovement: 1,
@@ -846,11 +957,12 @@ export class ContractsService {
         origin: 'Contract',
         ideOriginRisk: riskCoverage.ideFileRisk,
         ideCoverageOrMovement: movement.IdeCoverageMovement,
+        dbTransaction: tx,
       });
 
       for (const result of results) {
         if (result.columnName) continue; // TCoverageMovement no expone columnas dinámicas equivalentes a Amount/Rate/Prime de TQuoteCoverage para este flujo; se ignora, mismo criterio de "no adivinar" que el resto de la clase.
-        await this.prisma.tMovementConcept.create({
+        await tx.tMovementConcept.create({
           data: {
             IdeCoverageMovement: movement.IdeCoverageMovement,
             IdeConcept: result.ideConcept,
@@ -867,12 +979,12 @@ export class ContractsService {
 
       let prime = riskCoverage.prime;
       if (primaTotalConcept) {
-        const primaTotalRow = await this.prisma.tMovementConcept.findFirst({
+        const primaTotalRow = await tx.tMovementConcept.findFirst({
           where: { IdeCoverageMovement: movement.IdeCoverageMovement, IdeConcept: primaTotalConcept.IdeConcept },
         });
         prime = primaTotalRow ? round2(Number(primaTotalRow.ConceptValue)) : riskCoverage.prime;
       }
-      await this.prisma.tCoverageMovement.update({
+      await tx.tCoverageMovement.update({
         where: { IdeCoverageMovement: movement.IdeCoverageMovement },
         data: { Prime: prime, UsrModification: actor, TstModification: new Date() },
       });

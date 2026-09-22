@@ -1,7 +1,8 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '@ars-platform/database';
+import { Prisma, PrismaService } from '@ars-platform/database';
 import { RulesEngineService, StateMachineService } from '@ars-platform/shared-common';
 import { CreateQuoteDto } from './dto/create-quote.dto';
+import { ListQuotesDto } from './dto/list-quotes.dto';
 
 /**
  * Motor de cotización real, equivalente a `FQuote`/`FQuoteRiskPlan`/
@@ -104,6 +105,72 @@ export class QuotesService {
    * veces como haga falta mientras la cotización no se acepte) y calcula
    * el precio real vía el motor de reglas ya existente.
    */
+  /**
+   * Listado paginado/filtrable de cotizaciones (`GET /quotes`) -- pedido
+   * explícito del usuario al probar la Etapa 1 (ver `ListQuotesDto` y
+   * docs/02-roadmap.md). Trae, por cotización, lo mínimo para
+   * identificarla en una tabla (número, producto, estado, fecha, quién
+   * la creó) más el Tomador si ya está asignado (`TQuotePerson` con rol
+   * "TOMADOR", igual criterio que `findPersonByRole`) -- sin traer
+   * coberturas/planes/montos, que son pesados y no hacen falta en un
+   * listado (se consultan recién al abrir una cotización puntual, vía
+   * `GET /quotes/:id` o `/summary`).
+   */
+  async findAll(query: ListQuotesDto, actor: string) {
+    const [ideProduct, ideState] = await Promise.all([
+      query.codProduct ? this.resolveProduct(query.codProduct) : undefined,
+      query.codState ? this.resolveState(query.codState) : undefined,
+    ]);
+
+    const where: Prisma.TQuoteWhereInput = {
+      ...(query.all ? {} : { UsrCreation: actor }),
+      ...(ideProduct ? { IdeProduct: ideProduct } : {}),
+      ...(ideState ? { IdeState: ideState } : {}),
+      ...(query.dateFrom || query.dateTo
+        ? {
+            TstCreation: {
+              ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
+              ...(query.dateTo ? { lte: new Date(query.dateTo) } : {}),
+            },
+          }
+        : {}),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.tQuote.findMany({
+        where,
+        include: {
+          SProduct: true,
+          SState: true,
+          TQuotePerson: { where: { SPersonRol: { CodPersonRol: 'TOMADOR' } }, include: { TPerson: true } },
+        },
+        orderBy: { TstCreation: 'desc' },
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+      }),
+      this.prisma.tQuote.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((row) => {
+        const tomador = row.TQuotePerson[0]?.TPerson;
+        return {
+          ideQuote: row.IdeQuote,
+          numQuote: row.NumQuote,
+          desProduct: row.SProduct.DesProduct,
+          codState: row.SState.CodState,
+          desState: row.SState.DesState,
+          tstCreation: row.TstCreation,
+          usrCreation: row.UsrCreation,
+          tomador: tomador ? { name: tomador.DesFirstName, lastname: tomador.DesLastName1 } : null,
+        };
+      }),
+      total,
+      page: query.page,
+      limit: query.limit,
+    };
+  }
+
   async price(ideQuote: string, actor: string) {
     const quote = await this.prisma.tQuote.findUnique({ where: { IdeQuote: ideQuote } });
     if (!quote) {
@@ -331,10 +398,26 @@ export class QuotesService {
     });
   }
 
+  /**
+   * Incluye `TAddress`/`TContactData` activos de cada `TPerson` (no solo
+   * `TPerson` a secas) para que el paso "Personas" del frontend pueda
+   * mostrar si a Tomador/Titular les falta dirección o teléfono móvil
+   * SIN un round-trip aparte por persona -- mismo filtro por estado
+   * "Activo" que ya usa `PersonsService.findOne` en `party-service`.
+   */
   async listPersons(ideQuote: string) {
+    const activeStateId = await this.stateMachine.getStateByCode('ACTIVO');
     return this.prisma.tQuotePerson.findMany({
       where: { IdeQuote: ideQuote },
-      include: { TPerson: true, SPersonRol: true },
+      include: {
+        SPersonRol: true,
+        TPerson: {
+          include: {
+            TAddress: { where: { IdeState: activeStateId } },
+            TContactData: { where: { IdeState: activeStateId }, include: { SContactClass: true } },
+          },
+        },
+      },
     });
   }
 
@@ -368,37 +451,53 @@ export class QuotesService {
    * creación de contrato (`FContract`) que dispara -- eso queda para su
    * propio ítem, deliberadamente separado por ser "el trabajo de mayor
    * riesgo del proyecto" (ver README de este servicio).
+   *
+   * Acepta un `tx` opcional (default `this.prisma`) para poder correr
+   * DENTRO de la transacción de `ContractsService.create()` -- ese
+   * método usa esto para el paso final ("Contratar" sobre la cotización
+   * de origen), y necesita que TODA la cascada de contratación sea
+   * atómica (ver doc-comment de `ContractsService.create`). Cuando se
+   * pasa un `tx` explícito (llamado desde otra transacción en curso), se
+   * omite el `buildPricingResult` final -- leería por una conexión
+   * (`this.prisma`) distinta de la transacción todavía abierta, así que
+   * no reflejaría de forma confiable los cambios recién escritos; ningún
+   * llamador actual que pasa `tx` usa el valor de retorno.
    */
-  async transitionState(ideQuote: string, codOperative: string, actor: string) {
-    const quote = await this.prisma.tQuote.findUnique({ where: { IdeQuote: ideQuote } });
+  async transitionState(
+    ideQuote: string,
+    codOperative: string,
+    actor: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const quote = await tx.tQuote.findUnique({ where: { IdeQuote: ideQuote } });
     if (!quote) {
       throw new NotFoundException(`No existe cotización con id "${ideQuote}"`);
     }
 
     const now = new Date();
     const nextQuoteState = await this.stateMachine.getNextState('TQuote', quote.IdeState, codOperative);
-    await this.prisma.tQuote.update({
+    await tx.tQuote.update({
       where: { IdeQuote: ideQuote },
       data: { IdeState: nextQuoteState, UsrModification: actor, TstModification: now },
     });
 
-    const risks = await this.prisma.tQuoteRisk.findMany({ where: { IdeQuote: ideQuote } });
+    const risks = await tx.tQuoteRisk.findMany({ where: { IdeQuote: ideQuote } });
     for (const risk of risks) {
       const nextRiskState = await this.stateMachine.getNextState('TQuoteRisk', risk.IdeState, codOperative);
-      await this.prisma.tQuoteRisk.update({
+      await tx.tQuoteRisk.update({
         where: { IdeQuoteRisk: risk.IdeQuoteRisk },
         data: { IdeState: nextRiskState, UsrModification: actor, TstModification: now },
       });
 
-      const plans = await this.prisma.tQuoteRiskPlan.findMany({ where: { IdeQuoteRisk: risk.IdeQuoteRisk } });
+      const plans = await tx.tQuoteRiskPlan.findMany({ where: { IdeQuoteRisk: risk.IdeQuoteRisk } });
       for (const plan of plans) {
         const nextPlanState = await this.stateMachine.getNextState('TQuoteRiskPlan', plan.IdeState, codOperative);
-        await this.prisma.tQuoteRiskPlan.update({
+        await tx.tQuoteRiskPlan.update({
           where: { IdeQuoteRiskPlan: plan.IdeQuoteRiskPlan },
           data: { IdeState: nextPlanState, UsrModification: actor, TstModification: now },
         });
 
-        const coverages = await this.prisma.tQuoteCoverage.findMany({
+        const coverages = await tx.tQuoteCoverage.findMany({
           where: { IdeQuoteRiskPlan: plan.IdeQuoteRiskPlan },
         });
         for (const coverage of coverages) {
@@ -407,12 +506,12 @@ export class QuotesService {
             coverage.IdeState,
             codOperative,
           );
-          await this.prisma.tQuoteCoverage.update({
+          await tx.tQuoteCoverage.update({
             where: { IdeQuoteCoverage: coverage.IdeQuoteCoverage },
             data: { IdeState: nextCoverageState, UsrModification: actor, TstModification: now },
           });
 
-          const concepts = await this.prisma.tQuoteCoverageConcept.findMany({
+          const concepts = await tx.tQuoteCoverageConcept.findMany({
             where: { IdeQuoteCoverage: coverage.IdeQuoteCoverage },
           });
           for (const concept of concepts) {
@@ -421,7 +520,7 @@ export class QuotesService {
               concept.IdeState,
               codOperative,
             );
-            await this.prisma.tQuoteCoverageConcept.update({
+            await tx.tQuoteCoverageConcept.update({
               where: { IdeQuoteCoverageConcept: concept.IdeQuoteCoverageConcept },
               data: { IdeState: nextConceptState, UsrModification: actor, TstModification: now },
             });
@@ -430,6 +529,9 @@ export class QuotesService {
       }
     }
 
+    if (tx !== this.prisma) {
+      return undefined;
+    }
     return this.buildPricingResult(ideQuote);
   }
 
@@ -651,6 +753,8 @@ export class QuotesService {
       where: { IdeQuote: ideQuote },
       include: {
         SProduct: { include: { SCurrency: true } },
+        SState: true,
+        TContract: { select: { IdeContract: true, NumContract: true } },
         TQuoteRisk: {
           include: {
             SRiskProduct: { include: { SRisk: true } },
@@ -678,6 +782,18 @@ export class QuotesService {
       ideQuote: quote.IdeQuote,
       numQuote: quote.NumQuote,
       symbolCurrency: quote.SProduct.SCurrency.SymbolCurrency,
+      // Agregado para poder "retomar" una cotización existente desde el
+      // listado (`GET /quotes/:id`, mismo endpoint, ver
+      // `apps/backoffice/features/quotes/quotes.component.ts#resumeQuote`
+      // y docs/02-roadmap.md): con esto el frontend decide a qué paso
+      // saltar (personas/resumen/contrato) sin tener que reconstruir la
+      // Etapa 1 (riesgos/coberturas elegidos), que ya viene reflejada acá
+      // en `risks` tal cual quedó guardada.
+      codState: quote.SState.CodState,
+      desState: quote.SState.DesState,
+      contract: quote.TContract[0]
+        ? { ideContract: quote.TContract[0].IdeContract, numContract: quote.TContract[0].NumContract }
+        : null,
       risks: quote.TQuoteRisk.map((risk) => ({
         ideQuoteRisk: risk.IdeQuoteRisk,
         numRisk: risk.NumRisk,
@@ -728,6 +844,12 @@ export class QuotesService {
     const row = await this.prisma.sProduct.findFirst({ where: { CodProduct: codProduct } });
     if (!row) throw new NotFoundException(`No existe producto con código "${codProduct}"`);
     return row.IdeProduct;
+  }
+
+  private async resolveState(codState: string): Promise<string> {
+    const row = await this.prisma.sState.findFirst({ where: { CodState: codState } });
+    if (!row) throw new NotFoundException(`No existe estado con código "${codState}"`);
+    return row.IdeState;
   }
 
   private async resolveDistributionChannel(codDistributionChannel: string): Promise<string> {

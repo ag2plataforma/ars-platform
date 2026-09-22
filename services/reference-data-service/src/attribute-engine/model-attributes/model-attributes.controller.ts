@@ -19,6 +19,17 @@ export class ModelAttributesController {
     return this.service.findOne(id);
   }
 
+  /**
+   * Schema de formulario dinámico para un `IdeReference` (hoy siempre un
+   * `IdeRiskProduct`) -- lo consume el wizard de Cotización para pintar
+   * los campos personalizados de cada riesgo agregado (ver
+   * `ModelAttributesService.getSchemaForReference`).
+   */
+  @Get('by-reference/:ideReference/schema')
+  getSchema(@Param('ideReference') ideReference: string) {
+    return this.service.getSchemaForReference(ideReference);
+  }
+
   @Roles('ADMIN')
   @Post()
   create(@Body() dto: CreateModelAttributeDto, @CurrentUser() actor: JwtPayload) {

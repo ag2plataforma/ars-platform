@@ -68,12 +68,25 @@ export interface CalculationRuleRepository {
  * texto (igual que el original, que retorna `character varying`, no
  * numérico) — por defecto `'0'` si no hay dato, replicando el "atributo no
  * configurado = no aporta al cálculo" del sistema actual.
+ *
+ * `dbTransaction` es un handle OPACO (no tipado acá a propósito --
+ * `shared-common` no depende de Prisma, ver el doc-comment de este
+ * archivo): cuando el llamador está dentro de una transacción activa que
+ * pudo haber escrito el dato que este método necesita leer (por ejemplo,
+ * `TFileRisk.RiskAttributeValue` recién creado por
+ * `ContractsService.copyRisksAndCoverages` dentro de la misma
+ * transacción), lo pasa para que la implementación concreta
+ * (`PrismaAttributeValueResolver` en `@ars-platform/database`) lea por esa
+ * misma conexión en vez de una aparte -- si no, bajo READ COMMITTED, esa
+ * fila le resulta invisible hasta que la transacción externa haga commit.
+ * Si se omite, la implementación usa su conexión normal (no-transaccional).
  */
 export interface AttributeValueResolver {
   resolveAttributeValue(
     origin: RuleOrigin,
     ideOriginRisk: string,
     ideAttribute: string,
+    dbTransaction?: unknown,
   ): Promise<string>;
 }
 
@@ -81,12 +94,19 @@ export interface AttributeValueResolver {
  * Puerto equivalente a `FGetValueRule`: resuelve el valor ya calculado de
  * una regla anterior para la misma cobertura/movimiento. Por defecto `0`
  * si no hay dato (igual que el original).
+ *
+ * `dbTransaction`: mismo handle opaco y mismo motivo que en
+ * `AttributeValueResolver.resolveAttributeValue` -- necesario para
+ * `origin: 'Contract'` cuando el `TMovementConcept` a leer fue escrito por
+ * la misma transacción activa (`ContractsService.createInitialMovements`),
+ * todavía sin commit.
  */
 export interface RuleValueResolver {
   resolveRuleValue(
     origin: RuleOrigin,
     ideCoverageOrMovement: string,
     codCalculationRule: string,
+    dbTransaction?: unknown,
   ): Promise<number>;
 }
 

@@ -1,0 +1,473 @@
+<p-toast />
+
+<div class="mx-auto mb-2 max-w-2xl">
+  <button pButton type="button" [label]="'quotes.backToListButton' | transloco" [text]="true" size="small" (click)="volverAlListado()"></button>
+</div>
+
+@switch (step()) {
+  @case ('form') {
+    <div class="mx-auto flex max-w-2xl flex-col gap-6">
+      <div>
+        <h1 class="text-lg font-semibold text-slate-900">{{ 'quotes.formTitle' | transloco }}</h1>
+        <p class="text-sm text-slate-500">
+          {{ 'quotes.formSubtitle' | transloco }}
+        </p>
+      </div>
+
+      <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 rounded-lg border border-slate-200 p-6">
+        <div class="flex flex-col gap-2">
+          <label class="text-sm font-medium text-slate-700">{{ 'quotes.productLabel' | transloco }}</label>
+          <p-select
+            appendTo="body"
+            formControlName="codProduct"
+            [options]="products()"
+            optionLabel="DesProduct"
+            optionValue="CodProduct"
+            [placeholder]="'quotes.productPlaceholder' | transloco"
+            styleClass="w-full"
+            (onChange)="onProductChange()"
+          />
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div class="flex flex-col gap-2">
+            <label class="text-sm font-medium text-slate-700">{{ 'quotes.distributionChannelLabel' | transloco }}</label>
+            <p-select
+              appendTo="body"
+              formControlName="codDistributionChannel"
+              [options]="distributionChannels()"
+              optionLabel="DesDistributionChannel"
+              optionValue="CodDistributionChannel"
+              [placeholder]="'quotes.distributionChannelPlaceholder' | transloco"
+              styleClass="w-full"
+            />
+          </div>
+          <div class="flex flex-col gap-2">
+            <label class="text-sm font-medium text-slate-700">{{ 'quotes.distributionWayLabel' | transloco }}</label>
+            <p-select
+              appendTo="body"
+              formControlName="codDistributionWay"
+              [options]="distributionWays()"
+              optionLabel="DesDistributionWay"
+              optionValue="CodDistributionWay"
+              [placeholder]="'quotes.distributionWayPlaceholder' | transloco"
+              styleClass="w-full"
+            />
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-2 border-t border-slate-100 pt-4">
+          <label class="text-sm font-medium text-slate-700">{{ 'quotes.risksToQuoteLabel' | transloco }}</label>
+          @if (!form.controls.codProduct.value) {
+            <p class="text-xs text-slate-500">{{ 'quotes.chooseProductFirst' | transloco }}</p>
+          } @else {
+            <div class="flex gap-2">
+              <p-select
+                appendTo="body"
+                [formControl]="riskToAddControl"
+                [options]="riskProductOptions()"
+                optionLabel="CodRiskProduct"
+                optionValue="CodRiskProduct"
+                [placeholder]="'quotes.riskPlaceholder' | transloco"
+                styleClass="w-full"
+              >
+                <ng-template let-item #item>{{ riskLabel(item) }}</ng-template>
+                <ng-template let-item #selectedItem>{{ riskLabel(item) }}</ng-template>
+              </p-select>
+              <button pButton type="button" [label]="'quotes.addButton' | transloco" icon="pi pi-plus" (click)="addRisk()"></button>
+            </div>
+          }
+
+          @if (selectedRisks().length > 0) {
+            <ul class="mt-2 flex flex-col gap-2">
+              @for (risk of selectedRisks(); track risk['CodRiskProduct']) {
+                <li class="flex flex-col gap-2 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <div class="flex items-center justify-between">
+                    {{ riskLabel(risk) }}
+                    <button
+                      pButton
+                      type="button"
+                      icon="pi pi-times"
+                      [text]="true"
+                      severity="secondary"
+                      (click)="removeRisk(risk['CodRiskProduct'])"
+                    ></button>
+                  </div>
+
+                  @if (customFieldsFor(risk['CodRiskProduct']); as riskFields) {
+                    @if (riskFields.loading()) {
+                      <p class="text-xs text-slate-400">{{ 'quotes.loadingRiskData' | transloco }}</p>
+                    } @else if (riskFields.fields().length > 0) {
+                      <div [formGroup]="riskFields.form" class="grid grid-cols-2 gap-3 border-t border-slate-200 pt-2">
+                        @for (field of riskFields.fields(); track field.ideAttributeProperty) {
+                          <div class="flex flex-col gap-1">
+                            <label class="text-xs font-medium text-slate-600">{{ field.label }}</label>
+                            @switch (field.type) {
+                              @case ('select') {
+                                <p-select
+                                  appendTo="body"
+                                  [formControlName]="field.ideAttributeProperty"
+                                  [options]="field.options ?? []"
+                                  optionLabel="key"
+                                  optionValue="value"
+                                  [placeholder]="'quotes.selectOptionPlaceholder' | transloco"
+                                  styleClass="w-full"
+                                />
+                              }
+                              @case ('radio') {
+                                <div class="flex flex-wrap gap-3 pt-1">
+                                  @for (opt of field.options ?? []; track opt.key) {
+                                    <label class="flex items-center gap-1 text-xs text-slate-600">
+                                      <p-radiobutton [formControlName]="field.ideAttributeProperty" [value]="opt.value" />
+                                      {{ opt.key }}
+                                    </label>
+                                  }
+                                </div>
+                              }
+                              @case ('checkbox') {
+                                <p-checkbox [binary]="true" [formControlName]="field.ideAttributeProperty" />
+                              }
+                              @case ('number') {
+                                <input pInputText type="number" [formControlName]="field.ideAttributeProperty" />
+                              }
+                              @case ('date') {
+                                <input pInputText type="date" [formControlName]="field.ideAttributeProperty" />
+                              }
+                              @default {
+                                <input pInputText type="text" [formControlName]="field.ideAttributeProperty" />
+                              }
+                            }
+                            @if (fieldInvalid(riskFields, field)) {
+                              <span class="text-xs text-red-600">{{ firstErrorMessage(riskFields, field) }}</span>
+                            }
+                          </div>
+                        }
+                      </div>
+                    }
+                  }
+                </li>
+              }
+            </ul>
+          }
+        </div>
+
+        <div class="mt-2 flex justify-end">
+          <button
+            pButton
+            type="submit"
+            [label]="'quotes.quoteButton' | transloco"
+            icon="pi pi-calculator"
+            [loading]="creating()"
+            [disabled]="!canSubmit()"
+          ></button>
+        </div>
+      </form>
+    </div>
+  }
+
+  @case ('plans') {
+    <div class="mx-auto flex max-w-4xl flex-col gap-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-lg font-semibold text-slate-900">{{ 'quotes.plansTitle' | transloco: { num: pricing()!.numQuote } }}</h1>
+          <p class="text-sm text-slate-500">{{ 'quotes.plansSubtitle' | transloco }}</p>
+        </div>
+        <button pButton type="button" [label]="'quotes.newQuoteButton' | transloco" severity="secondary" [text]="true" (click)="nuevaCotizacion()"></button>
+      </div>
+
+      @for (risk of pricing()!.risks; track risk.ideQuoteRisk) {
+        <div class="rounded-lg border border-slate-200 p-4">
+          <h2 class="mb-3 text-base font-semibold text-slate-900">
+            {{ 'quotes.riskHeading' | transloco: { num: risk.numRisk, des: risk.desRisk } }}
+          </h2>
+
+          @if (risk.plans.length === 0) {
+            <p class="text-sm text-slate-500">{{ 'quotes.noPlansAvailable' | transloco }}</p>
+          } @else {
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+              @for (plan of risk.plans; track plan.ideQuoteRiskPlan) {
+                <div
+                  class="flex flex-col gap-3 rounded-lg border p-4"
+                  [class.border-brand-600]="plan.indSelected"
+                  [class.border-slate-200]="!plan.indSelected"
+                >
+                  <div class="flex items-start justify-between gap-2">
+                    <div>
+                      <p class="font-semibold text-slate-900">{{ plan.desShortPlan ?? plan.codPlanProduct }}</p>
+                      @if (plan.desLargePlan) {
+                        <p class="text-xs text-slate-500">{{ plan.desLargePlan }}</p>
+                      }
+                    </div>
+                    @if (plan.indSelected) {
+                      <p-tag [value]="'quotes.selectedLabel' | transloco" severity="success" />
+                    }
+                  </div>
+
+                  <p class="text-2xl font-bold text-slate-900">
+                    {{ pricing()!.symbolCurrency }}{{ plan.basePrice }}
+                    <span class="text-sm font-normal text-slate-500">/ {{ unitLabel(plan.unit.desUnit) }}</span>
+                  </p>
+
+                  @if (plan.mandatoryCoverages.length > 0) {
+                    <div class="flex flex-col gap-1">
+                      <p class="text-xs font-medium uppercase tracking-wide text-slate-500">{{ 'quotes.includedCoverages' | transloco }}</p>
+                      @for (coverage of plan.mandatoryCoverages; track coverage.ideQuoteCoverage) {
+                        <div class="flex justify-between text-sm text-slate-700">
+                          <span>{{ coverage.desShortCoverage ?? ('quotes.coverageFallback' | transloco) }}</span>
+                          <span>{{ pricing()!.symbolCurrency }}{{ coverage.prime }}</span>
+                        </div>
+                      }
+                    </div>
+                  }
+
+                  @if (plan.optionalCoverages.length > 0) {
+                    <div class="flex flex-col gap-1 border-t border-slate-100 pt-2">
+                      <p class="text-xs font-medium uppercase tracking-wide text-slate-500">{{ 'quotes.optionalCoverages' | transloco }}</p>
+                      @for (coverage of plan.optionalCoverages; track coverage.ideQuoteCoverage) {
+                        <div class="flex items-center justify-between gap-2 text-sm" [class.text-slate-400]="!coverage.indSelected" [class.text-slate-700]="coverage.indSelected">
+                          <label class="flex items-center gap-2">
+                            <p-checkbox
+                              [binary]="true"
+                              [ngModel]="coverage.indSelected"
+                              (onChange)="toggleCoverage(plan, coverage, $event.checked)"
+                            />
+                            <span>{{ coverage.desShortCoverage ?? ('quotes.coverageFallback' | transloco) }}</span>
+                          </label>
+                          <span>{{ pricing()!.symbolCurrency }}{{ coverage.prime }}</span>
+                        </div>
+                      }
+                    </div>
+                  }
+
+                  <button
+                    pButton
+                    type="button"
+                    [label]="(plan.indSelected ? 'quotes.selectedLabel' : 'quotes.selectThisPlanButton') | transloco"
+                    [severity]="plan.indSelected ? 'success' : 'primary'"
+                    [text]="plan.indSelected"
+                    [disabled]="plan.indSelected"
+                    (click)="selectPlan(risk, plan)"
+                  ></button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      <div class="flex justify-end">
+        <button
+          pButton
+          type="button"
+          [label]="'quotes.continueToPersonsButton' | transloco"
+          icon="pi pi-arrow-right"
+          iconPos="right"
+          [disabled]="!allRisksHavePlan()"
+          (click)="goToPersons()"
+        ></button>
+      </div>
+    </div>
+  }
+
+  @case ('persons') {
+    <div class="mx-auto flex max-w-2xl flex-col gap-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-lg font-semibold text-slate-900">{{ 'quotes.personsTitle' | transloco }}</h1>
+          <p class="text-sm text-slate-500">{{ 'quotes.personsSubtitle' | transloco }}</p>
+        </div>
+        <button pButton type="button" [label]="'quotes.newQuoteButton' | transloco" severity="secondary" [text]="true" (click)="nuevaCotizacion()"></button>
+      </div>
+
+      @for (slot of personSlots; track slot.code) {
+        <div class="flex flex-col gap-3 rounded-lg border border-slate-200 p-4">
+          <h2 class="text-base font-semibold text-slate-900">{{ slot.label | transloco }}</h2>
+
+          @if (assignedPerson(slot.code); as assigned) {
+            <div class="flex items-center justify-between rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              <span>{{ assigned.TPerson.DesFirstName }} {{ assigned.TPerson.DesLastName1 }} -- {{ assigned.TPerson.DesEmail }}</span>
+              <button pButton type="button" [label]="'quotes.changeButton' | transloco" [text]="true" severity="secondary" (click)="changeAssignment(slot)"></button>
+            </div>
+
+            @if (personContactComplete(slot.code)) {
+              <div class="flex items-center gap-2 rounded-md bg-green-50 px-3 py-2 text-xs text-green-700">
+                <i class="pi pi-check-circle"></i>
+                <span>{{ 'quotes.contactComplete' | transloco }}</span>
+              </div>
+            } @else {
+              <form [formGroup]="slot.contactForm" (ngSubmit)="saveContact(slot)" class="flex flex-col gap-2 border-t border-slate-100 pt-2">
+                <p class="text-xs text-slate-500">
+                  {{ 'quotes.contactMissing' | transloco }}
+                </p>
+                <div class="grid grid-cols-2 gap-2">
+                  <input pInputText formControlName="desAddressLine1" [placeholder]="'quotes.addressLine1Placeholder' | transloco" class="col-span-2 w-full" />
+                  <input pInputText formControlName="desAddressLine2" [placeholder]="'quotes.addressLine2Placeholder' | transloco" class="col-span-2 w-full" />
+                  <input pInputText formControlName="codPostal" [placeholder]="'quotes.postalCodePlaceholder' | transloco" class="w-full" />
+                  <input pInputText formControlName="mobilePhone" [placeholder]="'quotes.mobilePhonePlaceholder' | transloco" class="w-full" />
+                </div>
+                <div class="flex justify-end">
+                  <button pButton type="submit" [label]="'common.save' | transloco" [loading]="slot.savingContact()" icon="pi pi-save"></button>
+                </div>
+              </form>
+            }
+          } @else {
+            <div class="flex gap-2">
+              <input pInputText [formControl]="slot.searchControl" [placeholder]="'quotes.identificationNumberPlaceholder' | transloco" class="w-full" />
+              <button pButton type="button" [label]="'quotes.searchButton' | transloco" [loading]="slot.searching()" (click)="searchPerson(slot)"></button>
+            </div>
+
+            @if (slot.found(); as found) {
+              <div class="flex items-center justify-between rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                <span>{{ found.DesFirstName }} {{ found.DesLastName1 }} -- {{ found.DesEmail }}</span>
+                <button pButton type="button" [label]="'quotes.assignButton' | transloco" (click)="assignFoundPerson(slot)"></button>
+              </div>
+            }
+
+            @if (slot.notFound()) {
+              <div class="flex flex-col gap-2 border-t border-slate-100 pt-2">
+                <p class="text-xs text-slate-500">
+                  {{ 'quotes.personNotFound' | transloco }}
+                </p>
+                <form [formGroup]="slot.createForm" (ngSubmit)="createAndAssignPerson(slot)" class="grid grid-cols-2 gap-2">
+                  <input pInputText formControlName="desFirstName" [placeholder]="'quotes.firstNamePlaceholder' | transloco" class="w-full" />
+                  <input pInputText formControlName="desLastName1" [placeholder]="'quotes.lastNamePlaceholder' | transloco" class="w-full" />
+                  <input pInputText type="email" formControlName="desEmail" [placeholder]="'quotes.emailPlaceholder' | transloco" class="col-span-2 w-full" />
+                  <div class="col-span-2 flex justify-end">
+                    <button pButton type="submit" [label]="'quotes.createAndAssignButton' | transloco" icon="pi pi-user-plus"></button>
+                  </div>
+                </form>
+              </div>
+            }
+
+            @if (slot.code !== 'TOMADOR' && assignedPerson('TOMADOR')) {
+              <button
+                pButton
+                type="button"
+                [label]="'quotes.useSamePersonAsTomador' | transloco"
+                [text]="true"
+                (click)="copyFromTomador(slot)"
+              ></button>
+            }
+          }
+        </div>
+      }
+
+      <div class="flex justify-between">
+        <button pButton type="button" [label]="'quotes.backButton' | transloco" severity="secondary" [text]="true" (click)="backToPlans()"></button>
+        <button
+          pButton
+          type="button"
+          [label]="'quotes.continueToSummaryButton' | transloco"
+          icon="pi pi-arrow-right"
+          iconPos="right"
+          [disabled]="!canContinueToSummary()"
+          (click)="goToSummary()"
+        ></button>
+      </div>
+    </div>
+  }
+
+  @case ('summary') {
+    <div class="mx-auto flex max-w-2xl flex-col gap-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-lg font-semibold text-slate-900">{{ 'quotes.summaryTitle' | transloco }}</h1>
+          <p class="text-sm text-slate-500">{{ 'quotes.summarySubtitle' | transloco }}</p>
+        </div>
+        <button pButton type="button" [label]="'quotes.newQuoteButton' | transloco" severity="secondary" [text]="true" (click)="nuevaCotizacion()"></button>
+      </div>
+
+      @if (summary(); as s) {
+        <div class="flex flex-col gap-3 rounded-lg border border-slate-200 p-4">
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-slate-500">{{ 'quotes.planLabel' | transloco }}</span>
+            <span class="text-sm font-medium text-slate-900">{{ s.plan ?? ('quotes.dashPlaceholder' | transloco) }}</span>
+          </div>
+          <div class="flex items-center justify-between border-t border-slate-100 pt-3">
+            <span class="text-sm text-slate-500">{{ 'quotes.totalPrimeLabel' | transloco }}</span>
+            <span class="text-2xl font-bold text-slate-900">{{ s.symbolCurrency }}{{ s.quotePrime }}</span>
+          </div>
+
+          @if (s.personPayer) {
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-slate-500">{{ 'quotes.personSlotTomador' | transloco }}</span>
+              <span class="text-slate-900">{{ s.personPayer.name }} {{ s.personPayer.lastname }}</span>
+            </div>
+          }
+          @if (s.personHolder) {
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-slate-500">{{ 'quotes.personSlotTitular' | transloco }}</span>
+              <span class="text-slate-900">{{ s.personHolder.name }} {{ s.personHolder.lastname }}</span>
+            </div>
+          }
+
+          @for (risk of s.riskInfo; track risk.desShortRiskProduct) {
+            <div class="border-t border-slate-100 pt-3">
+              <p class="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">{{ risk.desShortRiskProduct }}</p>
+              @for (coverage of risk.coverages; track coverage.desShortCoverage) {
+                <div class="flex items-center justify-between text-sm text-slate-700">
+                  <span>{{ coverage.desShortCoverage ?? ('quotes.coverageFallback' | transloco) }}</span>
+                  <span>{{ coverage.symbolCurrency }}{{ coverage.coveragePrime }}</span>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      <div class="flex justify-between">
+        <button pButton type="button" [label]="'quotes.backButton' | transloco" severity="secondary" [text]="true" (click)="backToPersons()"></button>
+        <button pButton type="button" [label]="'quotes.continueButton' | transloco" icon="pi pi-arrow-right" iconPos="right" (click)="goToContractStep()"></button>
+      </div>
+    </div>
+  }
+
+  @case ('contract') {
+    <div class="mx-auto flex max-w-2xl flex-col gap-6">
+      <div>
+        <h1 class="text-lg font-semibold text-slate-900">{{ 'quotes.contractStepTitle' | transloco }}</h1>
+        <p class="text-sm text-slate-500">
+          {{ 'quotes.contractStepSubtitle' | transloco }}
+        </p>
+      </div>
+
+      <div class="flex flex-col gap-4 rounded-lg border border-slate-200 p-6">
+        <div class="flex items-center justify-between gap-4">
+          <div>
+            <p class="font-medium text-slate-900">{{ 'quotes.acceptStepLabel' | transloco }}</p>
+            <p class="text-xs text-slate-500">{{ 'quotes.acceptStepDetail' | transloco }}</p>
+          </div>
+          @if (quoteAccepted()) {
+            <p-tag [value]="'quotes.acceptedTag' | transloco" severity="success" />
+          } @else {
+            <button pButton type="button" [label]="'quotes.acceptQuoteButton' | transloco" [loading]="accepting()" (click)="acceptQuote()"></button>
+          }
+        </div>
+
+        <div class="flex items-center justify-between gap-4 border-t border-slate-100 pt-4">
+          <div>
+            <p class="font-medium text-slate-900">{{ 'quotes.contractStepLabel' | transloco }}</p>
+            <p class="text-xs text-slate-500">{{ 'quotes.contractStepDetail' | transloco }}</p>
+          </div>
+          @if (contractResult(); as contract) {
+            <p-tag [value]="'quotes.contractTag' | transloco: { num: contract.NumContract }" severity="success" />
+          } @else {
+            <button
+              pButton
+              type="button"
+              [label]="'quotes.generateContractButton' | transloco"
+              [loading]="contracting()"
+              [disabled]="!quoteAccepted()"
+              (click)="generateContract()"
+            ></button>
+          }
+        </div>
+      </div>
+
+      <div class="flex justify-between">
+        <button pButton type="button" [label]="'quotes.backButton' | transloco" severity="secondary" [text]="true" (click)="backToSummary()"></button>
+        <button pButton type="button" [label]="'quotes.newQuoteButton' | transloco" severity="secondary" (click)="irANueva()"></button>
+      </div>
+    </div>
+  }
+}

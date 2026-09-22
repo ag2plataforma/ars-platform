@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { RuleOrigin, RuleValueResolver } from '@ars-platform/shared-common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
 /**
@@ -21,6 +22,14 @@ import { PrismaService } from '../prisma.service';
  * aquí — este resolver solo se consulta para referencias a reglas FUERA
  * de la cadena que se está evaluando (otra cobertura, o una corrida ya
  * persistida anteriormente).
+ *
+ * `dbTransaction` (opcional, opaco en la interfaz de `shared-common`): si
+ * viene informado se castea a `Prisma.TransactionClient` y se usa esa
+ * conexión en vez de `this.prisma` -- mismo motivo que en
+ * `PrismaAttributeValueResolver` (ver ese archivo y docs/02-roadmap.md):
+ * para `origin: 'Contract'`, el `TMovementConcept` a leer puede haber sido
+ * escrito por la MISMA transacción activa
+ * (`ContractsService.createInitialMovements`) y todavía no tener commit.
  */
 @Injectable()
 export class PrismaRuleValueResolver implements RuleValueResolver {
@@ -30,22 +39,25 @@ export class PrismaRuleValueResolver implements RuleValueResolver {
     origin: RuleOrigin,
     ideCoverageOrMovement: string,
     codCalculationRule: string,
+    dbTransaction?: unknown,
   ): Promise<number> {
-    const rule = await this.prisma.sCalculationRule.findUnique({
+    const db = (dbTransaction as Prisma.TransactionClient | undefined) ?? this.prisma;
+
+    const rule = await db.sCalculationRule.findUnique({
       where: { CodCalculationRule: codCalculationRule },
       select: { IdeConcept: true },
     });
     if (!rule) return 0;
 
     if (origin === 'Quote') {
-      const concept = await this.prisma.tQuoteCoverageConcept.findFirst({
+      const concept = await db.tQuoteCoverageConcept.findFirst({
         where: { IdeQuoteCoverage: ideCoverageOrMovement, IdeConcept: rule.IdeConcept },
         select: { ConceptValue: true },
       });
       return concept ? Number(concept.ConceptValue) : 0;
     }
 
-    const concept = await this.prisma.tMovementConcept.findFirst({
+    const concept = await db.tMovementConcept.findFirst({
       where: { IdeCoverageMovement: ideCoverageOrMovement, IdeConcept: rule.IdeConcept },
       select: { ConceptValue: true },
     });
