@@ -1,6 +1,23 @@
 @import "tailwindcss";
 @import "primeicons/primeicons.css";
 
+/* Color de marca (logo real, ver public/brand/logo.png y app.config.ts::ArsPreset
+ * -- mismo hex en los dos lados, para que las clases Tailwind del sidebar y los
+ * componentes PrimeNG usen exactamente el mismo violeta). */
+@theme {
+  --color-brand-50: #f4f1fe;
+  --color-brand-100: #e5defc;
+  --color-brand-200: #c6b9f9;
+  --color-brand-300: #a18af5;
+  --color-brand-400: #8669f2;
+  --color-brand-500: #6d4aef;
+  --color-brand-600: #4d23ec;
+  --color-brand-700: #3b13d3;
+  --color-brand-800: #310fad;
+  --color-brand-900: #280c8d;
+  --color-brand-950: #1a085e;
+}
+
 html,
 body {
   height: 100%;
