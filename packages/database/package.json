@@ -12,7 +12,8 @@
     "db:seed-admin": "node scripts/seed-admin-user.js",
     "build": "prisma generate && tsc -p tsconfig.json",
     "postinstall": "prisma generate",
-    "db:seed-example-rules": "node scripts/seed-example-rules.js"
+    "db:seed-example-rules": "node scripts/seed-example-rules.js",
+    "db:seed-menu-config": "node scripts/seed-menu-config.js"
   },
   "dependencies": {
     "@ars-platform/shared-common": "*",

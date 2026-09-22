@@ -1,0 +1,31 @@
+<div class="flex flex-col gap-4">
+  <div>
+    <h1 class="text-lg font-semibold text-slate-900">{{ 'menuConfig.title' | transloco }}</h1>
+    <p class="text-sm text-slate-500">
+      {{ 'menuConfig.subtitle' | transloco }}
+    </p>
+  </div>
+
+  <p-tabs [value]="activeTab()" (valueChange)="activeTab.set($event ?? 'applications')">
+    <p-tablist>
+      <p-tab value="applications">{{ 'menuConfig.applicationsTab' | transloco }}</p-tab>
+      <p-tab value="application-roles">{{ 'menuConfig.applicationRolesTab' | transloco }}</p-tab>
+      <p-tab value="site-map">{{ 'menuConfig.siteMapTab' | transloco }}</p-tab>
+      <p-tab value="site-map-roles">{{ 'menuConfig.siteMapRolesTab' | transloco }}</p-tab>
+    </p-tablist>
+    <p-tabpanels>
+      <p-tabpanel value="applications">
+        <app-applications-tab />
+      </p-tabpanel>
+      <p-tabpanel value="application-roles">
+        <app-application-roles-tab />
+      </p-tabpanel>
+      <p-tabpanel value="site-map">
+        <app-site-map-tab />
+      </p-tabpanel>
+      <p-tabpanel value="site-map-roles">
+        <app-site-map-roles-tab />
+      </p-tabpanel>
+    </p-tabpanels>
+  </p-tabs>
+</div>

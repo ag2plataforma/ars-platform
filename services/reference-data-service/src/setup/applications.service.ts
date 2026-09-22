@@ -5,6 +5,8 @@ import { CatalogCrudService } from '@ars-platform/shared-common';
 import { CreateApplicationDto } from './dto/create-application.dto';
 import { UpdateApplicationDto } from './dto/update-application.dto';
 
+const INCLUDE = { SState: true } as const;
+
 @Injectable()
 export class ApplicationsService {
   private readonly crud: CatalogCrudService<SApplication>;
@@ -19,6 +21,7 @@ export class ApplicationsService {
       'DesApplication',
       'IdeApplication',
       'aplicación',
+      INCLUDE,
     );
   }
 

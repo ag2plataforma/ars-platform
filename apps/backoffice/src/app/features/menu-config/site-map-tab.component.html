@@ -1,0 +1,134 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex flex-col gap-4">
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold text-slate-900">{{ 'menuConfig.siteMap.title' | transloco }}</h2>
+      <p class="text-sm text-slate-500">{{ 'menuConfig.siteMap.subtitle' | transloco }}</p>
+    </div>
+    <button pButton type="button" icon="pi pi-plus" [label]="'menuConfig.siteMap.newRootButton' | transloco" (click)="openCreateRoot()"></button>
+  </div>
+
+  <p-treeTable [value]="treeNodes()" [loading]="loading()" dataKey="key" styleClass="p-datatable-sm">
+    <ng-template #header>
+      <tr>
+        <th>{{ 'menuConfig.siteMap.itemColumn' | transloco }}</th>
+        <th>{{ 'catalogs.codeColumn' | transloco }}</th>
+        <th>{{ 'menuConfig.siteMap.orderColumn' | transloco }}</th>
+        <th>{{ 'menuConfig.siteMap.routeColumn' | transloco }}</th>
+        <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+        <th class="w-52">{{ 'catalogs.actionsColumn' | transloco }}</th>
+      </tr>
+    </ng-template>
+    <ng-template #body let-rowNode let-rowData="rowData">
+      <tr>
+        <td>
+          <p-treeTableToggler [rowNode]="rowNode" />
+          {{ rowData.DesSiteMap }}
+        </td>
+        <td>{{ rowData.CodSiteMap }}</td>
+        <td>{{ rowData.NumOrder }}</td>
+        <td>{{ rowData.DesPathOption || ('common.dash' | transloco) }}</td>
+        <td>
+          <p-tag
+            [value]="(isActive(rowData) ? 'common.active' : 'common.inactive') | transloco"
+            [severity]="isActive(rowData) ? 'success' : 'danger'"
+          />
+        </td>
+        <td>
+          <div class="flex gap-1">
+            <button
+              pButton
+              type="button"
+              icon="pi pi-plus"
+              [text]="true"
+              severity="secondary"
+              [pTooltip]="'menuConfig.siteMap.addChildTooltip' | transloco"
+              tooltipPosition="top"
+              [disabled]="!canAddChild(rowData)"
+              (click)="openCreateChild(rowData)"
+            ></button>
+            <button
+              pButton
+              type="button"
+              icon="pi pi-pencil"
+              [text]="true"
+              severity="secondary"
+              [pTooltip]="'locations.editTooltip' | transloco"
+              tooltipPosition="top"
+              (click)="openEdit(rowData)"
+            ></button>
+            <button
+              pButton
+              type="button"
+              [icon]="isActive(rowData) ? 'pi pi-ban' : 'pi pi-check'"
+              [text]="true"
+              [severity]="isActive(rowData) ? 'danger' : 'success'"
+              [pTooltip]="(isActive(rowData) ? 'catalogs.deactivateHeader' : 'catalogs.activateHeader') | transloco"
+              tooltipPosition="top"
+              (click)="toggleState(rowData)"
+            ></button>
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="6" class="text-center text-slate-500">{{ 'menuConfig.siteMap.emptyState' | transloco }}</td>
+      </tr>
+    </ng-template>
+  </p-treeTable>
+</div>
+
+<p-dialog
+  [header]="(dialogMode() === 'create' ? 'menuConfig.siteMap.createDialogTitle' : 'menuConfig.siteMap.editDialogTitle') | transloco"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  [style]="{ width: '30rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-2">
+      <label for="sm-cod" class="text-sm font-medium text-slate-700">{{ 'catalogs.codeColumn' | transloco }}</label>
+      <input pInputText id="sm-cod" formControlName="cod" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label for="sm-des" class="text-sm font-medium text-slate-700">{{ 'catalogs.descriptionColumn' | transloco }}</label>
+      <input pInputText id="sm-des" formControlName="des" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label for="sm-order" class="text-sm font-medium text-slate-700">{{ 'menuConfig.siteMap.orderLabel' | transloco }}</label>
+      <input pInputText id="sm-order" type="number" formControlName="numOrder" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label for="sm-path" class="text-sm font-medium text-slate-700">{{ 'menuConfig.siteMap.routeLabel' | transloco }}</label>
+      <input pInputText id="sm-path" formControlName="desPathOption" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label for="sm-image" class="text-sm font-medium text-slate-700">{{ 'menuConfig.siteMap.iconLabel' | transloco }}</label>
+      <input pInputText id="sm-image" formControlName="image" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'menuConfig.siteMap.parentLabel' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codSiteMapParent"
+        [options]="parentOptions()"
+        optionLabel="label"
+        optionValue="cod"
+        [showClear]="true"
+        [placeholder]="'menuConfig.siteMap.noParentPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+      <p class="text-xs text-slate-500">
+        {{ 'menuConfig.siteMap.parentLevelHint' | transloco }}
+      </p>
+    </div>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
+    </div>
+  </form>
+</p-dialog>

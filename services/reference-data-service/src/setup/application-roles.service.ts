@@ -5,7 +5,7 @@ import { CatalogCrudService } from '@ars-platform/shared-common';
 import { CreateApplicationRoleDto } from './dto/create-application-role.dto';
 import { UpdateApplicationRoleDto } from './dto/update-application-role.dto';
 
-const INCLUDE = { SApplication: true } as const;
+const INCLUDE = { SApplication: true, SState: true } as const;
 
 @Injectable()
 export class ApplicationRolesService {

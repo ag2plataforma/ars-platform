@@ -24,6 +24,7 @@
     "start:product-rating": "npm run build:libs && npm run build --workspace=services/product-rating-service && node services/product-rating-service/dist/main.js",
     "start:product-rating:watch": "npm run build:libs && npm run start:dev --workspace=services/product-rating-service",
     "db:seed-example-rules": "node packages/database/scripts/seed-example-rules.js",
+    "db:seed-menu-config": "node packages/database/scripts/seed-menu-config.js",
     "db:seed-example-rate-table": "node packages/database/scripts/seed-example-rate-table.js",
     "db:investigate-attribute-engine": "node packages/database/scripts/investigate-attribute-engine.js",
     "db:investigate-quote-engine": "node packages/database/scripts/investigate-quote-engine.js",

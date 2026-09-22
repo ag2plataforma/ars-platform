@@ -1,0 +1,52 @@
+<p-toast />
+
+<div class="flex flex-col gap-4">
+  <div>
+    <h2 class="text-base font-semibold text-slate-900">{{ 'menuConfig.siteMapRoles.title' | transloco }}</h2>
+    <p class="text-sm text-slate-500">{{ 'menuConfig.siteMapRoles.subtitle' | transloco }}</p>
+  </div>
+
+  <div class="flex max-w-md flex-col gap-2">
+    <label class="text-sm font-medium text-slate-700">{{ 'menuConfig.siteMapRoles.roleLabel' | transloco }}</label>
+    <p-select
+      appendTo="body"
+      [options]="roleOptions()"
+      optionLabel="label"
+      optionValue="code"
+      [ngModel]="selectedRole()"
+      (ngModelChange)="onRoleChange($event)"
+      (onShow)="loadApplicationRoles()"
+      [showClear]="true"
+      [placeholder]="'menuConfig.siteMapRoles.rolePlaceholder' | transloco"
+      styleClass="w-full"
+    />
+  </div>
+
+  @if (!selectedRole()) {
+    <p class="text-sm text-slate-500">{{ 'menuConfig.siteMapRoles.chooseRoleHint' | transloco }}</p>
+  } @else {
+    <p-table [value]="matrix()" [loading]="loading()" styleClass="p-datatable-sm">
+      <ng-template #header>
+        <tr>
+          <th>{{ 'menuConfig.siteMapRoles.menuItemColumn' | transloco }}</th>
+          <th class="w-32 text-center">{{ 'menuConfig.siteMapRoles.grantedColumn' | transloco }}</th>
+        </tr>
+      </ng-template>
+      <ng-template #body let-row>
+        <tr>
+          <td [style.paddingLeft.rem]="(row.level - 1) * 1.25">
+            {{ row.level > 1 ? '↳ ' : '' }}{{ row.siteMap.DesSiteMap }}
+          </td>
+          <td class="text-center">
+            <input type="checkbox" [checked]="row.granted" (change)="toggle(row)" />
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template #emptymessage>
+        <tr>
+          <td colspan="2" class="text-center text-slate-500">{{ 'menuConfig.siteMapRoles.emptyState' | transloco }}</td>
+        </tr>
+      </ng-template>
+    </p-table>
+  }
+</div>

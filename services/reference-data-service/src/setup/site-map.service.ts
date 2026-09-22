@@ -5,6 +5,8 @@ import { CatalogCrudService } from '@ars-platform/shared-common';
 import { CreateSiteMapDto } from './dto/create-site-map.dto';
 import { UpdateSiteMapDto } from './dto/update-site-map.dto';
 
+const INCLUDE = { SState: true } as const;
+
 /**
  * `SSiteMap` -- ítems del árbol de navegación. `CodSiteMap` sí es único
  * global (`UK_SSiteMap_01`, a diferencia de `SLocation`), así que
@@ -28,6 +30,7 @@ export class SiteMapService {
       'DesSiteMap',
       'IdeSiteMap',
       'ítem de menú',
+      INCLUDE,
     );
   }
 
