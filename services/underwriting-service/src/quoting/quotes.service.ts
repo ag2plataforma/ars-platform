@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, PrismaService } from '@ars-platform/database';
-import { RulesEngineService, StateMachineService } from '@ars-platform/shared-common';
+import { RulesEngineService, SocialImpactCalculatorService, StateMachineService } from '@ars-platform/shared-common';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { ListQuotesDto } from './dto/list-quotes.dto';
 
@@ -40,6 +40,7 @@ export class QuotesService {
     private readonly prisma: PrismaService,
     private readonly stateMachine: StateMachineService,
     private readonly rulesEngine: RulesEngineService,
+    private readonly socialImpactCalculator: SocialImpactCalculatorService,
   ) {}
 
   async create(dto: CreateQuoteDto, actor: string) {
@@ -778,6 +779,13 @@ export class QuotesService {
     });
     const indAnnual = productValidityType?.SValidityType.IndAnnual ?? false;
 
+    // Impacto Social (Fase 3, ver docs/02-roadmap.md) -- puramente
+    // informativo, no toca ningun total de prima real todavia (Etapa 1:
+    // andamiaje + placeholder, ver SocialImpactCalculatorService en
+    // @ars-platform/shared-common). `active: false` es el caso normal
+    // para la inmensa mayoria de productos, que no participan.
+    const socialImpact = await this.socialImpactCalculator.calculateAdjustment(quote.IdeProduct);
+
     return {
       ideQuote: quote.IdeQuote,
       numQuote: quote.NumQuote,
@@ -794,6 +802,7 @@ export class QuotesService {
       contract: quote.TContract[0]
         ? { ideContract: quote.TContract[0].IdeContract, numContract: quote.TContract[0].NumContract }
         : null,
+      socialImpact,
       risks: quote.TQuoteRisk.map((risk) => ({
         ideQuoteRisk: risk.IdeQuoteRisk,
         numRisk: risk.NumRisk,

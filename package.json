@@ -48,6 +48,8 @@
     "start:claims:watch": "npm run build:libs && npm run start:dev --workspace=services/claims-service",
     "start:billing": "npm run build:libs && npm run build --workspace=services/billing-service && node services/billing-service/dist/main.js",
     "start:billing:watch": "npm run build:libs && npm run start:dev --workspace=services/billing-service",
+    "start:social-impact": "npm run build:libs && npm run build --workspace=services/social-impact-service && node services/social-impact-service/dist/main.js",
+    "start:social-impact:watch": "npm run build:libs && npm run start:dev --workspace=services/social-impact-service",
     "start:gateway": "npm run build:libs && npm run build --workspace=services/gateway && node services/gateway/dist/main.js",
     "start:gateway:watch": "npm run build:libs && npm run start:dev --workspace=services/gateway"
   },

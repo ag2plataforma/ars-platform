@@ -1,0 +1,25 @@
+import { All, Controller, Req, Res } from '@nestjs/common';
+import type { Request, Response } from 'express';
+import { Public } from '@ars-platform/shared-common';
+import { ProxyService } from './proxy.service';
+
+/**
+ * Proxy fiel hacia `social-impact` (ver `ProxyService`) -- solo `health`
+ * es público, igual que en el servicio real; todo lo demás exige el
+ * mismo JWT que ya exige `social-impact-service` directamente.
+ */
+@Controller('social-impact')
+export class SocialImpactProxyController {
+  constructor(private readonly proxy: ProxyService) {}
+
+  @Public()
+  @All('health')
+  health(@Req() req: Request, @Res() res: Response) {
+    return this.proxy.forward('social-impact', req, res);
+  }
+
+  @All('*')
+  catchAll(@Req() req: Request, @Res() res: Response) {
+    return this.proxy.forward('social-impact', req, res);
+  }
+}

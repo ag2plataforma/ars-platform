@@ -7,6 +7,7 @@ import { ProductRatingProxyController } from './product-rating-proxy.controller'
 import { UnderwritingProxyController } from './underwriting-proxy.controller';
 import { ClaimsProxyController } from './claims-proxy.controller';
 import { BillingProxyController } from './billing-proxy.controller';
+import { SocialImpactProxyController } from './social-impact-proxy.controller';
 
 /**
  * Único punto de entrada real para ambos frontends (ver
@@ -29,6 +30,7 @@ import { BillingProxyController } from './billing-proxy.controller';
     UnderwritingProxyController,
     ClaimsProxyController,
     BillingProxyController,
+    SocialImpactProxyController,
   ],
   providers: [ProxyService],
 })

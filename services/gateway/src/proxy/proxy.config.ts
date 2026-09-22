@@ -12,6 +12,7 @@ export const PROXY_TARGETS = {
   underwriting: { envVar: 'UNDERWRITING_SERVICE_URL', defaultUrl: 'http://localhost:3005' },
   claims: { envVar: 'CLAIMS_SERVICE_URL', defaultUrl: 'http://localhost:3006' },
   billing: { envVar: 'BILLING_SERVICE_URL', defaultUrl: 'http://localhost:3007' },
+  'social-impact': { envVar: 'SOCIAL_IMPACT_SERVICE_URL', defaultUrl: 'http://localhost:3008' },
 } as const;
 
 export type ProxyServiceKey = keyof typeof PROXY_TARGETS;

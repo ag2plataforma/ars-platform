@@ -1399,6 +1399,7 @@ model SProduct {
   SProductRequirement     SProductRequirement[]
   SProductValidityType    SProductValidityType[]
   SRiskProduct            SRiskProduct[]
+  SSocialImpactConfig     SSocialImpactConfig?
   TContract               TContract[]
   TQuote                  TQuote[]
 
@@ -1910,6 +1911,19 @@ model SSiteMapRole {
   @@index([IdeState], map: "IX_SSiteMapRole_SState")
 }
 
+model SSocialImpactConfig {
+  IdeSocialImpactConfig String   @id(map: "PK_SSocialImpactConfig") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  IdeProduct            String   @unique(map: "UK_SSocialImpactConfig_01") @db.Uuid
+  ConfigJSON            Json     @default("{}")
+  IdeState              String   @db.Uuid
+  UsrCreation           String   @db.VarChar(60)
+  TstCreation           DateTime @db.Timestamp(6)
+  UsrModification       String   @db.VarChar(60)
+  TstModification       DateTime @db.Timestamp(6)
+  SProduct              SProduct @relation(fields: [IdeProduct], references: [IdeProduct], onDelete: NoAction, onUpdate: NoAction, map: "FK_SSocialImpactConfig_SProduct")
+  SState                SState   @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_SSocialImpactConfig_SState")
+}
+
 model SState {
   IdeState                                         String                         @id(map: "PK_SState") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   CodState                                         String                         @unique(map: "UK_SState_01") @db.VarChar(30)
@@ -2000,6 +2014,7 @@ model SState {
   SScreen                                          SScreen[]
   SSiteMap                                         SSiteMap[]
   SSiteMapRole                                     SSiteMapRole[]
+  SSocialImpactConfig                              SSocialImpactConfig[]
   STextContent_SState_IdeTextContentToSTextContent STextContent?                  @relation("SState_IdeTextContentToSTextContent", fields: [IdeTextContent], references: [IdeTextContent], onDelete: NoAction, onUpdate: NoAction, map: "FK_SState_STextContent")
   SStateRule_SStateRule_IdeStateFromToSState       SStateRule[]                   @relation("SStateRule_IdeStateFromToSState")
   SStateRule_SStateRule_IdeStateToToSState         SStateRule[]                   @relation("SStateRule_IdeStateToToSState")
@@ -3242,9 +3257,9 @@ model TUser {
   TstModification DateTime          @db.Timestamp(6)
   SState          SState            @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_TUser_SState")
   TRol            TRol              @relation(fields: [IdeRol], references: [IdeRol], onDelete: NoAction, onUpdate: NoAction, map: "FK_TUser_TRol")
+  TUserBackupCode TUserBackupCode[]
   TUserCredential TUserCredential[]
   TUserTwoFactor  TUserTwoFactor?
-  TUserBackupCode TUserBackupCode[]
 
   @@index([IdeState], map: "IX_TUser_SState")
   @@index([IdeRol], map: "IX_TUser_TRol")
@@ -3266,12 +3281,6 @@ model TUserCredential {
   @@index([IdeUser], map: "IX_TUserCredential_TUser")
 }
 
-// 2FA (TOTP) -- feature nueva de cero, v1 no tenia esto (ver
-// db/migrations/002_two_factor_auth.sql). Uno por usuario (@unique en
-// IdeUser). IndEnabled es un booleano simple a proposito: no es una
-// entidad de negocio con transiciones via SStateRule, es una bandera
-// interna de "ya confirmo el enrolamiento". Secret queda en texto
-// plano -- decision explicita del usuario, ver docs/02-roadmap.md.
 model TUserTwoFactor {
   IdeUserTwoFactor String   @id(map: "PK_TUserTwoFactor") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   IdeUser          String   @unique(map: "UK_TUserTwoFactor_01") @db.Uuid
@@ -3286,9 +3295,6 @@ model TUserTwoFactor {
   @@index([IdeUser], map: "IX_TUserTwoFactor_TUser")
 }
 
-// Codigos de respaldo de un solo uso para 2FA -- se guardan hasheados
-// (bcrypt, igual que TUserCredential.Credential) porque solo hace falta
-// compararlos, nunca recuperarlos. IndUsed marca el consumo.
 model TUserBackupCode {
   IdeUserBackupCode String   @id(map: "PK_TUserBackupCode") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   IdeUser           String   @db.Uuid
