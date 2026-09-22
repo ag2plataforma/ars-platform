@@ -50,6 +50,10 @@ Dos catálogos con lógica extra:
 - `GET /countries` — `SCountry`, con `CodDDI` e `IdeLanguage` (resuelto desde `codLanguage` en el body).
 - `GET /locations` — `SLocation`, escrito a mano (no `CatalogCrudService`) porque su unicidad real es compuesta (`CodLocation`+`IdeCountry`, no `CodLocation` solo) y tiene jerarquía propia (`codLocationParent`).
 
+Dos catálogos agregados en la fase "Catálogos de producto" (ver `docs/02-roadmap.md`), prerequisito de `SCalculationRule.CodConcept` en `product-rating-service` -- sin CRUD en ningún servicio hasta esta fase:
+- `GET/POST /concept-types` — `SConceptType`, catálogo simple.
+- `GET/POST /concepts` — `SConcept`, resuelve `codConceptType`→`SConceptType`. Van acá (no en `product-rating-service`) porque también los consumen `billing-service` y `underwriting-service`.
+
 ### `I18nModule` — `STextContent` / `STranslator`
 
 Confirmado por grep sobre las funciones PL/pgSQL reales (no existe ninguna función de negocio para traducción, ni `Translat*` ni `GetText*` propias — solo el `pg_catalog.translate` nativo de Postgres) que esto es CRUD puro, sin algoritmo que replicar.
@@ -68,6 +72,12 @@ Incluye el único módulo de este servicio con una función PL/pgSQL de LECTURA 
 - `GET/POST/PATCH /site-map` — `SSiteMap`, ítems del árbol (`CodSiteMap` es único global, sí usa `CatalogCrudService`), jerarquía propia vía `codSiteMapParent`.
 - `GET /site-map-menu?codApplicationRole=COD1,COD2` — el árbol de menú real ya filtrado y armado (equivalente a `FGetSiteMap`), de solo lectura.
 - `GET/POST /site-map-roles` (`PATCH /:id/state`, sin `update`) — `SSiteMapRole`, concesión rol→ítem de menú. Único real por (`IdeSiteMap`, `IdeApplicationRole`) — se valida antes de insertar. Sin `update` porque es una concesión de acceso: se otorga o se retira, no se edita.
+
+`applications`, `application-roles` y `site-map` incluyen `SState` en las
+respuestas (y `application-roles` también `SApplication`) -- mismo agregado
+aditivo que en `CommonCatalogsModule`, hecho al construir la pantalla de
+"Configuración de menú" del backoffice (`apps/backoffice`) para poder
+mostrar Activo/Inactivo real sin una llamada aparte.
 
 Todos los `POST`/`PATCH` de `CommonCatalogsModule`, `I18nModule` y `SetupModule` requieren rol `ADMIN`, igual que `FieldCatalogModule`.
 

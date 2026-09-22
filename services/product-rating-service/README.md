@@ -29,6 +29,8 @@ Scaffoldeado siguiendo exactamente la misma plantilla que `services/iam-service`
   - `GET|POST /insurance-lines`, `GET|PATCH /insurance-lines/:id`, `PATCH /insurance-lines/:id/state` — `SInsuranceLine` (requiere `codInsuranceArea`).
   - `GET|POST /deductible-types`, `GET|PATCH /deductible-types/:id`, `PATCH /deductible-types/:id/state` — `SDeductibleType`.
   - `GET|POST /limit-types`, `GET|PATCH /limit-types/:id`, `PATCH /limit-types/:id/state` — `SLimitType`.
+
+  `SRisk` (`SRiskLevel`) y `SInsuranceLine` (`SInsuranceArea`) incluyen ahora esa relación en las respuestas de `findAll`/`findOne`/`create`/`update`/`setState` -- agregado al construir la pantalla de "Catálogos" del backoffice, mismo criterio aditivo que en `reference-data-service`.
 - **CRUD real de las 7 entidades "de dominio"** — la jerarquía completa de configuración de un producto, y la respuesta definitiva a "cómo se registra una fórmula nueva" (reemplaza a `db:seed-example-rules`, que queda solo como ejemplo/semilla rápida). Mismo criterio de permisos que los catálogos (lectura abierta, escritura `@Roles('ADMIN')`). Orden para dar de alta un producto completo:
   1. `GET|POST /products`, `GET|PATCH /products/:id`, `PATCH /products/:id/state` — `SProduct` (requiere `codInsuranceArea`, `codCurrency`).
   2. `GET|POST /risk-products`, `GET|PATCH /risk-products/:id`, `PATCH /risk-products/:id/state` — `SRiskProduct` (requiere `codProduct`, `codRisk`, `codRiskType`).
@@ -54,10 +56,7 @@ Scaffoldeado siguiendo exactamente la misma plantilla que `services/iam-service`
 
 **Nota importante:** la migración de `ars_platform` trajo la estructura de las 130 tablas pero ninguna fila de configuración de negocio — con el CRUD de arriba ya se puede cargar un producto completo (catálogos + jerarquía + reglas de cálculo) por API. `npm run db:seed-example-rules` (desde la raíz del repo) sigue disponible como atajo rápido para tener datos de ejemplo sin pasar por los 7 pasos a mano (códigos `SEED_...`, claramente de prueba; ver también `npm run verify:rules-engine` en `packages/shared-common` para la verificación del motor de reglas en memoria, sin BD).
 
-Pendiente para Fase 2 (ver `docs/02-roadmap.md`):
-
-- Equivalente a `FGetRateValue` (búsqueda del valor de tarifa aplicable dados los factores reales de una cotización) — el CRUD de `SRateTable`/`SRateFactor`/`SRateValue` ya está, falta confirmar el criterio de desempate exacto contra la función original (ver nota arriba y `find-legacy-function.js`).
-- Retirar los endpoints de prueba `/rules-engine/*` cuando `underwriting-service` (u otro consumidor real) use `RulesEngineService` directamente.
+**Migración cerrada (22/09/2026, ver `docs/02-roadmap.md`)**: los dos pendientes que quedaban acá ya se resolvieron. `FGetRateValue` está confirmado línea por línea contra su código fuente real en Postgres e implementado (`PrismaRateValueResolver`, `packages/database/src/repositories/rate-value.resolver.ts`), con su criterio exacto de desempate (0 o más de 1 fila = error, sin ganar por especificidad) documentado ahí. Los endpoints de prueba `/rules-engine/*` (`ProductRatingRulesEngineModule`/`RulesEngineTestController`) se retiraron: `underwriting-service` terminó con su propio módulo independiente (`UnderwritingRulesEngineModule`) que conecta `RulesEngineService` directamente en la cascada real de cotización/contratación, cumpliendo la condición que el propio doc-comment del controller de prueba pedía para retirarlo.
 
 ## Cómo correrlo
 
