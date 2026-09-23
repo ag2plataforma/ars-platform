@@ -29,3 +29,32 @@ body {
   background-color: #f8fafc;
   color: #1e293b;
 }
+
+/*
+ * Estilo global de tablas (PrimeNG `p-table`) -- pedido explícito del
+ * usuario (23/09/2026, ver docs/02-roadmap.md): fondo de color en el
+ * header + fuente más chica, "parecido a como estaba en el backoffice
+ * viejo" (`app-bg-table`, que usaba `--highlight-bg` + texto violeta +
+ * 13px). Global (no repetido por componente) para que aplique a TODAS
+ * las tablas de la app -- confirmado con el usuario (`AskUserQuestion`):
+ * el fondo/tamaño de fuente sí se aplica a todas ahora mismo; el
+ * orden/filtro por columna y el pie "Mostrando X al Y de Z" quedan
+ * implementados en las pantallas de contrato (la petición concreta de
+ * esta vuelta) y pendientes como retrofit para el resto de las tablas
+ * ya existentes (catálogos, productos, tarifas, ubicaciones,
+ * configuración de menú, listado de cotizaciones) -- ver el roadmap.
+ *
+ * Colores tomados de la escala de marca (`--color-brand-*`, ver
+ * `ArsPreset` en `app.config.ts`) en vez del `#6A63B8` literal del
+ * sistema viejo, para quedar coherente con el violeta real de esta app.
+ */
+.p-datatable .p-datatable-thead > tr > th {
+  background: var(--color-brand-50);
+  color: var(--color-brand-700);
+  font-size: 0.8125rem;
+}
+
+.p-datatable .p-datatable-tbody > tr > td {
+  font-size: 0.8125rem;
+}
+

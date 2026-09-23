@@ -805,6 +805,13 @@ export class QuotesComponent {
     });
   }
 
+  /** Navega a la pantalla de detalle de contrato (`/contratos/:id`) --
+   *  el `p-tag` "Contrato <N>" pasa a ser un link real, pedido explícito
+   *  del usuario el 22/09/2026 (ver docs/02-roadmap.md). */
+  verContrato(ideContract: string): void {
+    this.router.navigate(['/contratos', ideContract]);
+  }
+
   generateContract(): void {
     if (!this.ideQuote) return;
     this.contracting.set(true);

@@ -1,0 +1,433 @@
+<p-toast />
+
+<div class="mx-auto flex max-w-6xl flex-col gap-4">
+  <div class="flex items-center gap-3">
+    <button pButton type="button" icon="pi pi-arrow-left" severity="secondary" [text]="true" (click)="volver()"></button>
+    <div>
+      <h1 class="text-lg font-semibold text-slate-900">{{ 'contractDetail.title' | transloco }}</h1>
+      @if (contract(); as c) {
+        <p class="text-sm text-slate-500">{{ c.NumContract }} -- {{ c.SProduct.DesProduct }}</p>
+      }
+    </div>
+  </div>
+
+  @if (contract(); as c) {
+    <!-- ============================== Franja general ============================== -->
+    <div class="flex flex-wrap items-center gap-x-8 gap-y-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+      <div class="flex items-center gap-2">
+        <span class="text-slate-500">{{ 'contractDetail.numberLabel' | transloco }}</span>
+        <span class="font-medium text-slate-900">{{ c.NumContract }}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-slate-500">{{ 'catalogs.stateColumn' | transloco }}</span>
+        <p-tag [value]="c.SState.DesState" [severity]="stateSeverity(c.SState.CodState)" />
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-slate-500">{{ 'contractDetail.validityLabel' | transloco }}</span>
+        <span class="text-slate-900">{{ c.TstInitial | date: 'dd/MM/yyyy' }} - {{ c.TstEnd ? (c.TstEnd | date: 'dd/MM/yyyy') : ('common.noEndDate' | transloco) }}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-slate-500">{{ 'contractDetail.validityTypeLabel' | transloco }}</span>
+        <span class="text-slate-900">{{ c.SValidityType.DesValidityType }}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-slate-500">{{ 'contractDetail.paymentFractionLabel' | transloco }}</span>
+        <span class="text-slate-900">{{ c.SPaymentFraction.DesPaymentFraction }}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-slate-500">{{ 'contractDetail.subscriptionLabel' | transloco }}</span>
+        <span class="text-slate-900">{{ c.TstSubscription | date: 'dd/MM/yyyy' }}</span>
+      </div>
+    </div>
+
+    <p-tabs [value]="activeTab()" (valueChange)="activeTab.set($event ?? 'personas')">
+      <p-tablist>
+        <p-tab value="personas">{{ 'contractDetail.tabs.persons' | transloco }}</p-tab>
+        <p-tab value="certificados">{{ 'contractDetail.tabs.files' | transloco }}</p-tab>
+        <p-tab value="riesgos" [disabled]="risksDisabled()">{{ 'contractDetail.tabs.risks' | transloco }}</p-tab>
+        <p-tab value="coberturas" [disabled]="coveragesDisabled()">{{ 'contractDetail.tabs.coverages' | transloco }}</p-tab>
+        <p-tab value="movimientos">{{ 'contractDetail.tabs.operations' | transloco }}</p-tab>
+        <p-tab value="canal">{{ 'contractDetail.tabs.channel' | transloco }}</p-tab>
+        <p-tab value="requisitos">{{ 'contractDetail.tabs.requirements' | transloco }}</p-tab>
+      </p-tablist>
+
+      <p-tabpanels>
+        <!-- ============================== Tomador/Titular ============================== -->
+        <p-tabpanel value="personas">
+          <p-table
+            [value]="c.TContractPerson"
+            dataKey="IdePerson"
+            [paginator]="true"
+            [rows]="10"
+            [showCurrentPageReport]="true"
+            currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+            styleClass="rounded-lg border border-slate-200 text-sm"
+          >
+            <ng-template pTemplate="header">
+              <tr>
+                <th pSortableColumn="TPerson.DesFirstName">
+                  {{ 'contractDetail.nameColumn' | transloco }} <p-sortIcon field="TPerson.DesFirstName" />
+                  <p-columnFilter type="text" field="TPerson.DesFirstName" display="menu" />
+                </th>
+                <th pSortableColumn="SPersonRol.DesPersonRol">{{ 'contractDetail.roleColumn' | transloco }} <p-sortIcon field="SPersonRol.DesPersonRol" /></th>
+                <th pSortableColumn="SState.DesState">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="SState.DesState" /></th>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-cp>
+              <tr>
+                <td>{{ cp.TPerson.DesFirstName }} {{ cp.TPerson.DesLastName1 }}</td>
+                <td>{{ cp.SPersonRol.DesPersonRol }}</td>
+                <td><p-tag [value]="cp.SState.DesState" [severity]="stateSeverity(cp.SState.CodState)" /></td>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="emptymessage">
+              <tr>
+                <td colspan="3" class="py-6 text-center text-sm text-slate-500">{{ 'contractDetail.personsEmpty' | transloco }}</td>
+              </tr>
+            </ng-template>
+          </p-table>
+        </p-tabpanel>
+
+        <!-- ============================== Certificados ============================== -->
+        <p-tabpanel value="certificados">
+          <p-table
+            [value]="c.TContractFile"
+            dataKey="IdeContractFile"
+            selectionMode="single"
+            [selection]="selectedFile()"
+            (onRowSelect)="onFileSelect($event)"
+            [paginator]="true"
+            [rows]="10"
+            [showCurrentPageReport]="true"
+            currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+            styleClass="rounded-lg border border-slate-200 text-sm"
+          >
+            <ng-template pTemplate="header">
+              <tr>
+                <th pSortableColumn="NumContractFile">
+                  {{ 'contractDetail.fileNumberColumn' | transloco }} <p-sortIcon field="NumContractFile" />
+                  <p-columnFilter type="text" field="NumContractFile" display="menu" />
+                </th>
+                <th pSortableColumn="TstInclusion">{{ 'contractDetail.inclusionColumn' | transloco }} <p-sortIcon field="TstInclusion" /></th>
+                <th pSortableColumn="TstInitial">{{ 'contractsList.startColumn' | transloco }} <p-sortIcon field="TstInitial" /></th>
+                <th pSortableColumn="TstEnd">{{ 'contractsList.endColumn' | transloco }} <p-sortIcon field="TstEnd" /></th>
+                <th pSortableColumn="SState.DesState">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="SState.DesState" /></th>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-file>
+              <tr [pSelectableRow]="file" class="cursor-pointer">
+                <td>{{ file.NumContractFile }}</td>
+                <td>{{ file.TstInclusion | date: 'dd/MM/yyyy' }}</td>
+                <td>{{ file.TstInitial | date: 'dd/MM/yyyy' }}</td>
+                <td>{{ file.TstEnd | date: 'dd/MM/yyyy' }}</td>
+                <td><p-tag [value]="file.SState.DesState" [severity]="stateSeverity(file.SState.CodState)" /></td>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="emptymessage">
+              <tr>
+                <td colspan="5" class="py-6 text-center text-sm text-slate-500">{{ 'contractDetail.filesEmpty' | transloco }}</td>
+              </tr>
+            </ng-template>
+          </p-table>
+        </p-tabpanel>
+
+        <!-- ============================== Riesgos (Nivel 2) ============================== -->
+        <p-tabpanel value="riesgos">
+          @if (!selectedFile()) {
+            <p class="text-sm text-slate-500">{{ 'contractDetail.selectFileHint' | transloco }}</p>
+          } @else {
+            <p-table
+              [value]="selectedFileRisks()"
+              dataKey="IdeFileRisk"
+              selectionMode="single"
+              [selection]="selectedRisk()"
+              (onRowSelect)="onRiskSelect($event)"
+              [paginator]="true"
+              [rows]="10"
+              [showCurrentPageReport]="true"
+              currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+              styleClass="rounded-lg border border-slate-200 text-sm"
+            >
+              <ng-template pTemplate="header">
+                <tr>
+                  <th pSortableColumn="DesFileRisk">
+                    {{ 'contractDetail.riskColumn' | transloco }} <p-sortIcon field="DesFileRisk" />
+                    <p-columnFilter type="text" field="DesFileRisk" display="menu" />
+                  </th>
+                  <th pSortableColumn="SPlanProductRisk.SPlanProduct.DesShort">{{ 'contractDetail.planColumn' | transloco }} <p-sortIcon field="SPlanProductRisk.SPlanProduct.DesShort" /></th>
+                  <th pSortableColumn="TstInclusion">{{ 'contractDetail.inclusionColumn' | transloco }} <p-sortIcon field="TstInclusion" /></th>
+                  <th pSortableColumn="TstInitial">{{ 'contractsList.startColumn' | transloco }} <p-sortIcon field="TstInitial" /></th>
+                  <th pSortableColumn="TstEnd">{{ 'contractsList.endColumn' | transloco }} <p-sortIcon field="TstEnd" /></th>
+                  <th pSortableColumn="SState.DesState">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="SState.DesState" /></th>
+                  <th></th>
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="body" let-risk>
+                <tr [pSelectableRow]="risk" class="cursor-pointer">
+                  <td>{{ risk.DesFileRisk ?? risk.SRiskProduct.DesShort ?? ('quotes.coverageFallback' | transloco) }}</td>
+                  <td>{{ risk.SPlanProductRisk.SPlanProduct.DesShort ?? risk.SPlanProductRisk.SPlanProduct.DesPlanProduct }}</td>
+                  <td>{{ risk.TstInclusion | date: 'dd/MM/yyyy' }}</td>
+                  <td>{{ risk.TstInitial | date: 'dd/MM/yyyy' }}</td>
+                  <td>{{ risk.TstEnd | date: 'dd/MM/yyyy' }}</td>
+                  <td><p-tag [value]="risk.SState.DesState" [severity]="stateSeverity(risk.SState.CodState)" /></td>
+                  <td>
+                    <button
+                      pButton
+                      type="button"
+                      [label]="'contractDetail.attributesButton' | transloco"
+                      [text]="true"
+                      size="small"
+                      (click)="openAttributesDialog(risk); $event.stopPropagation()"
+                    ></button>
+                  </td>
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="emptymessage">
+                <tr>
+                  <td colspan="7" class="py-6 text-center text-sm text-slate-500">{{ 'contractDetail.risksEmpty' | transloco }}</td>
+                </tr>
+              </ng-template>
+            </p-table>
+          }
+        </p-tabpanel>
+
+        <!-- ============================== Coberturas (Nivel 3) ============================== -->
+        <p-tabpanel value="coberturas">
+          @if (!selectedRisk()) {
+            <p class="text-sm text-slate-500">{{ 'contractDetail.selectRiskHint' | transloco }}</p>
+          } @else {
+            <p-table
+              [value]="selectedRiskCoverages()"
+              dataKey="IdeRiskCoverage"
+              [paginator]="true"
+              [rows]="10"
+              [showCurrentPageReport]="true"
+              currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+              styleClass="rounded-lg border border-slate-200 text-sm"
+            >
+              <ng-template pTemplate="header">
+                <tr>
+                  <th pSortableColumn="SCoveragePlan.DesShort">
+                    {{ 'contractDetail.coverageColumn' | transloco }} <p-sortIcon field="SCoveragePlan.DesShort" />
+                    <p-columnFilter type="text" field="SCoveragePlan.DesShort" display="menu" />
+                  </th>
+                  <th pSortableColumn="Amount">{{ 'contractDetail.amountColumn' | transloco }} <p-sortIcon field="Amount" /></th>
+                  <th pSortableColumn="Rate">{{ 'contractDetail.rateColumn' | transloco }} <p-sortIcon field="Rate" /></th>
+                  <th pSortableColumn="Prime">{{ 'contractDetail.primeColumn' | transloco }} <p-sortIcon field="Prime" /></th>
+                  <th pSortableColumn="TstInitial">{{ 'contractsList.startColumn' | transloco }} <p-sortIcon field="TstInitial" /></th>
+                  <th pSortableColumn="TstEnd">{{ 'contractsList.endColumn' | transloco }} <p-sortIcon field="TstEnd" /></th>
+                  <th pSortableColumn="SState.DesState">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="SState.DesState" /></th>
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="body" let-coverage>
+                <tr>
+                  <td>{{ coverage.SCoveragePlan.DesShort ?? ('quotes.coverageFallback' | transloco) }}</td>
+                  <td>{{ c.SProduct.SCurrency.SymbolCurrency }}{{ coverage.Amount | number: '1.2-2' }}</td>
+                  <td>{{ coverage.Rate | number: '1.2-4' }}</td>
+                  <td>{{ c.SProduct.SCurrency.SymbolCurrency }}{{ coverage.Prime | number: '1.2-2' }}</td>
+                  <td>{{ coverage.TstInitial | date: 'dd/MM/yyyy' }}</td>
+                  <td>{{ coverage.TstEnd | date: 'dd/MM/yyyy' }}</td>
+                  <td><p-tag [value]="coverage.SState.DesState" [severity]="stateSeverity(coverage.SState.CodState)" /></td>
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="emptymessage">
+                <tr>
+                  <td colspan="7" class="py-6 text-center text-sm text-slate-500">{{ 'contractDetail.coveragesEmpty' | transloco }}</td>
+                </tr>
+              </ng-template>
+            </p-table>
+          }
+        </p-tabpanel>
+
+        <!-- ============================== Movimientos ============================== -->
+        <p-tabpanel value="movimientos">
+          <p-table
+            [value]="c.TContractOperation"
+            dataKey="IdeContractOperation"
+            selectionMode="single"
+            (onRowSelect)="onOperationSelect($event)"
+            [paginator]="true"
+            [rows]="10"
+            [showCurrentPageReport]="true"
+            currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+            styleClass="rounded-lg border border-slate-200 text-sm"
+          >
+            <ng-template pTemplate="header">
+              <tr>
+                <th pSortableColumn="NumOperation">
+                  {{ 'contractDetail.operationNumberColumn' | transloco }} <p-sortIcon field="NumOperation" />
+                  <p-columnFilter type="text" field="NumOperation" display="menu" />
+                </th>
+                <th pSortableColumn="SOperationProduct.SProcess.DesProcess">{{ 'contractDetail.processColumn' | transloco }} <p-sortIcon field="SOperationProduct.SProcess.DesProcess" /></th>
+                <th pSortableColumn="SOperationProduct.SOperation.DesOperation">{{ 'contractDetail.operationColumn' | transloco }} <p-sortIcon field="SOperationProduct.SOperation.DesOperation" /></th>
+                <th pSortableColumn="TstRequest">{{ 'contractDetail.dateColumn' | transloco }} <p-sortIcon field="TstRequest" /></th>
+                <th pSortableColumn="SState.DesState">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="SState.DesState" /></th>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-op>
+              <tr [pSelectableRow]="op" class="cursor-pointer">
+                <td>{{ op.NumOperation }}</td>
+                <td>{{ op.SOperationProduct.SProcess.DesProcess }}</td>
+                <td>{{ op.SOperationProduct.SOperation.DesOperation }}</td>
+                <td>{{ op.TstRequest | date: 'dd/MM/yyyy HH:mm' }}</td>
+                <td><p-tag [value]="op.SState.DesState" [severity]="stateSeverity(op.SState.CodState)" /></td>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="emptymessage">
+              <tr>
+                <td colspan="5" class="py-6 text-center text-sm text-slate-500">{{ 'contractDetail.operationsEmpty' | transloco }}</td>
+              </tr>
+            </ng-template>
+          </p-table>
+        </p-tabpanel>
+
+        <!-- ============================== Canales de distribución ============================== -->
+        <p-tabpanel value="canal">
+          <p-table
+            [value]="c.TContractDistributionChannel"
+            dataKey="IdeContractDistributionChannel"
+            [paginator]="true"
+            [rows]="10"
+            [showCurrentPageReport]="true"
+            currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+            styleClass="rounded-lg border border-slate-200 text-sm"
+          >
+            <ng-template pTemplate="header">
+              <tr>
+                <th pSortableColumn="SDistributionChannel.DesDistributionChannel">
+                  {{ 'contractDetail.channelNameColumn' | transloco }} <p-sortIcon field="SDistributionChannel.DesDistributionChannel" />
+                  <p-columnFilter type="text" field="SDistributionChannel.DesDistributionChannel" display="menu" />
+                </th>
+                <th pSortableColumn="Percentaje">{{ 'contractDetail.percentageColumn' | transloco }} <p-sortIcon field="Percentaje" /></th>
+                <th pSortableColumn="IndMain">{{ 'contractDetail.mainColumn' | transloco }} <p-sortIcon field="IndMain" /></th>
+                <th pSortableColumn="NumMovement">{{ 'contractDetail.movementColumn' | transloco }} <p-sortIcon field="NumMovement" /></th>
+                <th pSortableColumn="TstInitial">{{ 'contractsList.startColumn' | transloco }} <p-sortIcon field="TstInitial" /></th>
+                <th pSortableColumn="TstEnd">{{ 'contractsList.endColumn' | transloco }} <p-sortIcon field="TstEnd" /></th>
+                <th pSortableColumn="SState.DesState">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="SState.DesState" /></th>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-channel>
+              <tr>
+                <td>{{ channel.SDistributionChannel?.DesDistributionChannel ?? ('common.dash' | transloco) }}</td>
+                <td>{{ channel.Percentaje }}%</td>
+                <td>{{ (channel.IndMain ? 'common.yes' : 'common.no') | transloco }}</td>
+                <td>{{ channel.NumMovement }}</td>
+                <td>{{ channel.TstInitial | date: 'dd/MM/yyyy' }}</td>
+                <td>{{ channel.TstEnd | date: 'dd/MM/yyyy' }}</td>
+                <td><p-tag [value]="channel.SState.DesState" [severity]="stateSeverity(channel.SState.CodState)" /></td>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="emptymessage">
+              <tr>
+                <td colspan="7" class="py-6 text-center text-sm text-slate-500">{{ 'contractDetail.channelEmpty' | transloco }}</td>
+              </tr>
+            </ng-template>
+          </p-table>
+        </p-tabpanel>
+
+        <!-- ============================== Requisitos ============================== -->
+        <p-tabpanel value="requisitos">
+          <p-table
+            [value]="requirementRows()"
+            dataKey="requirement.IdeContractRequirement"
+            [paginator]="true"
+            [rows]="10"
+            [showCurrentPageReport]="true"
+            currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+            styleClass="rounded-lg border border-slate-200 text-sm"
+          >
+            <ng-template pTemplate="header">
+              <tr>
+                <th pSortableColumn="riskLabel">{{ 'contractDetail.riskColumn' | transloco }} <p-sortIcon field="riskLabel" /></th>
+                <th pSortableColumn="requirement.SProductRequirement.DesShort">
+                  {{ 'contractDetail.requirementColumn' | transloco }} <p-sortIcon field="requirement.SProductRequirement.DesShort" />
+                  <p-columnFilter type="text" field="requirement.SProductRequirement.DesShort" display="menu" />
+                </th>
+                <th pSortableColumn="requirement.SProductRequirement.IndMandatory">{{ 'contractDetail.mandatoryColumn' | transloco }} <p-sortIcon field="requirement.SProductRequirement.IndMandatory" /></th>
+                <th pSortableColumn="requirement.SState.DesState">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="requirement.SState.DesState" /></th>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-row>
+              <tr>
+                <td>{{ row.riskLabel }}</td>
+                <td>{{ row.requirement.SProductRequirement.DesShort ?? row.requirement.SProductRequirement.SRequirement.DesRequirement }}</td>
+                <td>{{ (row.requirement.SProductRequirement.IndMandatory ? 'common.yes' : 'common.no') | transloco }}</td>
+                <td><p-tag [value]="row.requirement.SState.DesState" [severity]="stateSeverity(row.requirement.SState.CodState)" /></td>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="emptymessage">
+              <tr>
+                <td colspan="4" class="py-6 text-center text-sm text-slate-500">{{ 'contractDetail.requirementsEmpty' | transloco }}</td>
+              </tr>
+            </ng-template>
+          </p-table>
+        </p-tabpanel>
+      </p-tabpanels>
+    </p-tabs>
+  } @else if (loading()) {
+    <p class="text-sm text-slate-500">{{ 'common.loading' | transloco }}</p>
+  }
+</div>
+
+<!-- ============================== Popup: Recibos del movimiento ============================== -->
+<p-dialog
+  [header]="selectedOperation() ? ('contractDetail.receiptsDialogTitle' | transloco: { num: selectedOperation()!.NumOperation }) : ''"
+  [visible]="receiptsDialogVisible()"
+  (visibleChange)="!$event && closeReceiptsDialog()"
+  [modal]="true"
+  [style]="{ width: '40rem' }"
+>
+  <p-table [value]="selectedOperationReceipts()" dataKey="IdeReceipt" styleClass="text-sm">
+    <ng-template pTemplate="header">
+      <tr>
+        <th>{{ 'contractDetail.receiptNumberColumn' | transloco }}</th>
+        <th>{{ 'contractDetail.receiptTypeColumn' | transloco }}</th>
+        <th>{{ 'contractsList.startColumn' | transloco }}</th>
+        <th>{{ 'contractsList.endColumn' | transloco }}</th>
+        <th>{{ 'contractDetail.commissionColumn' | transloco }}</th>
+        <th>{{ 'contractDetail.primeColumn' | transloco }}</th>
+        <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="body" let-receipt>
+      <tr>
+        <td>{{ receipt.NumReceipt }}</td>
+        <td>{{ receipt.SReceiptType.DesReceiptType }}</td>
+        <td>{{ receipt.TstInitial | date: 'dd/MM/yyyy' }}</td>
+        <td>{{ receipt.TstEnd | date: 'dd/MM/yyyy' }}</td>
+        <td>{{ receipt.Fee | number: '1.2-2' }}</td>
+        <td>{{ receipt.Prime | number: '1.2-2' }}</td>
+        <td><p-tag [value]="receipt.SState.DesState" [severity]="stateSeverity(receipt.SState.CodState)" /></td>
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="emptymessage">
+      <tr>
+        <td colspan="7" class="py-6 text-center text-sm text-slate-500">{{ 'contractDetail.receiptsEmpty' | transloco }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</p-dialog>
+
+<!-- ============================== Popup: Atributos personalizados ============================== -->
+<p-dialog
+  [header]="'contractDetail.attributesDialogTitle' | transloco"
+  [visible]="attributesDialogVisible()"
+  (visibleChange)="!$event && closeAttributesDialog()"
+  [modal]="true"
+  [style]="{ width: '28rem' }"
+>
+  @if (attributesDialogLoading()) {
+    <p class="text-sm text-slate-500">{{ 'common.loading' | transloco }}</p>
+  } @else if (attributesDialogFields().length === 0) {
+    <p class="text-sm text-slate-500">{{ 'contractDetail.attributesEmpty' | transloco }}</p>
+  } @else {
+    <div class="flex flex-col gap-2">
+      @for (field of attributesDialogFields(); track field.label) {
+        <div class="flex items-center justify-between border-t border-slate-100 pt-2 text-sm first:border-t-0 first:pt-0">
+          <span class="text-slate-500">{{ field.label }}</span>
+          <span class="font-medium text-slate-900">{{ field.value }}</span>
+        </div>
+      }
+    </div>
+  }
+</p-dialog>

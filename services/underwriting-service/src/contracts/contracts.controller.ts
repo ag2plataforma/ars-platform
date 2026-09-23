@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { CurrentUser, JwtPayload } from '@ars-platform/shared-common';
 import { ContractsService } from './contracts.service';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { TransitionContractStateDto } from './dto/transition-contract-state.dto';
 import { CancelContractDto } from './dto/cancel-contract.dto';
+import { ListContractsDto } from './dto/list-contracts.dto';
 
 /**
  * Cascada de creación de contrato (`FContract('CONTRACTNEW', ...)` y todo lo
@@ -22,6 +23,19 @@ export class ContractsController {
   @Post('quotes/:ideQuote/contract')
   create(@Param('ideQuote') ideQuote: string, @Body() dto: CreateContractDto, @CurrentUser() actor: JwtPayload) {
     return this.service.create(ideQuote, dto, actor.code);
+  }
+
+  /**
+   * Listado paginado/filtrable (ver `ListContractsDto`, mismo patrón que
+   * `GET /quotes`) -- pedido explícito del usuario, pantalla de listado
+   * de contratos (ver docs/02-roadmap.md). Declarado ANTES que
+   * `:id` (mismo motivo que en `QuotesController`: `/contracts` vs
+   * `/contracts/:id` no colisionan por longitud, pero se mantiene el
+   * orden por claridad).
+   */
+  @Get('contracts')
+  findAll(@Query() query: ListContractsDto, @CurrentUser() actor: JwtPayload) {
+    return this.service.findAll(query, actor.code);
   }
 
   @Get('contracts/:id')

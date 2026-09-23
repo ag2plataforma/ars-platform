@@ -47,6 +47,27 @@ export const routes: Routes = [
         ],
       },
       {
+        // Listado (landing) + detalle, mismo patrón que 'cotizacion' --
+        // pedido explícito del usuario (ver docs/02-roadmap.md): el
+        // p-tag "Contrato <N>" del wizard de Cotización pasa a ser un
+        // link real hacia acá. Sin ruta de creación directa -- un
+        // contrato solo se genera desde el wizard de Cotización.
+        path: 'contratos',
+        children: [
+          {
+            path: '',
+            pathMatch: 'full',
+            loadComponent: () =>
+              import('./features/contracts/contracts-list.component').then((m) => m.ContractsListComponent),
+          },
+          {
+            path: ':id',
+            loadComponent: () =>
+              import('./features/contracts/contract-detail.component').then((m) => m.ContractDetailComponent),
+          },
+        ],
+      },
+      {
         path: 'catalogos',
         loadComponent: () =>
           import('./features/catalogs/catalogs.component').then((m) => m.CatalogsComponent),

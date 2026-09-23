@@ -4,6 +4,7 @@ import { RulesEngineService, StateMachineService } from '@ars-platform/shared-co
 import { QuotesService } from '../quoting/quotes.service';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { CancelContractDto } from './dto/cancel-contract.dto';
+import { ListContractsDto } from './dto/list-contracts.dto';
 
 /**
  * Timeout de la transacción que envuelve `cancel()` -- generoso porque
@@ -244,6 +245,154 @@ export class ContractsService {
     return this.findOne(ideContract);
   }
 
+  /**
+   * Listado paginado/filtrable de contratos (`GET /contracts`) -- mismo
+   * patrón que `QuotesService.findAll` (ver `ListContractsDto`), pedido
+   * explícito del usuario para la pantalla de listado de contratos (ver
+   * docs/02-roadmap.md). Deliberadamente liviano (sin riesgos/coberturas/
+   * facturación, que solo hacen falta al abrir UN contrato puntual vía
+   * `findOne`).
+   */
+  /**
+   * Campos ordenables de `GET /contracts` -- lista cerrada (no se acepta
+   * cualquier `sortField` arbitrario) pedida explícita por el usuario
+   * ("con el componente de PrimeNG"), mismas columnas que la tabla del
+   * frontend (ver `ContractsListComponent`). Deliberadamente SIN
+   * `desInitialChannel` (canal inicial) -- ese valor se resuelve con una
+   * consulta aparte después de paginar (ver más abajo, mismo motivo que
+   * `enrichDistributionChannels` en `findOne`: `IdeDistributionChannel`
+   * no tiene relación de Prisma), así que no hay un `orderBy` de Prisma
+   * posible para esa columna sin traer TODOS los contratos a memoria
+   * primero -- se deja sin ordenar en vez de pagar ese costo.
+   */
+  private static readonly SORTABLE_FIELDS: Record<
+    string,
+    (dir: Prisma.SortOrder) => Prisma.TContractOrderByWithRelationInput
+  > = {
+    numContract: (dir) => ({ NumContract: dir }),
+    desProduct: (dir) => ({ SProduct: { DesProduct: dir } }),
+    tstInitial: (dir) => ({ TstInitial: dir }),
+    tstEnd: (dir) => ({ TstEnd: dir }),
+    tstSubscription: (dir) => ({ TstSubscription: dir }),
+    contractAge: (dir) => ({ ContractAge: dir }),
+    desValidityType: (dir) => ({ SValidityType: { DesValidityType: dir } }),
+    desPaymentFraction: (dir) => ({ SPaymentFraction: { DesPaymentFraction: dir } }),
+    desState: (dir) => ({ SState: { DesState: dir } }),
+  };
+
+  private resolveOrderBy(query: ListContractsDto): Prisma.TContractOrderByWithRelationInput {
+    const factory = query.sortField ? ContractsService.SORTABLE_FIELDS[query.sortField] : undefined;
+    if (!factory) return { TstCreation: 'desc' };
+    return factory(query.sortOrder === -1 ? 'desc' : 'asc');
+  }
+
+  async findAll(query: ListContractsDto, actor: string) {
+    const [ideProduct, ideState] = await Promise.all([
+      query.codProduct ? this.resolveProduct(query.codProduct) : undefined,
+      query.codState ? this.resolveState(query.codState) : undefined,
+    ]);
+
+    const where: Prisma.TContractWhereInput = {
+      ...(query.all ? {} : { UsrCreation: actor }),
+      ...(ideProduct ? { IdeProduct: ideProduct } : {}),
+      ...(ideState ? { IdeState: ideState } : {}),
+      ...(query.filterNumContract ? { NumContract: { contains: query.filterNumContract, mode: 'insensitive' } } : {}),
+      ...(query.dateFrom || query.dateTo
+        ? {
+            TstCreation: {
+              ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
+              ...(query.dateTo ? { lte: new Date(query.dateTo) } : {}),
+            },
+          }
+        : {}),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.tContract.findMany({
+        where,
+        include: {
+          SProduct: true,
+          SState: true,
+          SValidityType: true,
+          SPaymentFraction: true,
+        },
+        orderBy: this.resolveOrderBy(query),
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+      }),
+      this.prisma.tContract.count({ where }),
+    ]);
+
+    const ideContracts = rows.map((row) => row.IdeContract);
+    const mainChannelByContract = await this.resolveMainChannels(ideContracts);
+
+    return {
+      items: rows.map((row) => ({
+        ideContract: row.IdeContract,
+        numContract: row.NumContract,
+        desProduct: row.SProduct.DesProduct,
+        desInitialChannel: mainChannelByContract.get(row.IdeContract) ?? null,
+        tstInitial: row.TstInitial,
+        tstEnd: row.TstEnd,
+        tstSubscription: row.TstSubscription,
+        desValidityType: row.SValidityType.DesValidityType,
+        contractAge: row.ContractAge,
+        desPaymentFraction: row.SPaymentFraction.DesPaymentFraction,
+        codState: row.SState.CodState,
+        desState: row.SState.DesState,
+      })),
+      total,
+      page: query.page,
+      limit: query.limit,
+    };
+  }
+
+  /**
+   * "Canal inicial" del listado -- el `TContractDistributionChannel` con
+   * `IndMain=true` de cada contrato (hoy siempre hay uno solo por
+   * contrato, `NumMovement=1`, ver `setContractDistributionChannel`),
+   * resuelto en lote para toda la página en vez de una consulta por
+   * fila. Mismo motivo que `enrichDistributionChannels` en `findOne`:
+   * `IdeDistributionChannel` no tiene relación de Prisma generada.
+   */
+  private async resolveMainChannels(ideContracts: string[]): Promise<Map<string, string | null>> {
+    if (ideContracts.length === 0) return new Map();
+    const mainChannels = await this.prisma.tContractDistributionChannel.findMany({
+      where: { IdeContract: { in: ideContracts }, IndMain: true },
+    });
+    const ideDistributionChannels = mainChannels.map((c) => c.IdeDistributionChannel);
+    const channels = ideDistributionChannels.length
+      ? await this.prisma.sDistributionChannel.findMany({ where: { IdeDistributionChannel: { in: ideDistributionChannels } } })
+      : [];
+    const channelDescById = new Map(channels.map((c) => [c.IdeDistributionChannel, c.DesDistributionChannel]));
+    return new Map(mainChannels.map((c) => [c.IdeContract, channelDescById.get(c.IdeDistributionChannel) ?? null]));
+  }
+
+  private async resolveProduct(codProduct: string): Promise<string> {
+    const row = await this.prisma.sProduct.findFirst({ where: { CodProduct: codProduct } });
+    if (!row) throw new NotFoundException(`No existe producto con código "${codProduct}"`);
+    return row.IdeProduct;
+  }
+
+  private async resolveState(codState: string): Promise<string> {
+    const row = await this.prisma.sState.findFirst({ where: { CodState: codState } });
+    if (!row) throw new NotFoundException(`No existe estado con código "${codState}"`);
+    return row.IdeState;
+  }
+
+  /**
+   * `GET /contracts/:id` -- pantalla de detalle de contrato (ver
+   * docs/02-roadmap.md, pendiente cerrado a pedido explícito del
+   * usuario). Además de producto/riesgos/coberturas (ya existente),
+   * ahora también incluye personas (`TContractPerson`, para mostrar
+   * Tomador/Titular igual que el Resumen de la cotización) y
+   * facturación/recibos (`TContractBilling`/`TReceipt`) -- decisión
+   * explícita del usuario (opción "Completo" sobre las 3 alternativas
+   * planteadas): sin esto, la pantalla de detalle no podría mostrar el
+   * estado real de facturación de la póliza, que es justamente lo que
+   * el usuario ya había verificado a mano por SQL (`TReceipt.Prime`) al
+   * probar el motor de recargos/descuentos (ver el ítem de Fase 3).
+   */
   async findOne(ideContract: string) {
     const contract = await this.prisma.tContract.findUnique({
       where: { IdeContract: ideContract },
@@ -251,12 +400,66 @@ export class ContractsService {
         SProduct: { include: { SCurrency: true } },
         SValidityType: true,
         SPaymentFraction: true,
+        SState: true,
+        TContractPerson: { include: { TPerson: true, SPersonRol: true, SState: true } },
+        TContractBilling: { include: { SState: true }, orderBy: { NumPeriod: 'asc' } },
+        TReceipt: { include: { SReceiptType: true, SState: true }, orderBy: { TstIssue: 'asc' } },
+        /**
+         * `IdeDistributionChannel` no tiene relación de Prisma generada
+         * (la introspección no encontró un FK real en la BD para esa
+         * columna, solo el índice -- confirmado, ver `enrichDistributionChannels`
+         * más abajo) -- se resuelve aparte, a mano, después de esta query.
+         */
+        TContractDistributionChannel: { include: { SState: true } },
+        /**
+         * "Movimientos/Operaciones" del contrato (alta, anulación, futuros
+         * endosos/suplementos) -- equivalente a la pestaña "Movimiento" del
+         * backoffice viejo, que en realidad mostraba `TContractOperation`
+         * (no `TCoverageMovement`, que es la prima de una cobertura y ya
+         * se muestra dentro de cada riesgo). `SOperationProduct.SOperation`
+         * da el tipo de operación (`DesOperation`, ej. "Alta"/"Anulación").
+         */
+        TContractOperation: {
+          include: {
+            SState: true,
+            SOperationProduct: { include: { SOperation: true, SProcess: true } },
+            TContractOperationDocument: { include: { SState: true } },
+          },
+          orderBy: { NumOperation: 'asc' },
+        },
         TContractFile: {
           include: {
+            SState: true,
+            /** Personas por archivo (miembros de un colectivo) -- hoy
+             *  vacío en la práctica (esta fase no crea contratos
+             *  colectivos reales, ver el comentario de cabecera de
+             *  `create()`), pero se incluye para que la pantalla ya
+             *  quede lista cuando se aborden. */
+            TContractFilePerson: { include: { TPerson: true, SPersonRol: true } },
             TFileRisk: {
               include: {
                 SRiskProduct: true,
-                TRiskCoverage: { include: { SCoveragePlan: true, TCoverageMovement: true } },
+                /** Plan del riesgo (columna "Plan" del detalle de
+                 *  contrato) -- `SPlanProductRisk` no tiene su propia
+                 *  descripción, hay que bajar un nivel más a
+                 *  `SPlanProduct` (`DesShort`/`DesPlanProduct`). */
+                SPlanProductRisk: { include: { SPlanProduct: true } },
+                SState: true,
+                /** Requisitos copiados de la cotización al contratar
+                 *  (ver `copyRisksAndCoverages`) -- por riesgo y,
+                 *  opcionalmente, por cobertura puntual dentro del riesgo. */
+                TContractRequirement: {
+                  include: { SProductRequirement: { include: { SRequirement: true } }, SState: true },
+                },
+                /** Columnas monto/tasa/prima leen los escalares propios de
+                 *  `TRiskCoverage` (`Amount`/`Rate`/`Prime`), no
+                 *  `TCoverageMovement` -- confirmado que `Prime` ya llega
+                 *  descontado/recargado desde `TQuoteCoverage` al
+                 *  contratar (ver `copyRisksAndCoverages`), así que no
+                 *  hace falta agregar movimientos acá. */
+                TRiskCoverage: {
+                  include: { SCoveragePlan: true, SState: true },
+                },
               },
             },
           },
@@ -266,7 +469,32 @@ export class ContractsService {
     if (!contract) {
       throw new NotFoundException(`No existe contrato con id "${ideContract}"`);
     }
-    return contract;
+    return this.enrichDistributionChannels(contract);
+  }
+
+  /**
+   * `TContractDistributionChannel.IdeDistributionChannel` -- ver el
+   * comentario de `findOne`, sin relación de Prisma generada. Se resuelve
+   * con una consulta aparte y se mezcla a mano, mismo criterio que
+   * cualquier "resolve" manual ya usado en este servicio/`QuotesService`
+   * (`resolveProduct`/`resolveState`), solo que acá es la dirección
+   * inversa (de id a descripción, no de código a id).
+   */
+  private async enrichDistributionChannels<
+    T extends { TContractDistributionChannel: Array<{ IdeDistributionChannel: string }> },
+  >(contract: T) {
+    const ideDistributionChannels = contract.TContractDistributionChannel.map((c) => c.IdeDistributionChannel);
+    const channels = ideDistributionChannels.length
+      ? await this.prisma.sDistributionChannel.findMany({ where: { IdeDistributionChannel: { in: ideDistributionChannels } } })
+      : [];
+    const channelById = new Map(channels.map((channel) => [channel.IdeDistributionChannel, channel]));
+    return {
+      ...contract,
+      TContractDistributionChannel: contract.TContractDistributionChannel.map((c) => ({
+        ...c,
+        SDistributionChannel: channelById.get(c.IdeDistributionChannel) ?? null,
+      })),
+    };
   }
 
   /**

@@ -552,7 +552,12 @@
             <p class="text-xs text-slate-500">{{ 'quotes.contractStepDetail' | transloco }}</p>
           </div>
           @if (contractResult(); as contract) {
-            <p-tag [value]="'quotes.contractTag' | transloco: { num: contract.NumContract }" severity="success" />
+            <p-tag
+              [value]="'quotes.contractTag' | transloco: { num: contract.NumContract }"
+              severity="success"
+              class="cursor-pointer"
+              (click)="verContrato(contract.IdeContract)"
+            />
           } @else {
             <button
               pButton

@@ -23,9 +23,9 @@
  *     el `CodRol` del JWT, así que tienen que coincidir literalmente
  *     para que el usuario admin vea algo.
  *   - SSiteMap, en árbol (soporta hasta 3 niveles, ver
- *     `site-map-menu.service.ts`): 6 ítems raíz (Inicio, Cotización,
- *     Catálogos, Ubicaciones, Configuración de menú, Configuración de
- *     productos) -- el último es un ítem PADRE sin `path` propio (nunca
+ *     `site-map-menu.service.ts`): 7 ítems raíz (Inicio, Cotización,
+ *     Contratos, Catálogos, Ubicaciones, Configuración de menú,
+ *     Configuración de productos) -- el último es un ítem PADRE sin `path` propio (nunca
  *     navega, el sidebar lo muestra como desplegable porque tiene
  *     hijos) con 3 hijos: Catálogos de producto, Productos y Tablas de
  *     tarifa.
@@ -75,19 +75,20 @@ const SYSTEM = 'seed-script';
 const SITE_MAP_ITEMS = [
   { cod: 'DASHBOARD', des: 'Inicio', order: 1, path: '/dashboard', icon: 'pi-home' },
   { cod: 'COTIZACION', des: 'Cotización', order: 2, path: '/cotizacion', icon: 'pi-calculator' },
-  { cod: 'CATALOGOS', des: 'Catálogos', order: 3, path: '/catalogos', icon: 'pi-book' },
-  { cod: 'UBICACIONES', des: 'Ubicaciones', order: 4, path: '/ubicaciones', icon: 'pi-map-marker' },
+  { cod: 'CONTRATOS', des: 'Contratos', order: 3, path: '/contratos', icon: 'pi-file' },
+  { cod: 'CATALOGOS', des: 'Catálogos', order: 4, path: '/catalogos', icon: 'pi-book' },
+  { cod: 'UBICACIONES', des: 'Ubicaciones', order: 5, path: '/ubicaciones', icon: 'pi-map-marker' },
   {
     cod: 'CONFIGURACION_MENU',
     des: 'Configuración de menú',
-    order: 5,
+    order: 6,
     path: '/configuracion-menu',
     icon: 'pi-sitemap',
   },
   {
     cod: 'CONFIG_PRODUCTOS',
     des: 'Configuración de productos',
-    order: 6,
+    order: 7,
     path: null,
     icon: 'pi-box',
     children: [
