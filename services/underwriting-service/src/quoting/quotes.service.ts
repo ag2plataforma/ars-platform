@@ -145,6 +145,26 @@ export class QuotesService {
    * listado (se consultan recién al abrir una cotización puntual, vía
    * `GET /quotes/:id` o `/summary`).
    */
+  /** Campos ordenables de `GET /quotes` -- lista cerrada, mismo criterio
+   *  que `ContractsService.SORTABLE_FIELDS`. Deliberadamente SIN
+   *  "tomador" (se resuelve vía `TQuotePerson[0]?.TPerson`, sin relación
+   *  directa ordenable de Prisma para ese primer resultado). */
+  private static readonly SORTABLE_FIELDS: Record<
+    string,
+    (dir: Prisma.SortOrder) => Prisma.TQuoteOrderByWithRelationInput
+  > = {
+    numQuote: (dir) => ({ NumQuote: dir }),
+    desProduct: (dir) => ({ SProduct: { DesProduct: dir } }),
+    desState: (dir) => ({ SState: { DesState: dir } }),
+    tstCreation: (dir) => ({ TstCreation: dir }),
+  };
+
+  private resolveOrderBy(query: ListQuotesDto): Prisma.TQuoteOrderByWithRelationInput {
+    const factory = query.sortField ? QuotesService.SORTABLE_FIELDS[query.sortField] : undefined;
+    if (!factory) return { TstCreation: 'desc' };
+    return factory(query.sortOrder === -1 ? 'desc' : 'asc');
+  }
+
   async findAll(query: ListQuotesDto, actor: string) {
     const [ideProduct, ideState] = await Promise.all([
       query.codProduct ? this.resolveProduct(query.codProduct) : undefined,
@@ -155,6 +175,7 @@ export class QuotesService {
       ...(query.all ? {} : { UsrCreation: actor }),
       ...(ideProduct ? { IdeProduct: ideProduct } : {}),
       ...(ideState ? { IdeState: ideState } : {}),
+      ...(query.filterNumQuote ? { NumQuote: { contains: query.filterNumQuote, mode: 'insensitive' } } : {}),
       ...(query.dateFrom || query.dateTo
         ? {
             TstCreation: {
@@ -173,7 +194,7 @@ export class QuotesService {
           SState: true,
           TQuotePerson: { where: { SPersonRol: { CodPersonRol: 'TOMADOR' } }, include: { TPerson: true } },
         },
-        orderBy: { TstCreation: 'desc' },
+        orderBy: this.resolveOrderBy(query),
         skip: (query.page - 1) * query.limit,
         take: query.limit,
       }),

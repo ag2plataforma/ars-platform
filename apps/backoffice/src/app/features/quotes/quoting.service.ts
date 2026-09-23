@@ -129,6 +129,11 @@ export interface ListQuotesParams {
   all?: boolean;
   page?: number;
   limit?: number;
+  /** Ver `ListQuotesDto.sortField`/`.sortOrder`/`.filterNumQuote` en el
+   *  backend real -- misma lista cerrada de columnas ordenables. */
+  sortField?: string;
+  sortOrder?: number;
+  filterNumQuote?: string;
 }
 
 interface CreateQuoteResponse {

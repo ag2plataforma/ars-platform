@@ -17,12 +17,26 @@
     [paginator]="true"
     [rows]="10"
     [rowsPerPageOptions]="[10, 25, 50]"
+    [showCurrentPageReport]="true"
+    currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
     styleClass="p-datatable-sm"
   >
     <ng-template #header>
       <tr>
-        <th>{{ 'catalogs.codeColumn' | transloco }}</th>
-        <th>{{ 'catalogs.descriptionColumn' | transloco }}</th>
+        <th pSortableColumn="CodApplication">
+          <span class="ars-th-flex">
+            {{ 'catalogs.codeColumn' | transloco }}
+            <p-sortIcon field="CodApplication" />
+            <p-columnFilter type="text" field="CodApplication" display="menu" />
+          </span>
+        </th>
+        <th pSortableColumn="DesApplication">
+          <span class="ars-th-flex">
+            {{ 'catalogs.descriptionColumn' | transloco }}
+            <p-sortIcon field="DesApplication" />
+            <p-columnFilter type="text" field="DesApplication" display="menu" />
+          </span>
+        </th>
         <th>{{ 'catalogs.stateColumn' | transloco }}</th>
         <th class="w-32">{{ 'catalogs.actionsColumn' | transloco }}</th>
       </tr>

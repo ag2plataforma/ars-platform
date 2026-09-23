@@ -174,6 +174,19 @@ export class CatalogsComponent {
     return String(row[extraRowField(field)] ?? '');
   }
 
+  /** Nombre de campo (posiblemente con path anidado, ej.
+   * `SLanguage.DesLanguage`) que usa `p-sortableColumn`/`p-columnFilter`
+   * para ordenar/filtrar una columna extra -- mismo criterio que
+   * `extraColumnValue`, pero como path resoluble por PrimeNG
+   * (`ObjectUtils.resolveFieldData`, que soporta puntos) en vez de un
+   * valor ya calculado. */
+  sortField(field: CatalogExtraField): string {
+    if (field.columnRelation && field.optionDesField) {
+      return `${field.columnRelation}.${field.optionDesField}`;
+    }
+    return extraRowField(field);
+  }
+
   openCreate(): void {
     this.dialogMode.set('create');
     this.editingRow = null;

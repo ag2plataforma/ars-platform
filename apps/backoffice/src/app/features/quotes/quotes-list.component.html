@@ -37,16 +37,24 @@
     [rows]="20"
     [totalRecords]="total()"
     [loading]="loading()"
+    [showCurrentPageReport]="true"
+    currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
     dataKey="ideQuote"
     styleClass="rounded-lg border border-slate-200"
   >
     <ng-template pTemplate="header">
       <tr>
-        <th>{{ 'quotesList.numberColumn' | transloco }}</th>
-        <th>{{ 'quotesList.productColumn' | transloco }}</th>
+        <th pSortableColumn="numQuote">
+          <span class="ars-th-flex">
+            {{ 'quotesList.numberColumn' | transloco }}
+            <p-sortIcon field="numQuote" />
+            <p-columnFilter type="text" field="numQuote" display="menu" />
+          </span>
+        </th>
+        <th pSortableColumn="desProduct"><span class="ars-th-flex">{{ 'quotesList.productColumn' | transloco }} <p-sortIcon field="desProduct" /></span></th>
         <th>{{ 'quotes.personSlotTomador' | transloco }}</th>
-        <th>{{ 'catalogs.stateColumn' | transloco }}</th>
-        <th>{{ 'quotesList.createdColumn' | transloco }}</th>
+        <th pSortableColumn="desState"><span class="ars-th-flex">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="desState" /></span></th>
+        <th pSortableColumn="tstCreation"><span class="ars-th-flex">{{ 'quotesList.createdColumn' | transloco }} <p-sortIcon field="tstCreation" /></span></th>
         <th></th>
       </tr>
     </ng-template>

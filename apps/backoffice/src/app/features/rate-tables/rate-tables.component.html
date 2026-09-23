@@ -11,11 +11,33 @@
       <button pButton type="button" icon="pi pi-plus" [label]="'rateTables.newTableButton' | transloco" (click)="openCreate()"></button>
     </div>
 
-    <p-table [value]="rows()" [loading]="loading()" dataKey="IdeRateTable" styleClass="p-datatable-sm">
+    <p-table
+      [value]="rows()"
+      [loading]="loading()"
+      dataKey="IdeRateTable"
+      [paginator]="true"
+      [rows]="10"
+      [rowsPerPageOptions]="[10, 25, 50]"
+      [showCurrentPageReport]="true"
+      currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+      styleClass="p-datatable-sm"
+    >
       <ng-template #header>
         <tr>
-          <th>{{ 'catalogs.codeColumn' | transloco }}</th>
-          <th>{{ 'catalogs.descriptionColumn' | transloco }}</th>
+          <th pSortableColumn="CodRateTable">
+            <span class="ars-th-flex">
+              {{ 'catalogs.codeColumn' | transloco }}
+              <p-sortIcon field="CodRateTable" />
+              <p-columnFilter type="text" field="CodRateTable" display="menu" />
+            </span>
+          </th>
+          <th pSortableColumn="DesRateTable">
+            <span class="ars-th-flex">
+              {{ 'catalogs.descriptionColumn' | transloco }}
+              <p-sortIcon field="DesRateTable" />
+              <p-columnFilter type="text" field="DesRateTable" display="menu" />
+            </span>
+          </th>
           <th>{{ 'catalogs.stateColumn' | transloco }}</th>
           <th class="w-56">{{ 'catalogs.actionsColumn' | transloco }}</th>
         </tr>
@@ -116,17 +138,19 @@
             [paginator]="true"
             [rows]="10"
             [rowsPerPageOptions]="[10, 25, 50]"
+            [showCurrentPageReport]="true"
+            currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
             styleClass="p-datatable-sm"
           >
             <ng-template #header>
               <tr>
-                <th>{{ factorLabels()[1] ?? ('rateTables.factorPrefix' | transloco: { num: 1 }) }}</th>
-                <th>{{ factorLabels()[2] ?? ('rateTables.factorPrefix' | transloco: { num: 2 }) }}</th>
-                <th>{{ factorLabels()[3] ?? ('rateTables.factorPrefix' | transloco: { num: 3 }) }}</th>
-                <th>{{ factorLabels()[4] ?? ('rateTables.factorPrefix' | transloco: { num: 4 }) }}</th>
-                <th>{{ factorLabels()[5] ?? ('rateTables.factorPrefix' | transloco: { num: 5 }) }}</th>
-                <th>{{ 'rateTables.valueColumn' | transloco }}</th>
-                <th>{{ 'rateTables.validityColumn' | transloco }}</th>
+                <th pSortableColumn="Factor1"><span class="ars-th-flex">{{ factorLabels()[1] ?? ('rateTables.factorPrefix' | transloco: { num: 1 }) }} <p-sortIcon field="Factor1" /></span></th>
+                <th pSortableColumn="Factor2"><span class="ars-th-flex">{{ factorLabels()[2] ?? ('rateTables.factorPrefix' | transloco: { num: 2 }) }} <p-sortIcon field="Factor2" /></span></th>
+                <th pSortableColumn="Factor3"><span class="ars-th-flex">{{ factorLabels()[3] ?? ('rateTables.factorPrefix' | transloco: { num: 3 }) }} <p-sortIcon field="Factor3" /></span></th>
+                <th pSortableColumn="Factor4"><span class="ars-th-flex">{{ factorLabels()[4] ?? ('rateTables.factorPrefix' | transloco: { num: 4 }) }} <p-sortIcon field="Factor4" /></span></th>
+                <th pSortableColumn="Factor5"><span class="ars-th-flex">{{ factorLabels()[5] ?? ('rateTables.factorPrefix' | transloco: { num: 5 }) }} <p-sortIcon field="Factor5" /></span></th>
+                <th pSortableColumn="Value"><span class="ars-th-flex">{{ 'rateTables.valueColumn' | transloco }} <p-sortIcon field="Value" /></span></th>
+                <th pSortableColumn="TstInit"><span class="ars-th-flex">{{ 'rateTables.validityColumn' | transloco }} <p-sortIcon field="TstInit" /></span></th>
                 <th>{{ 'catalogs.stateColumn' | transloco }}</th>
                 <th class="w-32">{{ 'catalogs.actionsColumn' | transloco }}</th>
               </tr>

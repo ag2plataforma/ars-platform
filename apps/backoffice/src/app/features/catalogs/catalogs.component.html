@@ -37,14 +37,34 @@
       [paginator]="true"
       [rows]="10"
       [rowsPerPageOptions]="[10, 25, 50]"
+      [showCurrentPageReport]="true"
+      currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
       styleClass="p-datatable-sm"
     >
       <ng-template #header>
         <tr>
-          <th>{{ 'catalogs.codeColumn' | transloco }}</th>
-          <th>{{ 'catalogs.descriptionColumn' | transloco }}</th>
+          <th [pSortableColumn]="selected().codField">
+            <span class="ars-th-flex">
+              {{ 'catalogs.codeColumn' | transloco }}
+              <p-sortIcon [field]="selected().codField" />
+              <p-columnFilter type="text" [field]="selected().codField" display="menu" />
+            </span>
+          </th>
+          <th [pSortableColumn]="selected().desField">
+            <span class="ars-th-flex">
+              {{ 'catalogs.descriptionColumn' | transloco }}
+              <p-sortIcon [field]="selected().desField" />
+              <p-columnFilter type="text" [field]="selected().desField" display="menu" />
+            </span>
+          </th>
           @for (field of visibleExtraFields(); track field.key) {
-            <th>{{ field.label | transloco }}</th>
+            <th [pSortableColumn]="sortField(field)">
+              <span class="ars-th-flex">
+                {{ field.label | transloco }}
+                <p-sortIcon [field]="sortField(field)" />
+                <p-columnFilter type="text" [field]="sortField(field)" display="menu" />
+              </span>
+            </th>
           }
           <th>{{ 'catalogs.stateColumn' | transloco }}</th>
           <th class="w-32">{{ 'catalogs.actionsColumn' | transloco }}</th>

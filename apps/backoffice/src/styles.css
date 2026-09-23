@@ -1,21 +1,22 @@
 @import "tailwindcss";
 @import "primeicons/primeicons.css";
 
-/* Color de marca (logo real, ver public/brand/logo.png y app.config.ts::ArsPreset
- * -- mismo hex en los dos lados, para que las clases Tailwind del sidebar y los
- * componentes PrimeNG usen exactamente el mismo violeta). */
+/* Color de marca (ver app.config.ts::ArsPreset -- mismo hex en los dos
+ * lados, para que las clases Tailwind del sidebar y los componentes
+ * PrimeNG usen exactamente el mismo tono). Reemplazado el 23/09/2026 a
+ * pedido explícito del usuario: nuevo ancla `#6963B3` (escalón 500). */
 @theme {
-  --color-brand-50: #f4f1fe;
-  --color-brand-100: #e5defc;
-  --color-brand-200: #c6b9f9;
-  --color-brand-300: #a18af5;
-  --color-brand-400: #8669f2;
-  --color-brand-500: #6d4aef;
-  --color-brand-600: #4d23ec;
-  --color-brand-700: #3b13d3;
-  --color-brand-800: #310fad;
-  --color-brand-900: #280c8d;
-  --color-brand-950: #1a085e;
+  --color-brand-50: #dfddef;
+  --color-brand-100: #d1cfe8;
+  --color-brand-200: #b7b4db;
+  --color-brand-300: #9692ca;
+  --color-brand-400: #7f7abe;
+  --color-brand-500: #6963b3;
+  --color-brand-600: #534d9e;
+  --color-brand-700: #454083;
+  --color-brand-800: #363267;
+  --color-brand-900: #2a274f;
+  --color-brand-950: #18162d;
 }
 
 html,
@@ -56,5 +57,25 @@ body {
 
 .p-datatable .p-datatable-tbody > tr > td {
   font-size: 0.8125rem;
+}
+
+/*
+ * Alineación vertical del texto de encabezado con el ícono de orden
+ * (`p-sortIcon`) y el disparador del filtro por columna (`p-columnFilter`)
+ * -- pedido explícito del usuario (23/09/2026): salían desalineados
+ * porque PrimeNG no envuelve el contenido del `<th>` en un contenedor
+ * flex por defecto (confirmado leyendo el bundle -- no hay ninguna regla
+ * `display:flex` para el `<th>` en sí ni para `.p-datatable-column-header-content`
+ * salvo que el desarrollador lo arme). Se resuelve envolviendo el
+ * contenido de cada encabezado ordenable/filtrable en
+ * `<span class="ars-th-flex">` en el template (no se toca el `<th>` en
+ * sí -- eso rompería el layout de tabla) en vez de depender de una clase
+ * interna de PrimeNG no documentada como tal.
+ */
+.ars-th-flex {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  vertical-align: middle;
 }
 

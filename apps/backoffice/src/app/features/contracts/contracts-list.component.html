@@ -44,18 +44,21 @@
     <ng-template pTemplate="header">
       <tr>
         <th pSortableColumn="numContract">
-          {{ 'contractsList.numberColumn' | transloco }} <p-sortIcon field="numContract" />
-          <p-columnFilter type="text" field="numContract" display="menu" />
+          <span class="ars-th-flex">
+            {{ 'contractsList.numberColumn' | transloco }}
+            <p-sortIcon field="numContract" />
+            <p-columnFilter type="text" field="numContract" display="menu" />
+          </span>
         </th>
-        <th pSortableColumn="desProduct">{{ 'quotesList.productColumn' | transloco }} <p-sortIcon field="desProduct" /></th>
+        <th pSortableColumn="desProduct"><span class="ars-th-flex">{{ 'quotesList.productColumn' | transloco }} <p-sortIcon field="desProduct" /></span></th>
         <th>{{ 'contractsList.initialChannelColumn' | transloco }}</th>
-        <th pSortableColumn="tstInitial">{{ 'contractsList.startColumn' | transloco }} <p-sortIcon field="tstInitial" /></th>
-        <th pSortableColumn="tstEnd">{{ 'contractsList.endColumn' | transloco }} <p-sortIcon field="tstEnd" /></th>
-        <th pSortableColumn="tstSubscription">{{ 'contractsList.subscriptionColumn' | transloco }} <p-sortIcon field="tstSubscription" /></th>
-        <th pSortableColumn="desValidityType">{{ 'contractsList.validityTypeColumn' | transloco }} <p-sortIcon field="desValidityType" /></th>
-        <th pSortableColumn="contractAge">{{ 'contractsList.ageColumn' | transloco }} <p-sortIcon field="contractAge" /></th>
-        <th pSortableColumn="desPaymentFraction">{{ 'contractsList.paymentFractionColumn' | transloco }} <p-sortIcon field="desPaymentFraction" /></th>
-        <th pSortableColumn="desState">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="desState" /></th>
+        <th pSortableColumn="tstInitial"><span class="ars-th-flex">{{ 'contractsList.startColumn' | transloco }} <p-sortIcon field="tstInitial" /></span></th>
+        <th pSortableColumn="tstEnd"><span class="ars-th-flex">{{ 'contractsList.endColumn' | transloco }} <p-sortIcon field="tstEnd" /></span></th>
+        <th pSortableColumn="tstSubscription"><span class="ars-th-flex">{{ 'contractsList.subscriptionColumn' | transloco }} <p-sortIcon field="tstSubscription" /></span></th>
+        <th pSortableColumn="desValidityType"><span class="ars-th-flex">{{ 'contractsList.validityTypeColumn' | transloco }} <p-sortIcon field="desValidityType" /></span></th>
+        <th pSortableColumn="contractAge"><span class="ars-th-flex">{{ 'contractsList.ageColumn' | transloco }} <p-sortIcon field="contractAge" /></span></th>
+        <th pSortableColumn="desPaymentFraction"><span class="ars-th-flex">{{ 'contractsList.paymentFractionColumn' | transloco }} <p-sortIcon field="desPaymentFraction" /></span></th>
+        <th pSortableColumn="desState"><span class="ars-th-flex">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="desState" /></span></th>
         <th></th>
       </tr>
     </ng-template>

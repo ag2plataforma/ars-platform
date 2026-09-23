@@ -65,12 +65,9 @@
           >
             <ng-template pTemplate="header">
               <tr>
-                <th pSortableColumn="TPerson.DesFirstName">
-                  {{ 'contractDetail.nameColumn' | transloco }} <p-sortIcon field="TPerson.DesFirstName" />
-                  <p-columnFilter type="text" field="TPerson.DesFirstName" display="menu" />
-                </th>
-                <th pSortableColumn="SPersonRol.DesPersonRol">{{ 'contractDetail.roleColumn' | transloco }} <p-sortIcon field="SPersonRol.DesPersonRol" /></th>
-                <th pSortableColumn="SState.DesState">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="SState.DesState" /></th>
+                <th pSortableColumn="TPerson.DesFirstName"><span class="ars-th-flex">{{ 'contractDetail.nameColumn' | transloco }} <p-sortIcon field="TPerson.DesFirstName" /> <p-columnFilter type="text" field="TPerson.DesFirstName" display="menu" /></span></th>
+                <th pSortableColumn="SPersonRol.DesPersonRol"><span class="ars-th-flex">{{ 'contractDetail.roleColumn' | transloco }} <p-sortIcon field="SPersonRol.DesPersonRol" /></span></th>
+                <th pSortableColumn="SState.DesState"><span class="ars-th-flex">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="SState.DesState" /></span></th>
               </tr>
             </ng-template>
             <ng-template pTemplate="body" let-cp>
@@ -104,14 +101,11 @@
           >
             <ng-template pTemplate="header">
               <tr>
-                <th pSortableColumn="NumContractFile">
-                  {{ 'contractDetail.fileNumberColumn' | transloco }} <p-sortIcon field="NumContractFile" />
-                  <p-columnFilter type="text" field="NumContractFile" display="menu" />
-                </th>
-                <th pSortableColumn="TstInclusion">{{ 'contractDetail.inclusionColumn' | transloco }} <p-sortIcon field="TstInclusion" /></th>
-                <th pSortableColumn="TstInitial">{{ 'contractsList.startColumn' | transloco }} <p-sortIcon field="TstInitial" /></th>
-                <th pSortableColumn="TstEnd">{{ 'contractsList.endColumn' | transloco }} <p-sortIcon field="TstEnd" /></th>
-                <th pSortableColumn="SState.DesState">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="SState.DesState" /></th>
+                <th pSortableColumn="NumContractFile"><span class="ars-th-flex">{{ 'contractDetail.fileNumberColumn' | transloco }} <p-sortIcon field="NumContractFile" /> <p-columnFilter type="text" field="NumContractFile" display="menu" /></span></th>
+                <th pSortableColumn="TstInclusion"><span class="ars-th-flex">{{ 'contractDetail.inclusionColumn' | transloco }} <p-sortIcon field="TstInclusion" /></span></th>
+                <th pSortableColumn="TstInitial"><span class="ars-th-flex">{{ 'contractsList.startColumn' | transloco }} <p-sortIcon field="TstInitial" /></span></th>
+                <th pSortableColumn="TstEnd"><span class="ars-th-flex">{{ 'contractsList.endColumn' | transloco }} <p-sortIcon field="TstEnd" /></span></th>
+                <th pSortableColumn="SState.DesState"><span class="ars-th-flex">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="SState.DesState" /></span></th>
               </tr>
             </ng-template>
             <ng-template pTemplate="body" let-file>
@@ -150,15 +144,12 @@
             >
               <ng-template pTemplate="header">
                 <tr>
-                  <th pSortableColumn="DesFileRisk">
-                    {{ 'contractDetail.riskColumn' | transloco }} <p-sortIcon field="DesFileRisk" />
-                    <p-columnFilter type="text" field="DesFileRisk" display="menu" />
-                  </th>
-                  <th pSortableColumn="SPlanProductRisk.SPlanProduct.DesShort">{{ 'contractDetail.planColumn' | transloco }} <p-sortIcon field="SPlanProductRisk.SPlanProduct.DesShort" /></th>
-                  <th pSortableColumn="TstInclusion">{{ 'contractDetail.inclusionColumn' | transloco }} <p-sortIcon field="TstInclusion" /></th>
-                  <th pSortableColumn="TstInitial">{{ 'contractsList.startColumn' | transloco }} <p-sortIcon field="TstInitial" /></th>
-                  <th pSortableColumn="TstEnd">{{ 'contractsList.endColumn' | transloco }} <p-sortIcon field="TstEnd" /></th>
-                  <th pSortableColumn="SState.DesState">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="SState.DesState" /></th>
+                  <th pSortableColumn="DesFileRisk"><span class="ars-th-flex">{{ 'contractDetail.riskColumn' | transloco }} <p-sortIcon field="DesFileRisk" /> <p-columnFilter type="text" field="DesFileRisk" display="menu" /></span></th>
+                  <th pSortableColumn="SPlanProductRisk.SPlanProduct.DesShort"><span class="ars-th-flex">{{ 'contractDetail.planColumn' | transloco }} <p-sortIcon field="SPlanProductRisk.SPlanProduct.DesShort" /></span></th>
+                  <th pSortableColumn="TstInclusion"><span class="ars-th-flex">{{ 'contractDetail.inclusionColumn' | transloco }} <p-sortIcon field="TstInclusion" /></span></th>
+                  <th pSortableColumn="TstInitial"><span class="ars-th-flex">{{ 'contractsList.startColumn' | transloco }} <p-sortIcon field="TstInitial" /></span></th>
+                  <th pSortableColumn="TstEnd"><span class="ars-th-flex">{{ 'contractsList.endColumn' | transloco }} <p-sortIcon field="TstEnd" /></span></th>
+                  <th pSortableColumn="SState.DesState"><span class="ars-th-flex">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="SState.DesState" /></span></th>
                   <th></th>
                 </tr>
               </ng-template>
@@ -207,16 +198,13 @@
             >
               <ng-template pTemplate="header">
                 <tr>
-                  <th pSortableColumn="SCoveragePlan.DesShort">
-                    {{ 'contractDetail.coverageColumn' | transloco }} <p-sortIcon field="SCoveragePlan.DesShort" />
-                    <p-columnFilter type="text" field="SCoveragePlan.DesShort" display="menu" />
-                  </th>
-                  <th pSortableColumn="Amount">{{ 'contractDetail.amountColumn' | transloco }} <p-sortIcon field="Amount" /></th>
-                  <th pSortableColumn="Rate">{{ 'contractDetail.rateColumn' | transloco }} <p-sortIcon field="Rate" /></th>
-                  <th pSortableColumn="Prime">{{ 'contractDetail.primeColumn' | transloco }} <p-sortIcon field="Prime" /></th>
-                  <th pSortableColumn="TstInitial">{{ 'contractsList.startColumn' | transloco }} <p-sortIcon field="TstInitial" /></th>
-                  <th pSortableColumn="TstEnd">{{ 'contractsList.endColumn' | transloco }} <p-sortIcon field="TstEnd" /></th>
-                  <th pSortableColumn="SState.DesState">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="SState.DesState" /></th>
+                  <th pSortableColumn="SCoveragePlan.DesShort"><span class="ars-th-flex">{{ 'contractDetail.coverageColumn' | transloco }} <p-sortIcon field="SCoveragePlan.DesShort" /> <p-columnFilter type="text" field="SCoveragePlan.DesShort" display="menu" /></span></th>
+                  <th pSortableColumn="Amount"><span class="ars-th-flex">{{ 'contractDetail.amountColumn' | transloco }} <p-sortIcon field="Amount" /></span></th>
+                  <th pSortableColumn="Rate"><span class="ars-th-flex">{{ 'contractDetail.rateColumn' | transloco }} <p-sortIcon field="Rate" /></span></th>
+                  <th pSortableColumn="Prime"><span class="ars-th-flex">{{ 'contractDetail.primeColumn' | transloco }} <p-sortIcon field="Prime" /></span></th>
+                  <th pSortableColumn="TstInitial"><span class="ars-th-flex">{{ 'contractsList.startColumn' | transloco }} <p-sortIcon field="TstInitial" /></span></th>
+                  <th pSortableColumn="TstEnd"><span class="ars-th-flex">{{ 'contractsList.endColumn' | transloco }} <p-sortIcon field="TstEnd" /></span></th>
+                  <th pSortableColumn="SState.DesState"><span class="ars-th-flex">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="SState.DesState" /></span></th>
                 </tr>
               </ng-template>
               <ng-template pTemplate="body" let-coverage>
@@ -254,14 +242,11 @@
           >
             <ng-template pTemplate="header">
               <tr>
-                <th pSortableColumn="NumOperation">
-                  {{ 'contractDetail.operationNumberColumn' | transloco }} <p-sortIcon field="NumOperation" />
-                  <p-columnFilter type="text" field="NumOperation" display="menu" />
-                </th>
-                <th pSortableColumn="SOperationProduct.SProcess.DesProcess">{{ 'contractDetail.processColumn' | transloco }} <p-sortIcon field="SOperationProduct.SProcess.DesProcess" /></th>
-                <th pSortableColumn="SOperationProduct.SOperation.DesOperation">{{ 'contractDetail.operationColumn' | transloco }} <p-sortIcon field="SOperationProduct.SOperation.DesOperation" /></th>
-                <th pSortableColumn="TstRequest">{{ 'contractDetail.dateColumn' | transloco }} <p-sortIcon field="TstRequest" /></th>
-                <th pSortableColumn="SState.DesState">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="SState.DesState" /></th>
+                <th pSortableColumn="NumOperation"><span class="ars-th-flex">{{ 'contractDetail.operationNumberColumn' | transloco }} <p-sortIcon field="NumOperation" /> <p-columnFilter type="text" field="NumOperation" display="menu" /></span></th>
+                <th pSortableColumn="SOperationProduct.SProcess.DesProcess"><span class="ars-th-flex">{{ 'contractDetail.processColumn' | transloco }} <p-sortIcon field="SOperationProduct.SProcess.DesProcess" /></span></th>
+                <th pSortableColumn="SOperationProduct.SOperation.DesOperation"><span class="ars-th-flex">{{ 'contractDetail.operationColumn' | transloco }} <p-sortIcon field="SOperationProduct.SOperation.DesOperation" /></span></th>
+                <th pSortableColumn="TstRequest"><span class="ars-th-flex">{{ 'contractDetail.dateColumn' | transloco }} <p-sortIcon field="TstRequest" /></span></th>
+                <th pSortableColumn="SState.DesState"><span class="ars-th-flex">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="SState.DesState" /></span></th>
               </tr>
             </ng-template>
             <ng-template pTemplate="body" let-op>
@@ -294,16 +279,13 @@
           >
             <ng-template pTemplate="header">
               <tr>
-                <th pSortableColumn="SDistributionChannel.DesDistributionChannel">
-                  {{ 'contractDetail.channelNameColumn' | transloco }} <p-sortIcon field="SDistributionChannel.DesDistributionChannel" />
-                  <p-columnFilter type="text" field="SDistributionChannel.DesDistributionChannel" display="menu" />
-                </th>
-                <th pSortableColumn="Percentaje">{{ 'contractDetail.percentageColumn' | transloco }} <p-sortIcon field="Percentaje" /></th>
-                <th pSortableColumn="IndMain">{{ 'contractDetail.mainColumn' | transloco }} <p-sortIcon field="IndMain" /></th>
-                <th pSortableColumn="NumMovement">{{ 'contractDetail.movementColumn' | transloco }} <p-sortIcon field="NumMovement" /></th>
-                <th pSortableColumn="TstInitial">{{ 'contractsList.startColumn' | transloco }} <p-sortIcon field="TstInitial" /></th>
-                <th pSortableColumn="TstEnd">{{ 'contractsList.endColumn' | transloco }} <p-sortIcon field="TstEnd" /></th>
-                <th pSortableColumn="SState.DesState">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="SState.DesState" /></th>
+                <th pSortableColumn="SDistributionChannel.DesDistributionChannel"><span class="ars-th-flex">{{ 'contractDetail.channelNameColumn' | transloco }} <p-sortIcon field="SDistributionChannel.DesDistributionChannel" /> <p-columnFilter type="text" field="SDistributionChannel.DesDistributionChannel" display="menu" /></span></th>
+                <th pSortableColumn="Percentaje"><span class="ars-th-flex">{{ 'contractDetail.percentageColumn' | transloco }} <p-sortIcon field="Percentaje" /></span></th>
+                <th pSortableColumn="IndMain"><span class="ars-th-flex">{{ 'contractDetail.mainColumn' | transloco }} <p-sortIcon field="IndMain" /></span></th>
+                <th pSortableColumn="NumMovement"><span class="ars-th-flex">{{ 'contractDetail.movementColumn' | transloco }} <p-sortIcon field="NumMovement" /></span></th>
+                <th pSortableColumn="TstInitial"><span class="ars-th-flex">{{ 'contractsList.startColumn' | transloco }} <p-sortIcon field="TstInitial" /></span></th>
+                <th pSortableColumn="TstEnd"><span class="ars-th-flex">{{ 'contractsList.endColumn' | transloco }} <p-sortIcon field="TstEnd" /></span></th>
+                <th pSortableColumn="SState.DesState"><span class="ars-th-flex">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="SState.DesState" /></span></th>
               </tr>
             </ng-template>
             <ng-template pTemplate="body" let-channel>
@@ -338,13 +320,10 @@
           >
             <ng-template pTemplate="header">
               <tr>
-                <th pSortableColumn="riskLabel">{{ 'contractDetail.riskColumn' | transloco }} <p-sortIcon field="riskLabel" /></th>
-                <th pSortableColumn="requirement.SProductRequirement.DesShort">
-                  {{ 'contractDetail.requirementColumn' | transloco }} <p-sortIcon field="requirement.SProductRequirement.DesShort" />
-                  <p-columnFilter type="text" field="requirement.SProductRequirement.DesShort" display="menu" />
-                </th>
-                <th pSortableColumn="requirement.SProductRequirement.IndMandatory">{{ 'contractDetail.mandatoryColumn' | transloco }} <p-sortIcon field="requirement.SProductRequirement.IndMandatory" /></th>
-                <th pSortableColumn="requirement.SState.DesState">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="requirement.SState.DesState" /></th>
+                <th pSortableColumn="riskLabel"><span class="ars-th-flex">{{ 'contractDetail.riskColumn' | transloco }} <p-sortIcon field="riskLabel" /></span></th>
+                <th pSortableColumn="requirement.SProductRequirement.DesShort"><span class="ars-th-flex">{{ 'contractDetail.requirementColumn' | transloco }} <p-sortIcon field="requirement.SProductRequirement.DesShort" /> <p-columnFilter type="text" field="requirement.SProductRequirement.DesShort" display="menu" /></span></th>
+                <th pSortableColumn="requirement.SProductRequirement.IndMandatory"><span class="ars-th-flex">{{ 'contractDetail.mandatoryColumn' | transloco }} <p-sortIcon field="requirement.SProductRequirement.IndMandatory" /></span></th>
+                <th pSortableColumn="requirement.SState.DesState"><span class="ars-th-flex">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="requirement.SState.DesState" /></span></th>
               </tr>
             </ng-template>
             <ng-template pTemplate="body" let-row>

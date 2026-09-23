@@ -7,11 +7,33 @@
     <button pButton type="button" icon="pi pi-plus" [label]="'products.planProducts.newButton' | transloco" (click)="openCreate()"></button>
   </div>
 
-  <p-table [value]="rows()" [loading]="loading()" dataKey="IdePlanProduct" styleClass="p-datatable-sm">
+  <p-table
+    [value]="rows()"
+    [loading]="loading()"
+    dataKey="IdePlanProduct"
+    [paginator]="true"
+    [rows]="10"
+    [rowsPerPageOptions]="[10, 25, 50]"
+    [showCurrentPageReport]="true"
+    currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+    styleClass="p-datatable-sm"
+  >
     <ng-template #header>
       <tr>
-        <th>{{ 'catalogs.codeColumn' | transloco }}</th>
-        <th>{{ 'catalogs.descriptionColumn' | transloco }}</th>
+        <th pSortableColumn="CodPlanProduct">
+          <span class="ars-th-flex">
+            {{ 'catalogs.codeColumn' | transloco }}
+            <p-sortIcon field="CodPlanProduct" />
+            <p-columnFilter type="text" field="CodPlanProduct" display="menu" />
+          </span>
+        </th>
+        <th pSortableColumn="DesPlanProduct">
+          <span class="ars-th-flex">
+            {{ 'catalogs.descriptionColumn' | transloco }}
+            <p-sortIcon field="DesPlanProduct" />
+            <p-columnFilter type="text" field="DesPlanProduct" display="menu" />
+          </span>
+        </th>
         <th>{{ 'products.planProducts.validityColumn' | transloco }}</th>
         <th>{{ 'catalogs.stateColumn' | transloco }}</th>
         <th class="w-32">{{ 'catalogs.actionsColumn' | transloco }}</th>

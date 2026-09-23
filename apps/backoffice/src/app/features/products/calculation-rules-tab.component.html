@@ -46,12 +46,34 @@
       <button pButton type="button" icon="pi pi-plus" [label]="'products.calculationRules.newButton' | transloco" (click)="openCreate()"></button>
     </div>
 
-    <p-table [value]="rows()" [loading]="loading()" dataKey="IdeCalculationRule" styleClass="p-datatable-sm">
+    <p-table
+      [value]="rows()"
+      [loading]="loading()"
+      dataKey="IdeCalculationRule"
+      [paginator]="true"
+      [rows]="10"
+      [rowsPerPageOptions]="[10, 25, 50]"
+      [showCurrentPageReport]="true"
+      currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+      styleClass="p-datatable-sm"
+    >
       <ng-template #header>
         <tr>
-          <th>{{ 'products.calculationRules.orderColumn' | transloco }}</th>
-          <th>{{ 'catalogs.codeColumn' | transloco }}</th>
-          <th>{{ 'catalogs.descriptionColumn' | transloco }}</th>
+          <th pSortableColumn="Order"><span class="ars-th-flex">{{ 'products.calculationRules.orderColumn' | transloco }} <p-sortIcon field="Order" /></span></th>
+          <th pSortableColumn="CodCalculationRule">
+            <span class="ars-th-flex">
+              {{ 'catalogs.codeColumn' | transloco }}
+              <p-sortIcon field="CodCalculationRule" />
+              <p-columnFilter type="text" field="CodCalculationRule" display="menu" />
+            </span>
+          </th>
+          <th pSortableColumn="DesCalculationRule">
+            <span class="ars-th-flex">
+              {{ 'catalogs.descriptionColumn' | transloco }}
+              <p-sortIcon field="DesCalculationRule" />
+              <p-columnFilter type="text" field="DesCalculationRule" display="menu" />
+            </span>
+          </th>
           <th>{{ 'products.calculationRules.conceptColumn' | transloco }}</th>
           <th>{{ 'catalogs.stateColumn' | transloco }}</th>
           <th class="w-32">{{ 'catalogs.actionsColumn' | transloco }}</th>

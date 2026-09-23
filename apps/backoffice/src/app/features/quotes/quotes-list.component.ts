@@ -76,6 +76,9 @@ export class QuotesListComponent implements OnInit {
   });
 
   private lastLimit = 20;
+  private lastSortField: string | undefined;
+  private lastSortOrder: number | undefined;
+  private lastNumQuoteFilter: string | undefined;
 
   constructor() {
     // Cualquier cambio de filtro reinicia a la página 1 -- no tiene
@@ -93,6 +96,11 @@ export class QuotesListComponent implements OnInit {
   load(event: TableLazyLoadEvent): void {
     const rows = event.rows ?? this.lastLimit;
     const page = Math.floor((event.first ?? 0) / rows) + 1;
+    this.lastSortField = typeof event.sortField === 'string' ? event.sortField : undefined;
+    this.lastSortOrder = event.sortOrder ?? undefined;
+    const numQuoteFilter = event.filters?.['numQuote'];
+    const filterValue = Array.isArray(numQuoteFilter) ? numQuoteFilter[0]?.value : numQuoteFilter?.value;
+    this.lastNumQuoteFilter = typeof filterValue === 'string' && filterValue.length > 0 ? filterValue : undefined;
     this.fetch(page, rows);
   }
 
@@ -105,6 +113,9 @@ export class QuotesListComponent implements OnInit {
       limit,
       all: showAll,
       codProduct: codProduct || undefined,
+      sortField: this.lastSortField,
+      sortOrder: this.lastSortOrder,
+      filterNumQuote: this.lastNumQuoteFilter,
     };
     this.quoting.list(params).subscribe({
       next: (result) => {

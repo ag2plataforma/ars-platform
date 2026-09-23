@@ -7,7 +7,17 @@
     <button pButton type="button" icon="pi pi-plus" [label]="'products.planProductRisks.newButton' | transloco" (click)="openCreate()"></button>
   </div>
 
-  <p-table [value]="rows()" [loading]="loading()" dataKey="IdePlanProductRisk" styleClass="p-datatable-sm">
+  <p-table
+    [value]="rows()"
+    [loading]="loading()"
+    dataKey="IdePlanProductRisk"
+    [paginator]="true"
+    [rows]="10"
+    [rowsPerPageOptions]="[10, 25, 50]"
+    [showCurrentPageReport]="true"
+    currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+    styleClass="p-datatable-sm"
+  >
     <ng-template #header>
       <tr>
         <th>{{ 'products.planProductRisks.planColumn' | transloco }}</th>

@@ -68,4 +68,28 @@ export class ListQuotesDto {
   @Min(1)
   @Max(100)
   limit: number = 20;
+
+  /** Orden de columna (`p-table` de PrimeNG) -- mismo patrón que
+   *  `ListContractsDto.sortField`, agregado el 23/09/2026 al retrofit del
+   *  estándar de orden/filtro/pie de página al resto de las tablas de la
+   *  app (ver docs/02-roadmap.md). Ver `QuotesService.resolveOrderBy`
+   *  para la lista cerrada de columnas ordenables. */
+  @IsOptional()
+  @IsString()
+  sortField?: string;
+
+  /** `1` = ascendente, `-1` = descendente -- mismo criterio que el
+   *  `sortOrder` nativo de `p-table`. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  sortOrder?: number;
+
+  /** Filtro de columna (`p-columnFilter`) sobre `NumQuote` -- mismo
+   *  criterio que `ListContractsDto.filterNumContract` (el único filtro
+   *  de columna que no duplica uno ya existente en el formulario de
+   *  arriba, producto/estado). */
+  @IsOptional()
+  @IsString()
+  filterNumQuote?: string;
 }

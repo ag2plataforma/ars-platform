@@ -17,6 +17,8 @@
     [paginator]="true"
     [rows]="10"
     [rowsPerPageOptions]="[10, 25, 50]"
+    [showCurrentPageReport]="true"
+    currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
     styleClass="p-datatable-sm"
   >
     <ng-template #header>
@@ -24,9 +26,9 @@
         <th>{{ 'commissions.products.productColumn' | transloco }}</th>
         <th>{{ 'commissions.products.originColumn' | transloco }}</th>
         <th>{{ 'commissions.products.destinyColumn' | transloco }}</th>
-        <th>{{ 'commissions.commissionsTab_.percentageColumn' | transloco }}</th>
+        <th pSortableColumn="Percentaje"><span class="ars-th-flex">{{ 'commissions.commissionsTab_.percentageColumn' | transloco }} <p-sortIcon field="Percentaje" /></span></th>
         <th>{{ 'commissions.products.mainColumn' | transloco }}</th>
-        <th>{{ 'commissions.commissionsTab_.validityColumn' | transloco }}</th>
+        <th pSortableColumn="TstInitial"><span class="ars-th-flex">{{ 'commissions.commissionsTab_.validityColumn' | transloco }} <p-sortIcon field="TstInitial" /></span></th>
         <th>{{ 'catalogs.stateColumn' | transloco }}</th>
         <th class="w-32">{{ 'catalogs.actionsColumn' | transloco }}</th>
       </tr>
