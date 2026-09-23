@@ -22,6 +22,7 @@ import {
   QuotePerson,
   QuoteSummary,
   QuotingService,
+  SubmitSocialImpactAnswersPayload,
 } from './quoting.service';
 import { MOBILE_PHONE_CONTACT_CLASS, Person, PersonsService } from './persons.service';
 import { RiskAttributeField, RiskAttributesService } from './risk-attributes.service';
@@ -31,7 +32,7 @@ const DISTRIBUTION_CHANNELS_PATH = '/party/distribution-channels';
 const DISTRIBUTION_WAYS_PATH = '/party/distribution-ways';
 const RISK_PRODUCTS_PATH = '/product-rating/risk-products';
 
-type QuoteStep = 'form' | 'plans' | 'persons' | 'summary' | 'contract';
+type QuoteStep = 'form' | 'plans' | 'socialImpact' | 'persons' | 'summary' | 'contract';
 
 /** Un "slot" de persona a asociar a la cotización (Tomador/Titular --
  * los dos únicos roles que `ContractsService.setContractPersons` copia
@@ -205,6 +206,28 @@ export class QuotesComponent {
   readonly step = signal<QuoteStep>('form');
   private ideQuote: string | null = null;
   private numQuote: string | null = null;
+
+  // --- Etapa 2.5: Impacto Social (Fase 3 Etapa 2, ver docs/02-roadmap.md) ---
+  /** Opciones del único select de valor fijo de este formulario --
+   *  mismos 5 valores que valida `CarFuelType` en el backend real
+   *  (`SubmitSocialImpactAnswersDto`/`CalculateSocialImpactScoreDto`). */
+  readonly carFuelTypeOptions = [
+    { value: 'gasolina', labelKey: 'quotes.socialImpactFuelGasolina' },
+    { value: 'diesel', labelKey: 'quotes.socialImpactFuelDiesel' },
+    { value: 'hibrido', labelKey: 'quotes.socialImpactFuelHibrido' },
+    { value: 'electrico', labelKey: 'quotes.socialImpactFuelElectrico' },
+    { value: 'no_tiene', labelKey: 'quotes.socialImpactFuelNoTiene' },
+  ];
+  readonly submittingSocialImpact = signal(false);
+  socialImpactForm = this.fb.nonNullable.group({
+    carKmPerYear: [0, [Validators.required, Validators.min(0)]],
+    carFuelType: ['', Validators.required],
+    electricityKwhMonth: [0, [Validators.required, Validators.min(0)]],
+    flightsPerYear: [0, [Validators.required, Validators.min(0)]],
+    volunteerHoursPerYear: [0, [Validators.required, Validators.min(0)]],
+    recurringCause: [false],
+    regularDonations: [false],
+  });
 
   // --- Etapa 3: personas ---
   readonly personSlots: PersonSlot[] = [
@@ -459,13 +482,109 @@ export class QuotesComponent {
     return result.risks.every((risk) => risk.plans.length === 0 || risk.plans.some((plan) => plan.indSelected));
   }
 
+  /** ¿El producto de esta cotización participa de Impacto Social y
+   *  todavía no se llenó el formulario? -- si es así, el paso
+   *  'socialImpact' va ANTES de 'persons' (ver `continueFromPlans`/
+   *  `plansContinueLabel`); si el producto no participa, o ya se
+   *  contestó antes (por ejemplo al retomar la cotización, ver
+   *  `resumeQuote`), se salta directo a 'persons'. */
+  private pendingSocialImpact(): boolean {
+    const socialImpact = this.pricing()?.socialImpact;
+    return !!socialImpact && socialImpact.active && !socialImpact.answered;
+  }
+
+  plansContinueLabel(): string {
+    return this.transloco.translate(
+      this.pendingSocialImpact() ? 'quotes.continueToSocialImpactButton' : 'quotes.continueToPersonsButton',
+    );
+  }
+
+  continueFromPlans(): void {
+    if (this.pendingSocialImpact()) {
+      this.step.set('socialImpact');
+      return;
+    }
+    this.goToPersons();
+  }
+
   goToPersons(): void {
     this.step.set('persons');
     this.refreshPersons();
   }
 
+  /** Vuelve un paso atrás desde 'persons' -- a 'socialImpact' si el
+   *  producto participa (se haya contestado o no, para poder revisar el
+   *  resultado), o directo a 'plans' si no participa. */
+  backFromPersons(): void {
+    const socialImpact = this.pricing()?.socialImpact;
+    this.step.set(socialImpact?.active ? 'socialImpact' : 'plans');
+  }
+
   backToPlans(): void {
     this.step.set('plans');
+  }
+
+  // --- Etapa 2.5: Impacto Social ---
+
+  /** Resultado ya calculado y persistido (`socialImpact.answered ===
+   *  true`), o `null` si todavía no se llenó el formulario --
+   *  método dedicado (en vez de acceder al campo directo desde el
+   *  template) para que TypeScript pueda angostar el tipo unión de
+   *  `SocialImpactInfo` sin repetir el chequeo `active && answered` en
+   *  cada interpolación del HTML. */
+  socialImpactResult(): Extract<QuotePricingResult['socialImpact'], { answered: true }> | null {
+    const socialImpact = this.pricing()?.socialImpact;
+    return socialImpact && socialImpact.active && socialImpact.answered ? socialImpact : null;
+  }
+
+  /** Texto legible del `% pctPrimaAdjustment` -- negativo (el caso
+   *  normal hoy, ver los tramos de `SSocialImpactScoring`) es
+   *  descuento, positivo sería recargo, `0` sin ajuste. */
+  socialImpactAdjustmentText(pct: number): string {
+    if (pct < 0) {
+      return this.transloco.translate('quotes.socialImpactDiscountDetail', { pct: Math.abs(pct) });
+    }
+    if (pct > 0) {
+      return this.transloco.translate('quotes.socialImpactSurchargeDetail', { pct });
+    }
+    return this.transloco.translate('quotes.socialImpactNoAdjustmentDetail');
+  }
+
+  submitSocialImpact(): void {
+    if (!this.ideQuote || this.socialImpactForm.invalid) {
+      this.socialImpactForm.markAllAsTouched();
+      return;
+    }
+    const payload: SubmitSocialImpactAnswersPayload = this.socialImpactForm.getRawValue();
+    this.submittingSocialImpact.set(true);
+    this.quoting.submitSocialImpactAnswers(this.ideQuote, payload).subscribe({
+      next: (result) => {
+        this.pricing.set(result);
+        this.submittingSocialImpact.set(false);
+        const socialImpact = result.socialImpact;
+        const detail =
+          socialImpact.active && socialImpact.answered
+            ? this.socialImpactAdjustmentText(socialImpact.pctPrimaAdjustment)
+            : '';
+        this.messages.add({
+          severity: 'success',
+          summary: this.transloco.translate('common.done'),
+          detail,
+        });
+      },
+      error: (err: HttpErrorResponse) => {
+        this.submittingSocialImpact.set(false);
+        this.showError(err);
+      },
+    });
+  }
+
+  /** El formulario de Impacto Social es opcional de completar ahora
+   *  mismo -- `socialImpact` sigue en `{ active: true, answered:
+   *  false }` y, al retomar la cotización después (ver
+   *  `resumeQuote`), se vuelve a mostrar este paso. */
+  skipSocialImpact(): void {
+    this.goToPersons();
   }
 
   // --- Etapa 3: personas ---
@@ -703,6 +822,10 @@ export class QuotesComponent {
    *   vista de solo lectura aparte.
    * - Estado "Aceptado" (sin contrato todavía) -> paso 'contract',
    *   listo para generar el contrato.
+   * - Si el producto participa de Impacto Social y todavía no se
+   *   contestó el formulario (Fase 3 Etapa 2, ver docs/02-roadmap.md)
+   *   -> paso 'socialImpact', antes de mirar personas siquiera --
+   *   mismo criterio que `continueFromPlans`/`pendingSocialImpact`.
    * - Si no, sigue en Borrador -> se consultan las personas ya
    *   asociadas (`listPersons`) y, con el mismo criterio que ya usa
    *   `canContinueToSummary()`, se salta a 'summary' si Tomador/Titular
@@ -727,6 +850,10 @@ export class QuotesComponent {
         if (result.codState === 'ACEPTADO') {
           this.quoteAccepted.set(true);
           this.step.set('contract');
+          return;
+        }
+        if (result.socialImpact.active && !result.socialImpact.answered) {
+          this.step.set('socialImpact');
           return;
         }
 
@@ -771,6 +898,16 @@ export class QuotesComponent {
     this.pricing.set(null);
     this.summary.set(null);
     this.quotePersons.set([]);
+    this.socialImpactForm.reset({
+      carKmPerYear: 0,
+      carFuelType: '',
+      electricityKwhMonth: 0,
+      flightsPerYear: 0,
+      volunteerHoursPerYear: 0,
+      recurringCause: false,
+      regularDonations: false,
+    });
+    this.submittingSocialImpact.set(false);
     this.quoteAccepted.set(false);
     this.contractResult.set(null);
     this.accepting.set(false);

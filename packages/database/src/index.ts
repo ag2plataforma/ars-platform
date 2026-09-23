@@ -6,4 +6,5 @@ export * from './repositories/attribute-value.resolver';
 export * from './repositories/rule-value.resolver';
 export * from './repositories/rate-value.resolver';
 export * from './repositories/social-impact-config.resolver';
+export * from './repositories/adjustment-value.resolver';
 export * from '@prisma/client';

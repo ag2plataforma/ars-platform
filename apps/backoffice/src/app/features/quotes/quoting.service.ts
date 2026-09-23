@@ -49,6 +49,24 @@ export interface QuoteContractRef {
   numContract: string;
 }
 
+/** `socialImpact` de `GET/POST /quotes/:id(/price)` -- Fase 3, Etapa 2
+ *  (ver docs/02-roadmap.md): tres formas posibles, mismo discriminador
+ *  `active`/`answered` que usa el backend real
+ *  (`QuotesService.resolveSocialImpact`). `{ active: false }` es el caso
+ *  normal para la inmensa mayoría de productos, que no participan. */
+export type SocialImpactInfo =
+  | { active: false }
+  | { active: true; answered: false }
+  | {
+      active: true;
+      answered: true;
+      kgCo2Year: number;
+      cfpScore: number;
+      sipScore: number;
+      combinedScore: number;
+      pctPrimaAdjustment: number;
+    };
+
 export interface QuotePricingResult {
   ideQuote: string;
   numQuote: string;
@@ -60,6 +78,7 @@ export interface QuotePricingResult {
   desState: string;
   /** No-null solo si ya se generó un contrato para esta cotización. */
   contract: QuoteContractRef | null;
+  socialImpact: SocialImpactInfo;
   risks: QuoteRisk[];
 }
 
@@ -115,6 +134,21 @@ export interface ListQuotesParams {
 interface CreateQuoteResponse {
   IdeQuote: string;
   NumQuote: string;
+}
+
+/** Formulario de Impacto Social (nuevo paso del wizard de Cotización,
+ *  Fase 3 Etapa 2, ver docs/02-roadmap.md) -- reenviado tal cual a
+ *  `POST :id/social-impact-answers`. `country` queda deliberadamente
+ *  afuera de este formulario (opcional en el backend, que ya cae a un
+ *  país por defecto configurado en la fórmula si no se manda). */
+export interface SubmitSocialImpactAnswersPayload {
+  carKmPerYear: number;
+  carFuelType: string;
+  electricityKwhMonth: number;
+  flightsPerYear: number;
+  volunteerHoursPerYear: number;
+  recurringCause: boolean;
+  regularDonations: boolean;
 }
 
 /** `QuotesService.getSummary` (equivalente a `FGetQuoteSummary`) --
@@ -269,6 +303,17 @@ export class QuotingService {
   /** `GET :id/summary`, equivalente a `FGetQuoteSummary`. */
   getSummary(ideQuote: string): Observable<QuoteSummary> {
     return this.http.get<QuoteSummary>(`${this.base}/${ideQuote}/summary`);
+  }
+
+  /** `POST :id/social-impact-answers` -- dispara el cálculo real contra
+   *  `social-impact-service` (llamada HTTP real entre servicios,
+   *  Etapa 2) y devuelve el mismo `buildPricingResult` de siempre, ya
+   *  con `socialImpact.answered: true` y el resultado persistido. */
+  submitSocialImpactAnswers(
+    ideQuote: string,
+    payload: SubmitSocialImpactAnswersPayload,
+  ): Observable<QuotePricingResult> {
+    return this.http.post<QuotePricingResult>(`${this.base}/${ideQuote}/social-impact-answers`, payload);
   }
 
   /** `POST :id/state`, equivalente a `FQuote_SetState` -- aplica una

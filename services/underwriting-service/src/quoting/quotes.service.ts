@@ -691,6 +691,17 @@ export class QuotesService {
    * `TQuoteCoverageConcept`. Al final, `TQuoteCoverage.Prime` se fija al
    * valor del concepto `PrimaTotal` (redondeado a 2 decimales, 0 si no
    * existe) -- igual que el original.
+   *
+   * Idempotente (Fase 3, ver docs/02-roadmap.md): borra los
+   * `TQuoteCoverageConcept` existentes de cada cobertura en borrador
+   * antes de recalcular, así que se puede llamar más de una vez para la
+   * misma cotización sin duplicar conceptos -- necesario porque
+   * `submitSocialImpactAnswers` la vuelve a invocar para que
+   * `adjustment('SOCIAL_IMPACT')` quede reflejado en `PrimaTotal` en
+   * cuanto se contesta el formulario, sin repetir el resto del pipeline
+   * de `price()` (`rebuildQuoteRiskPlans`/`populateQuoteCoverages`
+   * resetearían selecciones de plan/cobertura ya hechas por el usuario
+   * -- por eso esta función se llama sola, no `price()` completo).
    */
   private async calculateQuoteCoverageConcepts(ideProduct: string, ideQuote: string, actor: string): Promise<void> {
     const [ideQuoteCoverageInitial, ideQuoteCoverageConceptInitial, primaTotalConcept] = await Promise.all([
@@ -704,6 +715,22 @@ export class QuotesService {
       include: { TQuoteRiskPlan: { select: { IdePlanProductRisk: true, IdeQuoteRisk: true } } },
       orderBy: { IdeQuoteCoverage: 'asc' },
     });
+
+    // Idempotencia (Fase 3, ver docs/02-roadmap.md): este metodo ahora
+    // se llama mas de una vez para la MISMA cotizacion -- ademas de
+    // `price()` (una sola vez, con todos los planes en borrador),
+    // `submitSocialImpactAnswers` lo vuelve a llamar para que
+    // `adjustment('SOCIAL_IMPACT')` quede reflejado en `PrimaTotal` una
+    // vez contestado el formulario (ver ese metodo). Sin este borrado
+    // previo, la segunda corrida insertaria un segundo juego de
+    // TQuoteCoverageConcept por cobertura (PrimaNeta/Impuesto/PrimaTotal
+    // duplicados) en vez de reemplazar el calculo anterior -- mismo
+    // criterio de limpieza que ya usa `rebuildQuoteRiskPlans` para el
+    // caso de re-cotizar.
+    const draftCoverageIds = draftCoverages.map((coverage) => coverage.IdeQuoteCoverage);
+    if (draftCoverageIds.length > 0) {
+      await this.prisma.tQuoteCoverageConcept.deleteMany({ where: { IdeQuoteCoverage: { in: draftCoverageIds } } });
+    }
 
     for (const coverage of draftCoverages) {
       const rules = await this.rulesEngine.getApplicableRules({
@@ -980,6 +1007,20 @@ export class QuotesService {
       create: { IdeQuote: ideQuote, ...data, UsrCreation: actor, TstCreation: now, UsrModification: actor, TstModification: now },
       update: { ...data, UsrModification: actor, TstModification: now },
     });
+
+    // Fase 3, motor generico de recargos/descuentos (ver
+    // docs/02-roadmap.md): recalcula la cadena de reglas ahora que
+    // `adjustment('SOCIAL_IMPACT')` ya tiene dato -- sin este recalculo,
+    // `TQuoteCoverage.Prime` (y por lo tanto el Resumen, que lo suma tal
+    // cual en `getSummary`) quedaria congelado en el valor SIN descuento
+    // calculado la ultima vez que corrio `price()`, antes de que
+    // existiera esta respuesta. Mismo motor, misma cadena de
+    // SCalculationRule que ya evalua `price()` -- el % de ajuste entra
+    // por la formula del producto (`PrimaTotal`), no por codigo nuevo
+    // aca. `ContractsService.createInitialMovements` re-evalua la MISMA
+    // cadena al contratar, asi que el descuento llega solo hasta el
+    // contrato/factura real tambien, sin tocar ese servicio.
+    await this.calculateQuoteCoverageConcepts(quote.IdeProduct, ideQuote, actor);
 
     return this.buildPricingResult(ideQuote);
   }

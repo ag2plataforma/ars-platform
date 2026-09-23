@@ -98,9 +98,21 @@ const rateValueResolver = {
     throw new Error(`sin dato de prueba para FGetRateValue(${codRateTable}, ${factor1})`);
   },
 };
+// Puerto nuevo (Fase 3, motor genérico de recargos/descuentos -- ver
+// docs/02-roadmap.md): en memoria, solo conoce el código de prueba
+// 'SOCIAL_IMPACT' (-5 = 5% de descuento), igual de simple que el resto
+// de los mocks de este script -- la implementación real
+// (PrismaAdjustmentValueResolver) se verifica en Fase 3 Etapa 2/3 con
+// datos reales, no acá (mismo criterio que el resto de estos mocks).
+const adjustmentValueResolver = {
+  async resolveAdjustmentValue(origin, ideOriginRisk, codAdjustment) {
+    if (codAdjustment === 'SOCIAL_IMPACT') return -5;
+    return 0;
+  },
+};
 
 async function main() {
-  const service = new RulesEngineService(ruleRepository, attributeResolver, ruleValueResolver, rateValueResolver);
+  const service = new RulesEngineService(ruleRepository, attributeResolver, ruleValueResolver, rateValueResolver, adjustmentValueResolver);
   const context = { origin: 'Quote', ideOriginRisk: 'risk-1', ideCoverageOrMovement: 'coverage-1' };
   const results = await service.evaluateChain(rules, context);
   const byCode = Object.fromEntries(results.map((r) => [r.codCalculationRule, r]));
@@ -125,6 +137,7 @@ async function main() {
     attributeResolver,
     ruleValueResolver,
     rateValueResolver,
+    adjustmentValueResolver,
   );
   const rateResults = await rateServiceForThis.evaluateChain([rateRule], context);
   check('RECARGOEDAD = FGetRateValue(TARIFA_EDAD, EDAD=30) => 7.5', rateResults[0].value, 7.5);
@@ -144,6 +157,7 @@ async function main() {
     attributeResolver,
     ruleValueResolver,
     rateValueResolver,
+    adjustmentValueResolver,
   );
   const legacyRateResults = await legacyRateService.evaluateChain([legacyRateRule], context);
   check('RECARGOEDAD_LEGACY = 68+(68*entity."FGetRateValue"(...)) => 68+68*7.5 = 578', legacyRateResults[0].value, 578);
@@ -172,10 +186,39 @@ async function main() {
     attributeResolver,
     ruleValueResolver,
     rateValueResolver,
+    adjustmentValueResolver,
   );
   const roundChainResults = await roundChainService.evaluateChain(roundChainRules, context);
   const byCodeRound = Object.fromEntries(roundChainResults.map((r) => [r.codCalculationRule, r]));
   check("COMISION = round(rule(PRIMANETA2)+2%+5%,2) => round(300+6+15,2) = 321", byCodeRound.COMISION.value, 321);
+
+  // 4. adjustment('COD') dentro de una fórmula (Fase 3, motor genérico
+  //    de recargos/descuentos -- ver docs/02-roadmap.md): mismo caso que
+  //    Impacto Social usará en PrimaTotal, PrimaNeta(300) ajustada por
+  //    un adjustment('SOCIAL_IMPACT') de -5% => 300 * 0.95 = 285.
+  console.log("\n-- adjustment('COD') dentro de una fórmula --");
+  const adjustmentRules = [
+    {
+      ideCalculationRule: 'r8', codCalculationRule: 'PRIMANETA3', order: 1,
+      ideConcept: 'concept-neta-3', desColumnName: null,
+      formula: { if: 'TRUE', then: '300', else: '0' },
+    },
+    {
+      ideCalculationRule: 'r9', codCalculationRule: 'PRIMATOTAL3', order: 2,
+      ideConcept: 'concept-total-3', desColumnName: null,
+      formula: { if: 'TRUE', then: "round(rule('PRIMANETA3') * (1 + adjustment('SOCIAL_IMPACT') / 100), 2)", else: '0' },
+    },
+  ];
+  const adjustmentService = new RulesEngineService(
+    { async findApplicableRules() { return adjustmentRules; }, async listActiveFieldTokens() { return []; } },
+    attributeResolver,
+    ruleValueResolver,
+    rateValueResolver,
+    adjustmentValueResolver,
+  );
+  const adjustmentResults = await adjustmentService.evaluateChain(adjustmentRules, context);
+  const byCodeAdjustment = Object.fromEntries(adjustmentResults.map((r) => [r.codCalculationRule, r]));
+  check("PRIMATOTAL3 = round(rule(PRIMANETA3) * (1 + adjustment(SOCIAL_IMPACT)/100), 2) => 300*0.95 = 285", byCodeAdjustment.PRIMATOTAL3.value, 285);
 
   console.log(failures === 0 ? '\nTodo OK.' : `\n${failures} verificación(es) fallaron.`);
   process.exit(failures === 0 ? 0 : 1);

@@ -6,6 +6,7 @@ export interface RulesEngineProviders {
   attributeValueResolverProvider: Provider;
   ruleValueResolverProvider: Provider;
   rateValueResolverProvider: Provider;
+  adjustmentValueResolverProvider: Provider;
 }
 
 /**
@@ -15,10 +16,12 @@ export interface RulesEngineProviders {
  * con los providers en el módulo consumidor: Nest no resuelve providers
  * "hacia arriba", en un módulo que importa a este).
  *
- * shared-common no depende de Prisma — el binding concreto de los cuatro
+ * shared-common no depende de Prisma — el binding concreto de los cinco
  * puertos (`CALCULATION_RULE_REPOSITORY`, `ATTRIBUTE_VALUE_RESOLVER`,
- * `RULE_VALUE_RESOLVER`, `RATE_VALUE_RESOLVER`) lo provee el módulo del
- * servicio consumidor, normalmente usando las implementaciones reales de
+ * `RULE_VALUE_RESOLVER`, `RATE_VALUE_RESOLVER`, `ADJUSTMENT_VALUE_RESOLVER`
+ * -- este último, Fase 3, motor genérico de recargos/descuentos, ver
+ * docs/02-roadmap.md) lo provee el módulo del servicio consumidor,
+ * normalmente usando las implementaciones reales de
  * `@ars-platform/database`.
  */
 @Module({})
@@ -32,6 +35,7 @@ export class RulesEngineModule {
         providers.attributeValueResolverProvider,
         providers.ruleValueResolverProvider,
         providers.rateValueResolverProvider,
+        providers.adjustmentValueResolverProvider,
       ],
       exports: [RulesEngineService],
     };

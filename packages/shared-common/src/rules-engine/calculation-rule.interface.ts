@@ -141,7 +141,48 @@ export interface RateValueResolver {
   ): Promise<number>;
 }
 
+/**
+ * Puerto nuevo (Fase 3, motor generico de recargos/descuentos -- ver
+ * docs/02-roadmap.md): resuelve el valor porcentual de un "ajuste"
+ * nombrado (recargo o descuento) ya calculado y persistido para la
+ * cotizacion/contrato de origen, para que una formula lo use via
+ * `adjustment('COD')` -- mismo mecanismo de sustitucion de texto que
+ * `rule('COD')` (ver RulesEngineService.substituteAdjustmentReferences),
+ * resuelto ANTES de llegar al evaluador de expresiones.
+ *
+ * Impacto Social es el primer caso de uso (`CodAdjustment='SOCIAL_IMPACT'`),
+ * pero el puerto es generico a proposito: una feature futura de
+ * recargos/descuentos (fidelidad, multi-poliza, siniestralidad, etc.)
+ * publica su propio `CodAdjustment` sin volver a tocar
+ * ContractsService/QuotesService -- alcanza con una fila nueva de
+ * SCalculationRule que lo referencie en su formula, exactamente igual
+ * que hoy se referencia `rule(...)` o `FGetRateValue(...)`. La
+ * implementacion real (`PrismaAdjustmentValueResolver`, en
+ * `@ars-platform/database`) es la unica que sabe, por `codAdjustment`,
+ * en que tabla de dominio buscar el valor ya calculado.
+ *
+ * Convencion de signo: igual que `pctPrimaAdjustment` ya expuesto por
+ * Impacto Social -- negativo = descuento, positivo = recargo. Por
+ * defecto 0 si no hay dato todavia (cotizacion sin el paso contestado,
+ * o `codAdjustment` desconocido) -- mismo criterio de "silencio = no
+ * aporta al calculo" que el resto del motor (ver AttributeValueResolver).
+ *
+ * `dbTransaction`: mismo handle opaco y mismo motivo que en
+ * AttributeValueResolver/RuleValueResolver (ver esas interfaces) --
+ * necesario para `origin: 'Contract'` cuando el dato a leer fue escrito
+ * por la misma transaccion activa, todavia sin commit.
+ */
+export interface AdjustmentValueResolver {
+  resolveAdjustmentValue(
+    origin: RuleOrigin,
+    ideOriginRisk: string,
+    codAdjustment: string,
+    dbTransaction?: unknown,
+  ): Promise<number>;
+}
+
 export const CALCULATION_RULE_REPOSITORY = Symbol('CALCULATION_RULE_REPOSITORY');
 export const ATTRIBUTE_VALUE_RESOLVER = Symbol('ATTRIBUTE_VALUE_RESOLVER');
 export const RULE_VALUE_RESOLVER = Symbol('RULE_VALUE_RESOLVER');
 export const RATE_VALUE_RESOLVER = Symbol('RATE_VALUE_RESOLVER');
+export const ADJUSTMENT_VALUE_RESOLVER = Symbol('ADJUSTMENT_VALUE_RESOLVER');

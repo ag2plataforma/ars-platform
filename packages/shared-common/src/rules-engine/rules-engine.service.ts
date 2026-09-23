@@ -1,5 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
+  ADJUSTMENT_VALUE_RESOLVER,
+  AdjustmentValueResolver,
   ATTRIBUTE_VALUE_RESOLVER,
   AttributeValueResolver,
   CalculationRule,
@@ -79,6 +81,8 @@ export class RulesEngineService {
     private readonly ruleValueResolver: RuleValueResolver,
     @Inject(RATE_VALUE_RESOLVER)
     private readonly rateValueResolver: RateValueResolver,
+    @Inject(ADJUSTMENT_VALUE_RESOLVER)
+    private readonly adjustmentResolver: AdjustmentValueResolver,
   ) {}
 
   /** Reglas aplicables a una cobertura por la jerarquía Producto >
@@ -158,6 +162,7 @@ export class RulesEngineService {
     let result = expr;
     result = await this.substituteFieldTokens(result, fieldTokens, context);
     result = await this.substituteRateValueReferences(result);
+    result = await this.substituteAdjustmentReferences(result, context);
     result = await this.substituteRuleReferences(result, context, computedInThisChain);
     return result;
   }
@@ -179,6 +184,35 @@ export class RulesEngineService {
         );
         result = result.replace(new RegExp(boundaryPattern, 'g'), value);
       }
+    }
+    return result;
+  }
+
+  /**
+   * Sustituye referencias `adjustment('COD')` por el valor porcentual ya
+   * calculado y persistido para ese recargo/descuento nombrado (Fase 3,
+   * motor generico de recargos/descuentos -- ver
+   * docs/02-roadmap.md y el doc-comment de `AdjustmentValueResolver`).
+   * Mismo patron de sustitucion por regex que `substituteRuleReferences`
+   * -- a diferencia de `rule('COD')`, esto NO se resuelve nunca en
+   * memoria dentro de la cadena: siempre se consulta al
+   * `AdjustmentValueResolver`, porque el valor no lo calcula el motor de
+   * reglas, lo calcula (y persiste) la feature dueña de ese
+   * `codAdjustment` (ej. Impacto Social).
+   */
+  private async substituteAdjustmentReferences(expr: string, context: EvaluationContext): Promise<string> {
+    const pattern = /adjustment\(\s*'([^']+)'\s*\)/gi;
+    let result = expr;
+    const matches = [...expr.matchAll(pattern)];
+    for (const match of matches) {
+      const codAdjustment = match[1];
+      const value = await this.adjustmentResolver.resolveAdjustmentValue(
+        context.origin,
+        context.ideOriginRisk,
+        codAdjustment,
+        context.dbTransaction,
+      );
+      result = result.replace(match[0], String(value));
     }
     return result;
   }
