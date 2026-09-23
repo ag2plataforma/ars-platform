@@ -1,0 +1,29 @@
+<div class="flex flex-col gap-4">
+  <div>
+    <h1 class="text-lg font-semibold text-slate-900">{{ 'commissions.title' | transloco }}</h1>
+    <p class="text-sm text-slate-500">{{ 'commissions.subtitle' | transloco }}</p>
+  </div>
+
+  <p-tabs [value]="activeTab()" (valueChange)="activeTab.set($event ?? 'trees')">
+    <p-tablist>
+      <p-tab value="trees">{{ 'commissions.treesTab' | transloco }}</p-tab>
+      <p-tab value="tables">{{ 'commissions.tablesTab' | transloco }}</p-tab>
+      <p-tab value="commissions">{{ 'commissions.commissionsTab' | transloco }}</p-tab>
+      <p-tab value="products">{{ 'commissions.productsTab' | transloco }}</p-tab>
+    </p-tablist>
+    <p-tabpanels>
+      <p-tabpanel value="trees">
+        <app-commission-trees-tab />
+      </p-tabpanel>
+      <p-tabpanel value="tables">
+        <app-commission-tables-tab />
+      </p-tabpanel>
+      <p-tabpanel value="commissions">
+        <app-commissions-tab />
+      </p-tabpanel>
+      <p-tabpanel value="products">
+        <app-commission-products-tab />
+      </p-tabpanel>
+    </p-tabpanels>
+  </p-tabs>
+</div>

@@ -83,6 +83,11 @@ export const routes: Routes = [
           import('./features/menu-config/menu-config.component').then((m) => m.MenuConfigComponent),
       },
       {
+        path: 'comisiones',
+        loadComponent: () =>
+          import('./features/commissions/commissions.component').then((m) => m.CommissionsComponent),
+      },
+      {
         // "Configuración de productos" -- ítem padre en el sidebar (ver
         // packages/database/scripts/seed-menu-config.js) con 3 hijos:
         // Catálogos de producto, Productos y Tablas de tarifa. Antes

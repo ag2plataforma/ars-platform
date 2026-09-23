@@ -10,6 +10,8 @@ import { CommissionsController } from './commissions.controller';
 import { CommissionsService } from './commissions.service';
 import { CommissionProductsController } from './commission-products.controller';
 import { CommissionProductsService } from './commission-products.service';
+import { ProcessesController } from './processes.controller';
+import { ProcessesService } from './processes.service';
 
 /**
  * Tercera parte del alcance de `party-service` (ver su README):
@@ -45,6 +47,7 @@ import { CommissionProductsService } from './commission-products.service';
     CommissionTablesController,
     CommissionsController,
     CommissionProductsController,
+    ProcessesController,
   ],
   providers: [
     BrokersService,
@@ -52,6 +55,7 @@ import { CommissionProductsService } from './commission-products.service';
     CommissionTablesService,
     CommissionsService,
     CommissionProductsService,
+    ProcessesService,
   ],
 })
 export class BrokersModule {}

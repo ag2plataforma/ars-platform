@@ -1,0 +1,138 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex flex-col gap-4">
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold text-slate-900">{{ 'commissions.commissionsTab_.title' | transloco }}</h2>
+      <p class="text-sm text-slate-500">{{ 'commissions.commissionsTab_.subtitle' | transloco }}</p>
+    </div>
+    <button pButton type="button" icon="pi pi-plus" [label]="'commissions.commissionsTab_.newButton' | transloco" (click)="openCreate()"></button>
+  </div>
+
+  <p-table
+    [value]="rows()"
+    [loading]="loading()"
+    dataKey="IdeCommission"
+    [paginator]="true"
+    [rows]="10"
+    [rowsPerPageOptions]="[10, 25, 50]"
+    styleClass="p-datatable-sm"
+  >
+    <ng-template #header>
+      <tr>
+        <th>{{ 'commissions.commissionsTab_.tableColumn' | transloco }}</th>
+        <th>{{ 'commissions.commissionsTab_.processColumn' | transloco }}</th>
+        <th>{{ 'commissions.commissionsTab_.percentageColumn' | transloco }}</th>
+        <th>{{ 'commissions.commissionsTab_.validityColumn' | transloco }}</th>
+        <th>{{ 'commissions.commissionsTab_.movementColumn' | transloco }}</th>
+        <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+        <th class="w-32">{{ 'catalogs.actionsColumn' | transloco }}</th>
+      </tr>
+    </ng-template>
+    <ng-template #body let-row>
+      <tr>
+        <td>{{ tableName(row) }}</td>
+        <td>{{ processName(row) }}</td>
+        <td>{{ row.Percentaje }}%</td>
+        <td>{{ formatDate(row.TstInitial) }} &rarr; {{ formatDate(row.TstEnd) }}</td>
+        <td>{{ row.NumMovement }}</td>
+        <td>
+          <p-tag [value]="(isActive(row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isActive(row) ? 'success' : 'danger'" />
+        </td>
+        <td>
+          <div class="flex gap-1">
+            <button
+              pButton
+              type="button"
+              icon="pi pi-pencil"
+              [text]="true"
+              severity="secondary"
+              [pTooltip]="'locations.editTooltip' | transloco"
+              tooltipPosition="top"
+              (click)="openEdit(row)"
+            ></button>
+            <button
+              pButton
+              type="button"
+              [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'"
+              [text]="true"
+              [severity]="isActive(row) ? 'danger' : 'success'"
+              [pTooltip]="(isActive(row) ? 'catalogs.deactivateHeader' : 'catalogs.activateHeader') | transloco"
+              tooltipPosition="top"
+              (click)="toggleState(row)"
+            ></button>
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="7" class="text-center text-slate-500">{{ 'commissions.commissionsTab_.emptyState' | transloco }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-dialog
+  [header]="(dialogMode() === 'create' ? 'commissions.commissionsTab_.createDialogTitle' : 'commissions.commissionsTab_.editDialogTitle') | transloco"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  [style]="{ width: '28rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'commissions.commissionsTab_.tableColumn' | transloco }}</label>
+      @if (dialogMode() === 'create') {
+        <p-select
+          appendTo="body"
+          formControlName="codCommissionTable"
+          [options]="tables()"
+          optionLabel="DesCommissionTable"
+          optionValue="CodCommissionTable"
+          [placeholder]="'commissions.commissionsTab_.tableSelectPlaceholder' | transloco"
+          styleClass="w-full"
+        />
+      } @else {
+        <input pInputText formControlName="codCommissionTable" class="w-full" />
+      }
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'commissions.commissionsTab_.processColumn' | transloco }}</label>
+      @if (dialogMode() === 'create') {
+        <p-select
+          appendTo="body"
+          formControlName="codProcess"
+          [options]="processes()"
+          optionLabel="DesProcess"
+          optionValue="CodProcess"
+          [placeholder]="'commissions.commissionsTab_.processSelectPlaceholder' | transloco"
+          styleClass="w-full"
+        />
+      } @else {
+        <input pInputText formControlName="codProcess" class="w-full" />
+      }
+    </div>
+    @if (dialogMode() === 'edit') {
+      <p class="text-xs text-slate-500">{{ 'commissions.commissionsTab_.lockedHint' | transloco }}</p>
+    }
+    <div class="flex flex-col gap-2">
+      <label for="commission-percentaje" class="text-sm font-medium text-slate-700">{{ 'commissions.commissionsTab_.percentageColumn' | transloco }}</label>
+      <p-inputNumber inputId="commission-percentaje" formControlName="percentaje" suffix="%" [minFractionDigits]="0" [maxFractionDigits]="2" styleClass="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label for="commission-tst-initial" class="text-sm font-medium text-slate-700">{{ 'commissions.commissionsTab_.validFromLabel' | transloco }}</label>
+      <input pInputText type="date" id="commission-tst-initial" formControlName="tstInitial" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label for="commission-tst-end" class="text-sm font-medium text-slate-700">{{ 'commissions.commissionsTab_.validUntilLabel' | transloco }}</label>
+      <input pInputText type="date" id="commission-tst-end" formControlName="tstEnd" class="w-full" />
+    </div>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
+    </div>
+  </form>
+</p-dialog>

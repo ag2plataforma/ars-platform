@@ -5,7 +5,7 @@ import { CreateCommissionProductDto } from './dto/create-commission-product.dto'
 import { UpdateCommissionProductDto } from './dto/update-commission-product.dto';
 import { ListCommissionProductsDto } from './dto/list-commission-products.dto';
 
-const INCLUDE = { SProduct: true } as const;
+const INCLUDE = { SProduct: true, SState: true } as const;
 
 /**
  * `SCommissionProduct` -- split de comisión de un producto entre un canal

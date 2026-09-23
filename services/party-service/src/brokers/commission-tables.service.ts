@@ -5,7 +5,7 @@ import { CreateCommissionTableDto } from './dto/create-commission-table.dto';
 import { UpdateCommissionTableDto } from './dto/update-commission-table.dto';
 import { ListCommissionTablesDto } from './dto/list-commission-tables.dto';
 
-const INCLUDE = { SCommissionTree: true, SCommission: true } as const;
+const INCLUDE = { SCommissionTree: true, SCommission: true, SState: true } as const;
 
 /**
  * `SCommissionTable` -- dentro de un árbol de comisión, la tabla

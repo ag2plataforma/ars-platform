@@ -1,0 +1,160 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex flex-col gap-4">
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold text-slate-900">{{ 'commissions.products.title' | transloco }}</h2>
+      <p class="text-sm text-slate-500">{{ 'commissions.products.subtitle' | transloco }}</p>
+    </div>
+    <button pButton type="button" icon="pi pi-plus" [label]="'commissions.products.newButton' | transloco" (click)="openCreate()"></button>
+  </div>
+
+  <p-table
+    [value]="rows()"
+    [loading]="loading()"
+    dataKey="IdeCommissionProduct"
+    [paginator]="true"
+    [rows]="10"
+    [rowsPerPageOptions]="[10, 25, 50]"
+    styleClass="p-datatable-sm"
+  >
+    <ng-template #header>
+      <tr>
+        <th>{{ 'commissions.products.productColumn' | transloco }}</th>
+        <th>{{ 'commissions.products.originColumn' | transloco }}</th>
+        <th>{{ 'commissions.products.destinyColumn' | transloco }}</th>
+        <th>{{ 'commissions.commissionsTab_.percentageColumn' | transloco }}</th>
+        <th>{{ 'commissions.products.mainColumn' | transloco }}</th>
+        <th>{{ 'commissions.commissionsTab_.validityColumn' | transloco }}</th>
+        <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+        <th class="w-32">{{ 'catalogs.actionsColumn' | transloco }}</th>
+      </tr>
+    </ng-template>
+    <ng-template #body let-row>
+      <tr>
+        <td>{{ productName(row) }}</td>
+        <td>{{ originChannelName(row) }}</td>
+        <td>{{ destinyChannelName(row) }}</td>
+        <td>{{ row.Percentaje }}%</td>
+        <td>{{ (row.IndMain ? 'common.yes' : 'common.no') | transloco }}</td>
+        <td>{{ formatDate(row.TstInitial) }} &rarr; {{ formatDate(row.TstEnd) }}</td>
+        <td>
+          <p-tag [value]="(isActive(row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isActive(row) ? 'success' : 'danger'" />
+        </td>
+        <td>
+          <div class="flex gap-1">
+            <button
+              pButton
+              type="button"
+              icon="pi pi-pencil"
+              [text]="true"
+              severity="secondary"
+              [pTooltip]="'locations.editTooltip' | transloco"
+              tooltipPosition="top"
+              (click)="openEdit(row)"
+            ></button>
+            <button
+              pButton
+              type="button"
+              [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'"
+              [text]="true"
+              [severity]="isActive(row) ? 'danger' : 'success'"
+              [pTooltip]="(isActive(row) ? 'catalogs.deactivateHeader' : 'catalogs.activateHeader') | transloco"
+              tooltipPosition="top"
+              (click)="toggleState(row)"
+            ></button>
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="8" class="text-center text-slate-500">{{ 'commissions.products.emptyState' | transloco }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-dialog
+  [header]="(dialogMode() === 'create' ? 'commissions.products.createDialogTitle' : 'commissions.products.editDialogTitle') | transloco"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  [style]="{ width: '28rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'commissions.products.productColumn' | transloco }}</label>
+      @if (dialogMode() === 'create') {
+        <p-select
+          appendTo="body"
+          formControlName="codProduct"
+          [options]="products()"
+          optionLabel="DesProduct"
+          optionValue="CodProduct"
+          [placeholder]="'commissions.products.productSelectPlaceholder' | transloco"
+          styleClass="w-full"
+        />
+      } @else {
+        <input pInputText formControlName="codProduct" class="w-full" />
+      }
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'commissions.products.originColumn' | transloco }}</label>
+      @if (dialogMode() === 'create') {
+        <p-select
+          appendTo="body"
+          formControlName="codDistributionChannelOrigin"
+          [options]="channels()"
+          optionLabel="DesDistributionChannel"
+          optionValue="CodDistributionChannel"
+          [placeholder]="'commissions.products.channelSelectPlaceholder' | transloco"
+          styleClass="w-full"
+        />
+      } @else {
+        <input pInputText formControlName="codDistributionChannelOrigin" class="w-full" />
+      }
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'commissions.products.destinyColumn' | transloco }}</label>
+      @if (dialogMode() === 'create') {
+        <p-select
+          appendTo="body"
+          formControlName="codDistributionChannelDestiny"
+          [options]="channels()"
+          optionLabel="DesDistributionChannel"
+          optionValue="CodDistributionChannel"
+          [placeholder]="'commissions.products.channelSelectPlaceholder' | transloco"
+          styleClass="w-full"
+        />
+      } @else {
+        <input pInputText formControlName="codDistributionChannelDestiny" class="w-full" />
+      }
+    </div>
+    @if (dialogMode() === 'edit') {
+      <p class="text-xs text-slate-500">{{ 'commissions.products.lockedHint' | transloco }}</p>
+    }
+    <div class="flex flex-col gap-2">
+      <label for="product-percentaje" class="text-sm font-medium text-slate-700">{{ 'commissions.commissionsTab_.percentageColumn' | transloco }}</label>
+      <p-inputNumber inputId="product-percentaje" formControlName="percentaje" suffix="%" [minFractionDigits]="0" [maxFractionDigits]="2" styleClass="w-full" />
+    </div>
+    <div class="flex items-center gap-2">
+      <p-checkbox formControlName="indMain" [binary]="true" inputId="product-ind-main" />
+      <label for="product-ind-main" class="text-sm font-medium text-slate-700">{{ 'commissions.products.mainColumn' | transloco }}</label>
+    </div>
+    <div class="flex flex-col gap-2">
+      <label for="product-tst-initial" class="text-sm font-medium text-slate-700">{{ 'commissions.commissionsTab_.validFromLabel' | transloco }}</label>
+      <input pInputText type="date" id="product-tst-initial" formControlName="tstInitial" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label for="product-tst-end" class="text-sm font-medium text-slate-700">{{ 'commissions.commissionsTab_.validUntilLabel' | transloco }}</label>
+      <input pInputText type="date" id="product-tst-end" formControlName="tstEnd" class="w-full" />
+    </div>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
+    </div>
+  </form>
+</p-dialog>

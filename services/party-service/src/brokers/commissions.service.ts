@@ -5,7 +5,7 @@ import { CreateCommissionDto } from './dto/create-commission.dto';
 import { UpdateCommissionDto } from './dto/update-commission.dto';
 import { ListCommissionsDto } from './dto/list-commissions.dto';
 
-const INCLUDE = { SCommissionTable: true, SProcess: true } as const;
+const INCLUDE = { SCommissionTable: true, SProcess: true, SState: true } as const;
 
 /**
  * `SCommission` -- el % de comisión vigente de una `SCommissionTable`

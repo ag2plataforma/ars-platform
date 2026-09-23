@@ -115,6 +115,7 @@ const SITE_MAP_ITEMS = [
       },
     ],
   },
+  { cod: 'COMISIONES', des: 'Comisiones', order: 8, path: '/comisiones', icon: 'pi-wallet' },
 ];
 
 async function main() {

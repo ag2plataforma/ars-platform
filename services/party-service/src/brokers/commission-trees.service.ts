@@ -4,7 +4,7 @@ import { CatalogCrudService, StateMachineService } from '@ars-platform/shared-co
 import { CreateCommissionTreeDto } from './dto/create-commission-tree.dto';
 import { UpdateCommissionTreeDto } from './dto/update-commission-tree.dto';
 
-const INCLUDE = { SCommissionTable: true } as const;
+const INCLUDE = { SCommissionTable: true, SState: true } as const;
 
 /**
  * `SCommissionTree` -- el árbol de comisión de UN canal de distribución
