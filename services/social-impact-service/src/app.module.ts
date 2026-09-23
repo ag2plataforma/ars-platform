@@ -5,6 +5,7 @@ import { PrismaModule } from '@ars-platform/database';
 import { AuthModule } from '@ars-platform/shared-common';
 import { HealthController } from './health/health.controller';
 import { SocialImpactConfigModule } from './social-impact-config/social-impact-config.module';
+import { SocialImpactScoringModule } from './social-impact-scoring/social-impact-scoring.module';
 
 /**
  * Impacto Social (Fase 3, ver docs/02-roadmap.md) -- SIP (puntos de
@@ -23,6 +24,17 @@ import { SocialImpactConfigModule } from './social-impact-config/social-impact-c
  * real entre servicios. Este servicio sí queda disponible desde ya para
  * cualquier otro consumidor (por ejemplo, la futura Store App de
  * Fase 5) que necesite consultarlo por HTTP.
+ *
+ * Etapa 2 (formulas reales): SocialImpactScoringModule agrega el
+ * calculo real de CFP/SIP/score combinado (SocialImpactScoringService),
+ * la config de la formula (SSocialImpactScoring.FormulaJSON, mismo
+ * patron que SCalculationRule.FormulaJSON) y el cliente de la API
+ * externa emissions.dev (huella de carbono por electricidad). Esta
+ * etapa SI introduce la llamada HTTP real entre servicios: ahora
+ * underwriting-service llama a POST /social-impact-score de este
+ * servicio en vez de calcular en proceso -- decision explicita del
+ * usuario (2026-09-22). El endpoint queda protegido por el mismo
+ * AuthModule (JWT) de arriba, reenviando el JWT del usuario.
  */
 @Module({
   imports: [
@@ -36,6 +48,7 @@ import { SocialImpactConfigModule } from './social-impact-config/social-impact-c
     PrismaModule,
     AuthModule, // guard JWT global — mismo JWT_SECRET que iam-service, este servicio solo VERIFICA tokens
     SocialImpactConfigModule,
+    SocialImpactScoringModule,
   ],
   controllers: [HealthController],
 })

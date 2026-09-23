@@ -1924,6 +1924,15 @@ model SSocialImpactConfig {
   SState                SState   @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_SSocialImpactConfig_SState")
 }
 
+model SSocialImpactScoring {
+  IdeSocialImpactScoring String   @id(map: "PK_SSocialImpactScoring") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  FormulaJSON            Json
+  UsrCreation            String   @db.VarChar(60)
+  TstCreation            DateTime @db.Timestamp(6)
+  UsrModification        String   @db.VarChar(60)
+  TstModification        DateTime @db.Timestamp(6)
+}
+
 model SState {
   IdeState                                         String                         @id(map: "PK_SState") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   CodState                                         String                         @unique(map: "UK_SState_01") @db.VarChar(30)
@@ -2951,27 +2960,28 @@ model TPersonConsent {
 }
 
 model TQuote {
-  IdeQuote               String            @id(map: "PK_TQuote") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  NumQuote               String            @unique(map: "UK_TQuote_01") @db.VarChar(30)
-  IdePerson              String?           @db.Uuid
-  IdeDistributionChannel String            @db.Uuid
-  IdeProduct             String            @db.Uuid
-  IdeDistributionWay     String            @db.Uuid
-  TstQuote               DateTime          @db.Timestamp(6)
-  IdeState               String            @db.Uuid
-  UsrCreation            String            @db.VarChar(60)
-  TstCreation            DateTime          @db.Timestamp(6)
-  UsrModification        String            @db.VarChar(60)
-  TstModification        DateTime          @db.Timestamp(6)
-  TContract              TContract[]
-  TPersonConsent         TPersonConsent[]
-  SDistributionWay       SDistributionWay  @relation(fields: [IdeDistributionWay], references: [IdeDistributionWay], onDelete: NoAction, onUpdate: NoAction, map: "FK_TQuote_SDistributionWay")
-  SProduct               SProduct          @relation(fields: [IdeProduct], references: [IdeProduct], onDelete: NoAction, onUpdate: NoAction, map: "FK_TQuote_SProduct")
-  SState                 SState            @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_TQuote_SState")
-  TPerson                TPerson?          @relation(fields: [IdePerson], references: [IdePerson], onDelete: NoAction, onUpdate: NoAction, map: "FK_TQuote_TPerson")
-  TQuoteOperation        TQuoteOperation[]
-  TQuotePerson           TQuotePerson[]
-  TQuoteRisk             TQuoteRisk[]
+  IdeQuote                 String                    @id(map: "PK_TQuote") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  NumQuote                 String                    @unique(map: "UK_TQuote_01") @db.VarChar(30)
+  IdePerson                String?                   @db.Uuid
+  IdeDistributionChannel   String                    @db.Uuid
+  IdeProduct               String                    @db.Uuid
+  IdeDistributionWay       String                    @db.Uuid
+  TstQuote                 DateTime                  @db.Timestamp(6)
+  IdeState                 String                    @db.Uuid
+  UsrCreation              String                    @db.VarChar(60)
+  TstCreation              DateTime                  @db.Timestamp(6)
+  UsrModification          String                    @db.VarChar(60)
+  TstModification          DateTime                  @db.Timestamp(6)
+  TContract                TContract[]
+  TPersonConsent           TPersonConsent[]
+  SDistributionWay         SDistributionWay          @relation(fields: [IdeDistributionWay], references: [IdeDistributionWay], onDelete: NoAction, onUpdate: NoAction, map: "FK_TQuote_SDistributionWay")
+  SProduct                 SProduct                  @relation(fields: [IdeProduct], references: [IdeProduct], onDelete: NoAction, onUpdate: NoAction, map: "FK_TQuote_SProduct")
+  SState                   SState                    @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_TQuote_SState")
+  TPerson                  TPerson?                  @relation(fields: [IdePerson], references: [IdePerson], onDelete: NoAction, onUpdate: NoAction, map: "FK_TQuote_TPerson")
+  TQuoteOperation          TQuoteOperation[]
+  TQuotePerson             TQuotePerson[]
+  TQuoteRisk               TQuoteRisk[]
+  TQuoteSocialImpactAnswer TQuoteSocialImpactAnswer?
 
   @@index([IdeDistributionChannel], map: "IX_TQuote_SDistributionChannel")
   @@index([IdeDistributionWay], map: "IX_TQuote_SDistributionWay")
@@ -3134,6 +3144,22 @@ model TQuoteRiskPlan {
   @@index([IdePlanProductRisk], map: "IX_TQuoteRiskPlan_SPlanProductRisk")
   @@index([IdeState], map: "IX_TQuoteRiskPlan_SState")
   @@index([IdeQuoteRisk], map: "IX_TQuoteRiskPlan_TQuoteRisk")
+}
+
+model TQuoteSocialImpactAnswer {
+  IdeQuoteSocialImpactAnswer String   @id(map: "PK_TQuoteSocialImpactAnswer") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  IdeQuote                   String   @unique(map: "UK_TQuoteSocialImpactAnswer_01") @db.Uuid
+  AnswersJSON                Json
+  KgCo2Year                  Decimal  @db.Decimal
+  CfpScore                   Decimal  @db.Decimal
+  SipScore                   Decimal  @db.Decimal
+  CombinedScore              Decimal  @db.Decimal
+  PctPrimaAdjustment         Decimal  @db.Decimal
+  UsrCreation                String   @db.VarChar(60)
+  TstCreation                DateTime @db.Timestamp(6)
+  UsrModification            String   @db.VarChar(60)
+  TstModification            DateTime @db.Timestamp(6)
+  TQuote                     TQuote   @relation(fields: [IdeQuote], references: [IdeQuote], onDelete: NoAction, onUpdate: NoAction, map: "FK_TQuoteSocialImpactAnswer_TQuote")
 }
 
 model TReceipt {

@@ -1,8 +1,30 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, PrismaService } from '@ars-platform/database';
-import { RulesEngineService, SocialImpactCalculatorService, StateMachineService } from '@ars-platform/shared-common';
+import {
+  RulesEngineService,
+  SOCIAL_IMPACT_CONFIG_RESOLVER,
+  SocialImpactConfigResolver,
+  StateMachineService,
+} from '@ars-platform/shared-common';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { ListQuotesDto } from './dto/list-quotes.dto';
+import { SocialImpactHttpClient } from '../social-impact/social-impact-http.client';
+import { SubmitSocialImpactAnswersDto } from '../social-impact/dto/submit-social-impact-answers.dto';
+
+/** Forma expuesta en `buildPricingResult` -- ver el comentario ahi y en
+ *  `resolveSocialImpact`. */
+type SocialImpactInfo =
+  | { active: false }
+  | { active: true; answered: false }
+  | {
+      active: true;
+      answered: true;
+      kgCo2Year: number;
+      cfpScore: number;
+      sipScore: number;
+      combinedScore: number;
+      pctPrimaAdjustment: number;
+    };
 
 /**
  * Motor de cotización real, equivalente a `FQuote`/`FQuoteRiskPlan`/
@@ -40,7 +62,9 @@ export class QuotesService {
     private readonly prisma: PrismaService,
     private readonly stateMachine: StateMachineService,
     private readonly rulesEngine: RulesEngineService,
-    private readonly socialImpactCalculator: SocialImpactCalculatorService,
+    @Inject(SOCIAL_IMPACT_CONFIG_RESOLVER)
+    private readonly socialImpactConfigResolver: SocialImpactConfigResolver,
+    private readonly socialImpactHttpClient: SocialImpactHttpClient,
   ) {}
 
   async create(dto: CreateQuoteDto, actor: string) {
@@ -780,11 +804,14 @@ export class QuotesService {
     const indAnnual = productValidityType?.SValidityType.IndAnnual ?? false;
 
     // Impacto Social (Fase 3, ver docs/02-roadmap.md) -- puramente
-    // informativo, no toca ningun total de prima real todavia (Etapa 1:
-    // andamiaje + placeholder, ver SocialImpactCalculatorService en
-    // @ars-platform/shared-common). `active: false` es el caso normal
-    // para la inmensa mayoria de productos, que no participan.
-    const socialImpact = await this.socialImpactCalculator.calculateAdjustment(quote.IdeProduct);
+    // informativo, no toca ningun total de prima real todavia. `active:
+    // false` es el caso normal para la inmensa mayoria de productos, que
+    // no participan. Etapa 2 (formulas reales): si el producto participa
+    // pero la cotizacion todavia no tiene `TQuoteSocialImpactAnswer`
+    // (el usuario no lleno el formulario todavia), se expone
+    // `answered: false` para que el frontend sepa que falta ese paso --
+    // ver `submitSocialImpactAnswers` mas abajo, que es quien lo crea.
+    const socialImpact = await this.resolveSocialImpact(quote.IdeProduct, ideQuote);
 
     return {
       ideQuote: quote.IdeQuote,
@@ -881,6 +908,80 @@ export class QuotesService {
     const row = await this.prisma.sRiskProduct.findFirst({ where: { CodRiskProduct: codRiskProduct } });
     if (!row) throw new NotFoundException(`No existe producto de riesgo con código "${codRiskProduct}"`);
     return row.IdeRiskProduct;
+  }
+
+  /** Ver el comentario en `buildPricingResult` -- resuelve si el producto
+   *  participa de Impacto Social y, si participa, si esta cotización ya
+   *  tiene una respuesta real persistida (`TQuoteSocialImpactAnswer`). */
+  private async resolveSocialImpact(ideProduct: string, ideQuote: string): Promise<SocialImpactInfo> {
+    const config = await this.socialImpactConfigResolver.resolveActiveConfig(ideProduct);
+    if (!config) {
+      return { active: false };
+    }
+
+    const answer = await this.prisma.tQuoteSocialImpactAnswer.findUnique({ where: { IdeQuote: ideQuote } });
+    if (!answer) {
+      return { active: true, answered: false };
+    }
+
+    return {
+      active: true,
+      answered: true,
+      kgCo2Year: Number(answer.KgCo2Year),
+      cfpScore: Number(answer.CfpScore),
+      sipScore: Number(answer.SipScore),
+      combinedScore: Number(answer.CombinedScore),
+      pctPrimaAdjustment: Number(answer.PctPrimaAdjustment),
+    };
+  }
+
+  /**
+   * Recibe las respuestas del formulario de Impacto Social (nuevo paso
+   * del wizard de Cotización, ver docs/02-roadmap.md), valida que el
+   * producto de la cotización participe, le pide el cálculo real a
+   * `social-impact-service` (Etapa 2, llamada HTTP real -- ver
+   * `SocialImpactHttpClient`) y persiste el resultado en
+   * `TQuoteSocialImpactAnswer` (una fila por cotización -- se reemplaza
+   * si el usuario vuelve a llenar el formulario, sin acumular histórico
+   * de versiones a propósito, mismo criterio simple que el resto de esta
+   * Fase 1 del motor de cotización). Reenvía el `Authorization` crudo
+   * del usuario (no el JWT ya decodificado) -- lo necesita el guard JWT
+   * de `social-impact-service` para validar el token igual que si el
+   * frontend le hubiera pegado directo.
+   */
+  async submitSocialImpactAnswers(
+    ideQuote: string,
+    dto: SubmitSocialImpactAnswersDto,
+    actor: string,
+    authorization: string,
+  ) {
+    const quote = await this.prisma.tQuote.findUnique({ where: { IdeQuote: ideQuote } });
+    if (!quote) {
+      throw new NotFoundException(`No existe cotización con id "${ideQuote}"`);
+    }
+
+    const config = await this.socialImpactConfigResolver.resolveActiveConfig(quote.IdeProduct);
+    if (!config) {
+      throw new ConflictException('El producto de esta cotización no participa de Impacto Social');
+    }
+
+    const result = await this.socialImpactHttpClient.calculateScore(dto, authorization);
+    const now = new Date();
+    const data = {
+      AnswersJSON: dto as unknown as Prisma.InputJsonValue,
+      KgCo2Year: result.kgCo2Year,
+      CfpScore: result.cfpScore,
+      SipScore: result.sipScore,
+      CombinedScore: result.combinedScore,
+      PctPrimaAdjustment: result.pctPrimaAdjustment,
+    };
+    await this.prisma.tQuoteSocialImpactAnswer.upsert({
+      where: { IdeQuote: ideQuote },
+      create: { IdeQuote: ideQuote, ...data, UsrCreation: actor, TstCreation: now, UsrModification: actor, TstModification: now },
+      update: { ...data, UsrModification: actor, TstModification: now },
+    });
+
+    return this.buildPricingResult(ideQuote);
   }
 }
 

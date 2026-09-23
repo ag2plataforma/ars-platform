@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { CurrentUser, JwtPayload } from '@ars-platform/shared-common';
 import { QuotesService } from './quotes.service';
 import { CreateQuoteDto } from './dto/create-quote.dto';
@@ -6,6 +6,7 @@ import { ToggleCoverageDto } from './dto/toggle-coverage.dto';
 import { SetQuotePersonDto } from './dto/set-quote-person.dto';
 import { TransitionQuoteStateDto } from './dto/transition-quote-state.dto';
 import { ListQuotesDto } from './dto/list-quotes.dto';
+import { SubmitSocialImpactAnswersDto } from '../social-impact/dto/submit-social-impact-answers.dto';
 
 /**
  * Fase 1 del motor de cotización real (ver el comentario de cabecera de
@@ -98,5 +99,23 @@ export class QuotesController {
     @CurrentUser() actor: JwtPayload,
   ) {
     return this.service.transitionState(id, dto.codOperative, actor.code);
+  }
+
+  /**
+   * Nuevo paso del wizard de Cotización (Impacto Social, Etapa 2, ver
+   * docs/02-roadmap.md): envía las respuestas del formulario, dispara el
+   * cálculo real contra `social-impact-service` y persiste el resultado.
+   * Se reenvía el header `Authorization` crudo (no `@CurrentUser()`, que
+   * solo da el payload ya decodificado) porque `social-impact-service`
+   * necesita el JWT original para su propio guard.
+   */
+  @Post(':id/social-impact-answers')
+  submitSocialImpactAnswers(
+    @Param('id') id: string,
+    @Body() dto: SubmitSocialImpactAnswersDto,
+    @CurrentUser() actor: JwtPayload,
+    @Headers('authorization') authorization: string,
+  ) {
+    return this.service.submitSocialImpactAnswers(id, dto, actor.code, authorization);
   }
 }

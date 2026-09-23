@@ -18,5 +18,4 @@ export * from './email/brevo-email-sender.service';
 export * from './email/email.module';
 export * from './catalog-crud/catalog-crud.service';
 export * from './social-impact/social-impact.module';
-export * from './social-impact/social-impact-calculator.service';
 export * from './social-impact/social-impact-config.interface';
