@@ -479,12 +479,17 @@
               @for (adj of s.appliedAdjustments; track adj.codAdjustment) {
                 <div class="flex items-center justify-between text-sm">
                   <span class="text-slate-500">{{ appliedAdjustmentLabel(adj.codAdjustment) }}</span>
-                  <span
-                    class="font-medium"
-                    [class.text-emerald-600]="adj.pctPrimaAdjustment < 0"
-                    [class.text-amber-600]="adj.pctPrimaAdjustment > 0"
-                    [class.text-slate-500]="adj.pctPrimaAdjustment === 0"
-                  >{{ socialImpactAdjustmentText(adj.pctPrimaAdjustment) }}</span>
+                  <span class="flex flex-col items-end">
+                    <span
+                      class="font-medium"
+                      [class.text-emerald-600]="adj.pctPrimaAdjustment < 0"
+                      [class.text-amber-600]="adj.pctPrimaAdjustment > 0"
+                      [class.text-slate-500]="adj.pctPrimaAdjustment === 0"
+                    >{{ socialImpactAdjustmentText(adj.pctPrimaAdjustment) }}</span>
+                    @if (adj.amountPrimaAdjustment !== 0) {
+                      <span class="text-xs text-slate-400">{{ appliedAdjustmentAmountText(s.symbolCurrency, adj.amountPrimaAdjustment) }}</span>
+                    }
+                  </span>
                 </div>
               }
             </div>

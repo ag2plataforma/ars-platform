@@ -570,6 +570,17 @@ export class QuotesComponent {
     }
   }
 
+  /** Texto del importe en moneda de un ajuste (`adj.amountPrimaAdjustment`,
+   *  ver `QuotesService.getSummary` -- docs/02-roadmap.md, "Importe del
+   *  ajuste en el Resumen"): signo explícito antes del símbolo de moneda
+   *  (ej. "-€1.95"/"+€1.95"), igual convención que pide el propio roadmap,
+   *  distinta de como se interpola `symbolCurrency` en el resto de la
+   *  pantalla (ahí siempre son importes positivos). */
+  appliedAdjustmentAmountText(symbolCurrency: string, amount: number): string {
+    const sign = amount < 0 ? '-' : amount > 0 ? '+' : '';
+    return `${sign}${symbolCurrency}${Math.abs(amount)}`;
+  }
+
   submitSocialImpact(): void {
     if (!this.ideQuote || this.socialImpactForm.invalid) {
       this.socialImpactForm.markAllAsTouched();

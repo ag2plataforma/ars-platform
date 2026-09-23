@@ -186,6 +186,11 @@ export interface QuoteSummaryRisk {
 export interface QuoteSummaryAppliedAdjustment {
   codAdjustment: string;
   pctPrimaAdjustment: number;
+  /** Importe en moneda del ajuste (ya calculado en el backend a partir de
+   *  `quotePrime` y `pctPrimaAdjustment` -- ver `QuotesService.getSummary`),
+   *  no solo el `%` -- negativo = descuento, positivo = recargo, misma
+   *  convención de signo que `pctPrimaAdjustment`. */
+  amountPrimaAdjustment: number;
 }
 
 export interface QuoteSummary {

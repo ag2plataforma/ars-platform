@@ -372,11 +372,33 @@ export class QuotesService {
       this.adjustmentValueResolver.listAppliedAdjustments(ideQuote),
     ]);
 
+    const quotePrime = round2(Number(primeAgg._sum.Prime ?? 0));
+
     return {
       symbolCurrency,
       plan: selectedPlan?.SPlanProductRisk.SPlanProduct.DesShort ?? null,
-      quotePrime: round2(Number(primeAgg._sum.Prime ?? 0)),
-      appliedAdjustments,
+      quotePrime,
+      // `amountPrimaAdjustment`: importe en moneda de cada ajuste, no solo
+      // el `%` (ver docs/02-roadmap.md, "Importe del ajuste en el
+      // Resumen"). Derivado matematicamente de `quotePrime` (ya ajustado,
+      // ver comentario en `submitSocialImpactAnswers`) y `pctPrimaAdjustment`
+      // -- NO requiere que `AdjustmentValueResolver` conozca la prima base:
+      // como la formula del producto aplica el ajuste como
+      // `PrimaTotal = base * (1 + pct/100)` (ver
+      // `apply-social-impact-adjustment-to-prima-total.js`), la base se
+      // despeja como `quotePrime / (1 + pct/100)` y el importe es la
+      // diferencia. Negativo = descuento, positivo = recargo, igual
+      // convencion de signo que `pctPrimaAdjustment`. Asume un unico ajuste
+      // multiplicativo total (cierto hoy, unico caso real es
+      // 'SOCIAL_IMPACT') -- con mas de un `codAdjustment` compuesto
+      // simultaneamente habria que conocer la prima intermedia entre uno y
+      // otro para repartir el importe con exactitud.
+      appliedAdjustments: appliedAdjustments.map((adjustment) => ({
+        ...adjustment,
+        amountPrimaAdjustment: round2(
+          quotePrime - quotePrime / (1 + adjustment.pctPrimaAdjustment / 100),
+        ),
+      })),
       personPayer,
       personHolder,
       riskInfo: risks.map((risk) => ({
