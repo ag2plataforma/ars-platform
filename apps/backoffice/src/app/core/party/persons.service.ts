@@ -49,15 +49,18 @@ export interface CreateContactDataPayload {
 }
 
 /** Cliente HTTP contra `party-service` (`/party/persons`, vía el
- * gateway) para el paso "Personas" de Cotización: buscar una persona
- * existente (`GET /persons/lookup`, equivalente a `FPerson_GetBy`),
- * crear una nueva (`POST /persons`) para asociarla a la cotización
- * (`QuotingService.setPerson`), y completar dirección
- * (`POST :id/addresses`) y teléfono móvil (`POST :id/contact-data`) --
- * ambos exigidos por `ContractsService.assertPersonsReadyForIssuance`
- * antes de poder generar el contrato (ver docs/02-roadmap.md). No
- * reutiliza `CatalogService` porque `TPerson` no tiene shape Cod/Des de
- * catálogo simple. */
+ * gateway): buscar una persona existente (`GET /persons/lookup`,
+ * equivalente a `FPerson_GetBy`), crear una nueva (`POST /persons`), y
+ * completar dirección (`POST :id/addresses`) y teléfono móvil
+ * (`POST :id/contact-data`). Movido a `core/party` (antes vivía en
+ * `features/quotes`) para poder reutilizarlo desde la pantalla de
+ * Corredores (selector de `TPerson` por DNI/email) sin duplicar el
+ * cliente HTTP -- nace del paso "Personas" de Cotización
+ * (`QuotingService.setPerson`, dirección/teléfono exigidos por
+ * `ContractsService.assertPersonsReadyForIssuance` antes de poder
+ * generar el contrato, ver docs/02-roadmap.md), pero no es propio de esa
+ * pantalla. No reutiliza `CatalogService` porque `TPerson` no tiene
+ * shape Cod/Des de catálogo simple. */
 @Injectable({ providedIn: 'root' })
 export class PersonsService {
   private readonly base = `${environment.apiUrl}/party/persons`;
@@ -69,6 +72,16 @@ export class PersonsService {
     if (criteria.numIdentification) params = params.set('numIdentification', criteria.numIdentification);
     if (criteria.email) params = params.set('email', criteria.email);
     return this.http.get<Person>(`${this.base}/lookup`, { params });
+  }
+
+  /** Búsqueda por nombre (`GET /persons/search?q=...`), complementaria
+   *  a `lookup` -- pensada para un selector en pantalla (ej. Corredores)
+   *  cuando no se tiene a mano el DNI/email exacto de la persona. Puede
+   *  devolver varias personas (hasta 20); a diferencia de `lookup`, NO
+   *  tira 404 si no hay coincidencias, devuelve un array vacío. */
+  searchByName(q: string): Observable<Person[]> {
+    const params = new HttpParams().set('q', q);
+    return this.http.get<Person[]>(`${this.base}/search`, { params });
   }
 
   create(payload: CreatePersonPayload): Observable<Person> {

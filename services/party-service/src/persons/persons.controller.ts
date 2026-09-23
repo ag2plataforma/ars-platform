@@ -4,6 +4,7 @@ import { PersonsService } from './persons.service';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
 import { LookupPersonDto } from './dto/lookup-person.dto';
+import { SearchPersonsDto } from './dto/search-persons.dto';
 import { CreateAddressDto } from './dto/create-address.dto';
 import { UpdateAddressDto } from './dto/update-address.dto';
 import { CreateContactDataDto } from './dto/create-contact-data.dto';
@@ -28,6 +29,12 @@ export class PersonsController {
   @Get('lookup')
   lookup(@Query() query: LookupPersonDto) {
     return this.service.lookup(query);
+  }
+
+  // Mismo motivo que 'lookup': antes de ':id' a propósito.
+  @Get('search')
+  search(@Query() query: SearchPersonsDto) {
+    return this.service.search(query.q);
   }
 
   @Get(':id')

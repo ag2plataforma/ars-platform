@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { PartyStateMachineModule } from '../state-machine/party-state-machine.module';
 import { BrokersController } from './brokers.controller';
 import { BrokersService } from './brokers.service';
+import { BrokerTypesController } from './broker-types.controller';
+import { BrokerTypesService } from './broker-types.service';
 import { CommissionTreesController } from './commission-trees.controller';
 import { CommissionTreesService } from './commission-trees.service';
 import { CommissionTablesController } from './commission-tables.controller';
@@ -21,7 +23,10 @@ import { ProcessesService } from './processes.service';
  * código real que NINGUNA de las 5 tiene función PL/pgSQL propia de
  * escritura (`brokers.service.ts`/`commission-products.service.ts`
  * tienen el detalle completo), así que es CRUD administrativo diseñado
- * de cero, no una réplica de lógica de negocio existente.
+ * de cero, no una réplica de lógica de negocio existente. `BrokerTypesController`/
+ * `BrokerTypesService` (`SBrokerType`) se suman acá mismo -- catálogo que este
+ * módulo ya daba por "asumido sembrado" pero nunca tuvo CRUD propio, hasta que
+ * la pantalla de Corredores del backoffice necesitó un selector real.
  *
  * Ya usado en la práctica por `underwriting-service`:
  * `resolveCommissionPercentage`/`generateReceipts` calculan la comisión
@@ -43,6 +48,7 @@ import { ProcessesService } from './processes.service';
   imports: [PartyStateMachineModule],
   controllers: [
     BrokersController,
+    BrokerTypesController,
     CommissionTreesController,
     CommissionTablesController,
     CommissionsController,
@@ -51,6 +57,7 @@ import { ProcessesService } from './processes.service';
   ],
   providers: [
     BrokersService,
+    BrokerTypesService,
     CommissionTreesService,
     CommissionTablesService,
     CommissionsService,

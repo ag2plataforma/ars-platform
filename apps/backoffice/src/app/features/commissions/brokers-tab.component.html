@@ -1,0 +1,203 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex flex-col gap-4">
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold text-slate-900">{{ 'commissions.brokers.title' | transloco }}</h2>
+      <p class="text-sm text-slate-500">{{ 'commissions.brokers.subtitle' | transloco }}</p>
+    </div>
+    <button pButton type="button" icon="pi pi-plus" [label]="'commissions.brokers.newButton' | transloco" (click)="openCreate()"></button>
+  </div>
+
+  <p-table
+    [value]="rows()"
+    [loading]="loading()"
+    dataKey="IdeBroker"
+    [paginator]="true"
+    [rows]="10"
+    [rowsPerPageOptions]="[10, 25, 50]"
+    [showCurrentPageReport]="true"
+    currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+    styleClass="p-datatable-sm"
+  >
+    <ng-template #header>
+      <tr>
+        <th pSortableColumn="CodBroker">
+          <span class="ars-th-flex">
+            {{ 'catalogs.codeColumn' | transloco }}
+            <p-sortIcon field="CodBroker" />
+            <p-columnFilter type="text" field="CodBroker" display="menu" />
+          </span>
+        </th>
+        <th pSortableColumn="DesBroker">
+          <span class="ars-th-flex">
+            {{ 'catalogs.descriptionColumn' | transloco }}
+            <p-sortIcon field="DesBroker" />
+            <p-columnFilter type="text" field="DesBroker" display="menu" />
+          </span>
+        </th>
+        <th pSortableColumn="SBrokerType.DesBrokerType">
+          <span class="ars-th-flex">
+            {{ 'commissions.brokers.typeColumn' | transloco }}
+            <p-sortIcon field="SBrokerType.DesBrokerType" />
+            <p-columnFilter type="text" field="SBrokerType.DesBrokerType" display="menu" />
+          </span>
+        </th>
+        <th>{{ 'commissions.brokers.personColumn' | transloco }}</th>
+        <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+        <th class="w-32">{{ 'catalogs.actionsColumn' | transloco }}</th>
+      </tr>
+    </ng-template>
+    <ng-template #body let-row>
+      <tr>
+        <td>{{ row.CodBroker }}</td>
+        <td>{{ row.DesBroker }}</td>
+        <td>{{ brokerTypeName(row) }}</td>
+        <td>{{ personName(row) }}</td>
+        <td>
+          <p-tag [value]="(isActive(row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isActive(row) ? 'success' : 'danger'" />
+        </td>
+        <td>
+          <div class="flex gap-1">
+            <button
+              pButton
+              type="button"
+              icon="pi pi-pencil"
+              [text]="true"
+              severity="secondary"
+              [pTooltip]="'locations.editTooltip' | transloco"
+              tooltipPosition="top"
+              (click)="openEdit(row)"
+            ></button>
+            <button
+              pButton
+              type="button"
+              [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'"
+              [text]="true"
+              [severity]="isActive(row) ? 'danger' : 'success'"
+              [pTooltip]="(isActive(row) ? 'catalogs.deactivateHeader' : 'catalogs.activateHeader') | transloco"
+              tooltipPosition="top"
+              (click)="toggleState(row)"
+            ></button>
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="6" class="text-center text-slate-500">{{ 'commissions.brokers.emptyState' | transloco }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-dialog
+  [header]="(dialogMode() === 'create' ? 'commissions.brokers.createDialogTitle' : 'commissions.brokers.editDialogTitle') | transloco"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  [style]="{ width: '32rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-2">
+      <label for="broker-cod" class="text-sm font-medium text-slate-700">{{ 'catalogs.codeColumn' | transloco }}</label>
+      <input pInputText id="broker-cod" formControlName="cod" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label for="broker-des" class="text-sm font-medium text-slate-700">{{ 'catalogs.descriptionColumn' | transloco }}</label>
+      <input pInputText id="broker-des" formControlName="des" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'commissions.brokers.typeColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codBrokerType"
+        [options]="brokerTypes()"
+        optionLabel="DesBrokerType"
+        optionValue="CodBrokerType"
+        [placeholder]="'commissions.brokers.typeSelectPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+
+    <div class="flex flex-col gap-2 rounded-lg border border-slate-200 p-3">
+      <label class="text-sm font-medium text-slate-700">{{ 'commissions.brokers.personColumn' | transloco }}</label>
+
+      @if (selectedPerson(); as person) {
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-slate-900">{{ person.DesFirstName }} {{ person.DesLastName1 }} ({{ person.NumIdentification ?? person.DesEmail }})</span>
+          <button pButton type="button" [label]="'commissions.brokers.changePersonButton' | transloco" severity="secondary" [text]="true" (click)="changePerson()"></button>
+        </div>
+      } @else {
+        <div class="flex flex-col gap-2">
+          <div class="flex gap-2">
+            <input
+              pInputText
+              [formControl]="personSearchControl"
+              [placeholder]="'commissions.brokers.personSearchPlaceholder' | transloco"
+              class="w-full"
+              (keydown.enter)="$event.preventDefault(); searchPerson()"
+            />
+            <button pButton type="button" [label]="'quotes.searchButton' | transloco" [loading]="personSearching()" (click)="searchPerson()"></button>
+          </div>
+
+          @if (personFound(); as found) {
+            <div class="flex items-center justify-between rounded border border-emerald-200 bg-emerald-50 p-2 text-sm">
+              <span>{{ found.DesFirstName }} {{ found.DesLastName1 }}</span>
+              <button pButton type="button" [label]="'commissions.brokers.selectPersonButton' | transloco" severity="success" [text]="true" (click)="selectFoundPerson()"></button>
+            </div>
+          }
+
+          <div class="flex items-center gap-2">
+            <div class="h-px flex-1 bg-slate-200"></div>
+            <span class="text-xs uppercase tracking-wide text-slate-400">{{ 'commissions.brokers.orSearchByNameLabel' | transloco }}</span>
+            <div class="h-px flex-1 bg-slate-200"></div>
+          </div>
+
+          <div class="flex gap-2">
+            <input
+              pInputText
+              [formControl]="nameSearchControl"
+              [placeholder]="'commissions.brokers.nameSearchPlaceholder' | transloco"
+              class="w-full"
+              (keydown.enter)="$event.preventDefault(); searchByName()"
+            />
+            <button pButton type="button" [label]="'quotes.searchButton' | transloco" [loading]="nameSearching()" (click)="searchByName()"></button>
+          </div>
+
+          @if (nameSearchResults().length > 0) {
+            <div class="flex max-h-40 flex-col gap-1 overflow-y-auto">
+              @for (person of nameSearchResults(); track person.IdePerson) {
+                <div class="flex items-center justify-between rounded border border-slate-200 p-2 text-sm">
+                  <span>{{ person.DesFirstName }} {{ person.DesLastName1 }} <span class="text-slate-400">({{ person.NumIdentification ?? person.DesEmail }})</span></span>
+                  <button pButton type="button" [label]="'commissions.brokers.selectPersonButton' | transloco" severity="success" [text]="true" (click)="pickPerson(person)"></button>
+                </div>
+              }
+            </div>
+          }
+          @if (nameSearchedEmpty()) {
+            <p class="text-xs text-slate-500">{{ 'commissions.brokers.nameSearchEmptyDetail' | transloco }}</p>
+          }
+
+          @if (personNotFound()) {
+            <div class="flex flex-col gap-2 rounded border border-amber-200 bg-amber-50 p-2">
+              <p class="text-xs text-amber-700">{{ 'quotes.personNotFound' | transloco }}</p>
+              <form [formGroup]="createPersonForm" (ngSubmit)="createPerson()" class="flex flex-col gap-2">
+                <input pInputText formControlName="desFirstName" [placeholder]="'quotes.firstNamePlaceholder' | transloco" class="w-full" />
+                <input pInputText formControlName="desLastName1" [placeholder]="'quotes.lastNamePlaceholder' | transloco" class="w-full" />
+                <input pInputText formControlName="desEmail" [placeholder]="'quotes.emailPlaceholder' | transloco" class="w-full" />
+                <button pButton type="submit" [label]="'quotes.createAndAssignButton' | transloco" size="small"></button>
+              </form>
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
+    </div>
+  </form>
+</p-dialog>

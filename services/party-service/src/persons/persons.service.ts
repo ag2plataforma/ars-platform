@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '@ars-platform/database';
+import { PrismaService, TPerson } from '@ars-platform/database';
 import { StateMachineService } from '@ars-platform/shared-common';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
@@ -114,6 +114,43 @@ export class PersonsService {
       throw new NotFoundException('No se encontró ninguna persona con esos criterios');
     }
     return this.findOne(person.IdePerson);
+  }
+
+  /**
+   * Búsqueda por nombre (`q`, texto libre) -- complementaria a `lookup`
+   * (coincidencia exacta por DNI/email, pensada para un único
+   * resultado). Acá puede haber varias personas con nombres parecidos,
+   * así que devuelve una lista, no un único objeto ni 404 si no hay
+   * coincidencias. `q` se separa en palabras y CADA una debe aparecer
+   * (insensible a mayúsculas/acentos no -- Postgres `contains` con
+   * `mode: 'insensitive'` no normaliza acentos) en ALGUNO de los 4
+   * campos de nombre -- así "juan perez" matchea a alguien con
+   * `DesFirstName="Juan"`/`DesLastName1="Perez"` sin exigir que un único
+   * campo contenga la cadena completa. Tope de 20 resultados, pensado
+   * para un selector en pantalla, no para un reporte.
+   */
+  async search(q: string): Promise<TPerson[]> {
+    const terms = q
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (terms.length === 0) {
+      return [];
+    }
+    return this.prisma.tPerson.findMany({
+      where: {
+        AND: terms.map((term) => ({
+          OR: [
+            { DesFirstName: { contains: term, mode: 'insensitive' as const } },
+            { DesMiddleName: { contains: term, mode: 'insensitive' as const } },
+            { DesLastName1: { contains: term, mode: 'insensitive' as const } },
+            { DesLastName2: { contains: term, mode: 'insensitive' as const } },
+          ],
+        })),
+      },
+      orderBy: [{ DesFirstName: 'asc' }, { DesLastName1: 'asc' }],
+      take: 20,
+    });
   }
 
   async update(id: string, dto: UpdatePersonDto, actor: string) {

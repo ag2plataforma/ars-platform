@@ -66,6 +66,10 @@
       "label": "Países",
       "singular": "país"
     },
+    "broker-types": {
+      "label": "Tipos de corredor",
+      "singular": "tipo de corredor"
+    },
     "risk-levels": {
       "label": "Niveles de riesgo",
       "singular": "nivel de riesgo"
@@ -699,6 +703,29 @@
       "loadErrorDetail": "No se pudieron cargar los splits de comisión.",
       "savedDetail": "Split de comisión guardado.",
       "toggledDetail": "Estado del split actualizado."
+    },
+    "brokersTab": "Corredores",
+    "noBrokerTypeFallback": "—",
+    "noPersonFallback": "—",
+    "brokers": {
+      "title": "Corredores",
+      "subtitle": "Corredores dados de alta, con su tipo y la persona asociada.",
+      "newButton": "Nuevo corredor",
+      "typeColumn": "Tipo de corredor",
+      "personColumn": "Persona",
+      "emptyState": "No hay corredores todavía.",
+      "createDialogTitle": "Nuevo corredor",
+      "editDialogTitle": "Editar corredor",
+      "typeSelectPlaceholder": "Elegí un tipo de corredor",
+      "personSearchPlaceholder": "Número de identificación",
+      "selectPersonButton": "Usar esta persona",
+      "changePersonButton": "Cambiar",
+      "missingPersonDetail": "Buscá y elegí (o creá) la persona del corredor antes de guardar.",
+      "loadTypesErrorDetail": "No se pudieron cargar los tipos de corredor para el selector.",
+      "loadErrorDetail": "No se pudieron cargar los corredores.",
+      "orSearchByNameLabel": "o buscar por nombre",
+      "nameSearchPlaceholder": "Nombre y/o apellido",
+      "nameSearchEmptyDetail": "No se encontró ninguna persona con ese nombre."
     }
   }
 }

@@ -167,6 +167,15 @@ export const COMMON_CATALOG_REGISTRY: CatalogConfig[] = [
       },
     ],
   },
+  {
+    key: 'broker-types',
+    label: 'catalogsRegistry.broker-types.label',
+    singular: 'catalogsRegistry.broker-types.singular',
+    path: '/party/broker-types',
+    codField: 'CodBrokerType',
+    desField: 'DesBrokerType',
+    idField: 'IdeBrokerType',
+  },
 ];
 
 /** Catálogos propios de la configuración de un producto: los 8 simples +

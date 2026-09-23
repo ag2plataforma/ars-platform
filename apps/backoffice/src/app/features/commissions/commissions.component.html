@@ -10,6 +10,7 @@
       <p-tab value="tables">{{ 'commissions.tablesTab' | transloco }}</p-tab>
       <p-tab value="commissions">{{ 'commissions.commissionsTab' | transloco }}</p-tab>
       <p-tab value="products">{{ 'commissions.productsTab' | transloco }}</p-tab>
+      <p-tab value="brokers">{{ 'commissions.brokersTab' | transloco }}</p-tab>
     </p-tablist>
     <p-tabpanels>
       <p-tabpanel value="trees">
@@ -23,6 +24,9 @@
       </p-tabpanel>
       <p-tabpanel value="products">
         <app-commission-products-tab />
+      </p-tabpanel>
+      <p-tabpanel value="brokers">
+        <app-brokers-tab />
       </p-tabpanel>
     </p-tabpanels>
   </p-tabs>

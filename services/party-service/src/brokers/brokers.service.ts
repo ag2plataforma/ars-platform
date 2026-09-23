@@ -4,7 +4,7 @@ import { CatalogCrudService, StateMachineService } from '@ars-platform/shared-co
 import { CreateBrokerDto } from './dto/create-broker.dto';
 import { UpdateBrokerDto } from './dto/update-broker.dto';
 
-const INCLUDE = { SBrokerType: true } as const;
+const INCLUDE = { SBrokerType: true, TPerson: true, SState: true } as const;
 
 /**
  * `TBroker` -- confirmado contra el código real (`full_dump.txt`, todas
@@ -14,13 +14,21 @@ const INCLUDE = { SBrokerType: true } as const;
  * capa LoopBack original, igual que `TPerson`/`TQuote`. `Cod`/`Des`
  * únicos + `IdeState`, así que reutiliza `CatalogCrudService`.
  *
+ * `SState` y `TPerson` agregados explícitamente al `INCLUDE` (no venían
+ * en la primera versión de este archivo) -- mismo bug real ya encontrado
+ * y corregido en los 4 servicios de Comisiones (`commission-trees.service.ts`
+ * y hermanos): sin `SState: true`, `CatalogCrudService` arma la fila sin
+ * el estado y la pantalla de Corredores mostraría siempre "Inactivo"
+ * pase lo que pase en la BD. `TPerson: true` es nuevo, para poder
+ * mostrar el nombre de la persona en el listado sin un round-trip aparte.
+ *
  * `SBrokerType` (`codBrokerType`) y `TPerson` (`idePerson`) se
  * resuelven acá mismo (sin llamada HTTP entre servicios, mismo criterio
- * que `TQuotePerson`/`SPersonRol` en `underwriting-service`) -- ninguno
- * de los dos tiene CRUD propio todavía: `SBrokerType` se asume ya
- * sembrado (como `SDistributionChannel`/`SProcess`, catálogos que
- * tampoco tienen CRUD todavía), y `TPerson` ya lo gestiona
- * `PersonsModule` de este mismo servicio.
+ * que `TQuotePerson`/`SPersonRol` en `underwriting-service`): `TPerson`
+ * ya lo gestiona `PersonsModule` de este mismo servicio, y `SBrokerType`
+ * ahora tiene su propio CRUD (`BrokerTypesController`/`BrokerTypesService`,
+ * ver `brokers.module.ts`) -- se resuelve por código igual que antes,
+ * simplemente ya no hace falta sembrarlo a mano.
  */
 @Injectable()
 export class BrokersService {

@@ -24,7 +24,7 @@ import {
   QuotingService,
   SubmitSocialImpactAnswersPayload,
 } from './quoting.service';
-import { MOBILE_PHONE_CONTACT_CLASS, Person, PersonsService } from './persons.service';
+import { MOBILE_PHONE_CONTACT_CLASS, Person, PersonsService } from '../../core/party/persons.service';
 import { RiskAttributeField, RiskAttributesService } from './risk-attributes.service';
 
 const PRODUCTS_PATH = '/product-rating/products';
