@@ -172,6 +172,11 @@ export interface RateValueResolver {
  * necesario para `origin: 'Contract'` cuando el dato a leer fue escrito
  * por la misma transaccion activa, todavia sin commit.
  */
+export interface AppliedAdjustment {
+  codAdjustment: string;
+  pctPrimaAdjustment: number;
+}
+
 export interface AdjustmentValueResolver {
   resolveAdjustmentValue(
     origin: RuleOrigin,
@@ -179,6 +184,22 @@ export interface AdjustmentValueResolver {
     codAdjustment: string,
     dbTransaction?: unknown,
   ): Promise<number>;
+
+  /**
+   * Lista los recargos/descuentos ya calculados y persistidos para una
+   * cotización, sin importar de qué feature vienen -- pensado para que
+   * una pantalla (ej. el Resumen de la cotización) pueda mostrar el
+   * detalle de QUÉ se aplicó, no solo el total ya ajustado (ver
+   * docs/02-roadmap.md, "detalle de recargos/descuentos en el Resumen").
+   * Distinto de `resolveAdjustmentValue`: ese resuelve un `codAdjustment`
+   * puntual a partir de un riesgo, en medio de la evaluación de una
+   * fórmula; este devuelve TODOS los aplicados a una cotización, a
+   * partir de su `IdeQuote` directo (no hace falta resolverlo desde un
+   * riesgo). Vacío si la cotización no tiene ningún ajuste calculado
+   * todavía -- mismo criterio de "silencio = nada que mostrar" que el
+   * resto del motor.
+   */
+  listAppliedAdjustments(ideQuote: string, dbTransaction?: unknown): Promise<AppliedAdjustment[]>;
 }
 
 export const CALCULATION_RULE_REPOSITORY = Symbol('CALCULATION_RULE_REPOSITORY');

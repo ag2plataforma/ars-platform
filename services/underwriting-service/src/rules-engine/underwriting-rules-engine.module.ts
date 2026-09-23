@@ -57,6 +57,15 @@ const rulesEngine = RulesEngineModule.forRoot({
 
 @Module({
   imports: [rulesEngine],
-  exports: [rulesEngine],
+  // `ADJUSTMENT_VALUE_RESOLVER` se provee y exporta OTRA VEZ acá, aparte
+  // de dentro de `rulesEngine` (que solo exporta `RulesEngineService`,
+  // a propósito -- `RulesEngineModule` es de `shared-common`, genérico
+  // y no debe filtrar sus puertos internos a cualquier consumidor). Este
+  // segundo binding es el que usa `QuotesService.getSummary` para listar
+  // los ajustes aplicados a una cotización (ver
+  // `AdjustmentValueResolver.listAppliedAdjustments`), sin pasar por
+  // `RulesEngineService` -- esa llamada no evalúa ninguna fórmula.
+  providers: [{ provide: ADJUSTMENT_VALUE_RESOLVER, useClass: PrismaAdjustmentValueResolver }],
+  exports: [rulesEngine, ADJUSTMENT_VALUE_RESOLVER],
 })
 export class UnderwritingRulesEngineModule {}

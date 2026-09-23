@@ -550,6 +550,26 @@ export class QuotesComponent {
     return this.transloco.translate('quotes.socialImpactNoAdjustmentDetail');
   }
 
+  /** Etiqueta traducida para un `codAdjustment` del Resumen
+   *  (`s.appliedAdjustments`, ver `QuotesService.getSummary` ->
+   *  `AdjustmentValueResolver.listAppliedAdjustments`) -- mapeo
+   *  explícito código -> clave de traducción, no una interpolación
+   *  directa del código, para no exponer el identificador técnico en
+   *  pantalla. Un futuro `codAdjustment` (fidelidad, multi-póliza) se
+   *  agrega acá como un `case` más, mismo criterio que
+   *  `PrismaAdjustmentValueResolver` en el backend. `codAdjustment`
+   *  desconocido: se muestra tal cual, mejor eso que una pantalla en
+   *  blanco si el backend agrega un ajuste nuevo antes que el frontend.
+   */
+  appliedAdjustmentLabel(codAdjustment: string): string {
+    switch (codAdjustment) {
+      case 'SOCIAL_IMPACT':
+        return this.transloco.translate('quotes.adjustmentLabelSocialImpact');
+      default:
+        return codAdjustment;
+    }
+  }
+
   submitSocialImpact(): void {
     if (!this.ideQuote || this.socialImpactForm.invalid) {
       this.socialImpactForm.markAllAsTouched();

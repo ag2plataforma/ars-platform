@@ -473,6 +473,23 @@
             <span class="text-2xl font-bold text-slate-900">{{ s.symbolCurrency }}{{ s.quotePrime }}</span>
           </div>
 
+          @if (s.appliedAdjustments.length > 0) {
+            <div class="flex flex-col gap-1 border-t border-slate-100 pt-3">
+              <p class="text-xs font-medium uppercase tracking-wide text-slate-500">{{ 'quotes.appliedAdjustmentsTitle' | transloco }}</p>
+              @for (adj of s.appliedAdjustments; track adj.codAdjustment) {
+                <div class="flex items-center justify-between text-sm">
+                  <span class="text-slate-500">{{ appliedAdjustmentLabel(adj.codAdjustment) }}</span>
+                  <span
+                    class="font-medium"
+                    [class.text-emerald-600]="adj.pctPrimaAdjustment < 0"
+                    [class.text-amber-600]="adj.pctPrimaAdjustment > 0"
+                    [class.text-slate-500]="adj.pctPrimaAdjustment === 0"
+                  >{{ socialImpactAdjustmentText(adj.pctPrimaAdjustment) }}</span>
+                </div>
+              }
+            </div>
+          }
+
           @if (s.personPayer) {
             <div class="flex items-center justify-between text-sm">
               <span class="text-slate-500">{{ 'quotes.personSlotTomador' | transloco }}</span>

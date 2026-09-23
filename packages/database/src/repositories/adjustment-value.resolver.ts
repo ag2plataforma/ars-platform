@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AdjustmentValueResolver, RuleOrigin } from '@ars-platform/shared-common';
+import { AdjustmentValueResolver, AppliedAdjustment, RuleOrigin } from '@ars-platform/shared-common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
@@ -87,5 +87,31 @@ export class PrismaAdjustmentValueResolver implements AdjustmentValueResolver {
       select: { TContractFile: { select: { TContract: { select: { IdeQuote: true } } } } },
     });
     return fileRisk?.TContractFile.TContract.IdeQuote ?? null;
+  }
+
+  /**
+   * A diferencia de `resolveAdjustmentValue`, acá `IdeQuote` ya viene
+   * directo (no hace falta resolverlo desde un riesgo) -- el llamador
+   * típico es una pantalla de resumen, no una fórmula en evaluación.
+   * Recorre cada `codAdjustment` conocido y agrega el que tenga dato;
+   * mismo criterio de "un case por feature" que `resolveAdjustmentValue`.
+   */
+  async listAppliedAdjustments(ideQuote: string, dbTransaction?: unknown): Promise<AppliedAdjustment[]> {
+    const db = (dbTransaction as Prisma.TransactionClient | undefined) ?? this.prisma;
+
+    const applied: AppliedAdjustment[] = [];
+
+    const socialImpactAnswer = await db.tQuoteSocialImpactAnswer.findUnique({
+      where: { IdeQuote: ideQuote },
+      select: { PctPrimaAdjustment: true },
+    });
+    if (socialImpactAnswer) {
+      applied.push({
+        codAdjustment: 'SOCIAL_IMPACT',
+        pctPrimaAdjustment: Number(socialImpactAnswer.PctPrimaAdjustment),
+      });
+    }
+
+    return applied;
   }
 }

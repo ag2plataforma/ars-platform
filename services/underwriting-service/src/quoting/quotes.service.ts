@@ -1,6 +1,8 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, PrismaService } from '@ars-platform/database';
 import {
+  ADJUSTMENT_VALUE_RESOLVER,
+  AdjustmentValueResolver,
   RulesEngineService,
   SOCIAL_IMPACT_CONFIG_RESOLVER,
   SocialImpactConfigResolver,
@@ -65,6 +67,8 @@ export class QuotesService {
     @Inject(SOCIAL_IMPACT_CONFIG_RESOLVER)
     private readonly socialImpactConfigResolver: SocialImpactConfigResolver,
     private readonly socialImpactHttpClient: SocialImpactHttpClient,
+    @Inject(ADJUSTMENT_VALUE_RESOLVER)
+    private readonly adjustmentValueResolver: AdjustmentValueResolver,
   ) {}
 
   async create(dto: CreateQuoteDto, actor: string) {
@@ -303,6 +307,11 @@ export class QuotesService {
    *    real; se expone `riskAttributeValue` crudo (el JSON tal cual se
    *    guardó en `TQuoteRisk.RiskAttributeValue`) en su lugar, hasta que
    *    le toque su propia investigación.
+   *  - `appliedAdjustments` (ausente en el original): detalle de los
+   *    recargos/descuentos ya calculados para esta cotización (Fase 3,
+   *    motor genérico de recargos/descuentos -- ver docs/02-roadmap.md),
+   *    para que el frontend pueda mostrar QUÉ se aplicó (ej. "-2%
+   *    Impacto Social"), no solo `quotePrime` ya ajustado.
    */
   async getSummary(ideQuote: string) {
     const quote = await this.prisma.tQuote.findUnique({
@@ -314,7 +323,7 @@ export class QuotesService {
     }
     const symbolCurrency = quote.SProduct.SCurrency.SymbolCurrency;
 
-    const [selectedPlan, primeAgg, personPayer, personHolder, risks] = await Promise.all([
+    const [selectedPlan, primeAgg, personPayer, personHolder, risks, appliedAdjustments] = await Promise.all([
       this.prisma.tQuoteRiskPlan.findFirst({
         where: { IndSelected: true, TQuoteRisk: { IdeQuote: ideQuote } },
         include: { SPlanProductRisk: { include: { SPlanProduct: true } } },
@@ -335,12 +344,18 @@ export class QuotesService {
           },
         },
       }),
+      // Fase 3, motor genérico de recargos/descuentos (ver
+      // docs/02-roadmap.md): detalle de QUÉ se aplicó, no solo el total
+      // ya ajustado que suma `primeAgg`. Vacío si la cotización no tiene
+      // ningún ajuste calculado todavía.
+      this.adjustmentValueResolver.listAppliedAdjustments(ideQuote),
     ]);
 
     return {
       symbolCurrency,
       plan: selectedPlan?.SPlanProductRisk.SPlanProduct.DesShort ?? null,
       quotePrime: round2(Number(primeAgg._sum.Prime ?? 0)),
+      appliedAdjustments,
       personPayer,
       personHolder,
       riskInfo: risks.map((risk) => ({

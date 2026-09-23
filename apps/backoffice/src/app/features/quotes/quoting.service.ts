@@ -172,10 +172,22 @@ export interface QuoteSummaryRisk {
   riskAttributeValue: unknown;
 }
 
+/** `AdjustmentValueResolver.listAppliedAdjustments` (backend, Fase 3,
+ * motor genérico de recargos/descuentos -- ver docs/02-roadmap.md):
+ * detalle de un recargo/descuento ya calculado y aplicado a la
+ * cotización. `codAdjustment` es genérico a propósito -- hoy solo
+ * existe `'SOCIAL_IMPACT'`, ver `appliedAdjustmentLabel` en
+ * `QuotesComponent` para el mapeo a una etiqueta traducida. */
+export interface QuoteSummaryAppliedAdjustment {
+  codAdjustment: string;
+  pctPrimaAdjustment: number;
+}
+
 export interface QuoteSummary {
   symbolCurrency: string;
   plan: string | null;
   quotePrime: number;
+  appliedAdjustments: QuoteSummaryAppliedAdjustment[];
   personPayer: QuoteSummaryPerson | null;
   personHolder: QuoteSummaryPerson | null;
   riskInfo: QuoteSummaryRisk[];
