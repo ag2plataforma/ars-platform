@@ -7,6 +7,7 @@ import { HealthController } from './health/health.controller';
 import { FieldCatalogModule } from './field-catalog/field-catalog.module';
 import { AttributeEngineModule } from './attribute-engine/attribute-engine.module';
 import { CommonCatalogsModule } from './common-catalogs/common-catalogs.module';
+import { RequirementsModule } from './requirements/requirements.module';
 import { I18nModule } from './i18n/i18n.module';
 import { SetupModule } from './setup/setup.module';
 
@@ -32,6 +33,7 @@ import { SetupModule } from './setup/setup.module';
     FieldCatalogModule,
     AttributeEngineModule,
     CommonCatalogsModule,
+    RequirementsModule,
     I18nModule,
     SetupModule,
   ],

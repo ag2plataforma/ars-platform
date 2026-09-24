@@ -3,6 +3,7 @@ import { UnderwritingStateMachineModule } from '../state-machine/underwriting-st
 import { UnderwritingRulesEngineModule } from '../rules-engine/underwriting-rules-engine.module';
 import { UnderwritingSocialImpactModule } from '../social-impact/underwriting-social-impact.module';
 import { UnderwritingProcessFlowModule } from '../process-flow/underwriting-process-flow.module';
+import { RequirementsModule } from '../requirements/requirements.module';
 import { QuotesController } from './quotes.controller';
 import { QuotesService } from './quotes.service';
 
@@ -19,6 +20,7 @@ import { QuotesService } from './quotes.service';
     UnderwritingRulesEngineModule,
     UnderwritingSocialImpactModule,
     UnderwritingProcessFlowModule,
+    RequirementsModule,
   ],
   controllers: [QuotesController],
   providers: [QuotesService],

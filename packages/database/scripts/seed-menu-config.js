@@ -113,6 +113,17 @@ const SITE_MAP_ITEMS = [
         path: '/configuracion-productos/tarifas',
         icon: 'pi-percentage',
       },
+      {
+        // Feature "Requisitos" -- checklist de documentos exigidos por
+        // producto (2026-09-24, ver product-requirements.component.ts).
+        // El catálogo simple SRequirement va en 'Catálogos de producto'
+        // (ya está en PRODUCT_CATALOG_REGISTRY); esto es la asignación.
+        cod: 'REQUISITOS',
+        des: 'Requisitos',
+        order: 4,
+        path: '/configuracion-productos/requisitos',
+        icon: 'pi-file-check',
+      },
     ],
   },
   { cod: 'COMISIONES', des: 'Comisiones', order: 8, path: '/comisiones', icon: 'pi-wallet' },

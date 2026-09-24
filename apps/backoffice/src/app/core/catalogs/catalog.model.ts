@@ -355,6 +355,21 @@ export const PRODUCT_CATALOG_REGISTRY: CatalogConfig[] = [
     ],
   },
 
+  // --- reference-data-service: SRequirement, catálogo de tipos de
+  // documento exigible (feature "Requisitos", 2026-09-24) -- ver
+  // RequirementService/ProductRequirementService en reference-data-service.
+  // La CONFIGURACIÓN real (qué producto exige qué documento) vive en su
+  // propia pantalla bespoke, no acá (ver ProductRequirementsComponent).
+  {
+    key: 'requirements',
+    label: 'catalogsRegistry.requirements.label',
+    singular: 'catalogsRegistry.requirements.singular',
+    path: '/reference-data/requirements',
+    codField: 'CodRequirement',
+    desField: 'DesRequirement',
+    idField: 'IdeRequirement',
+  },
+
   // --- party-service: catálogos de distribución (canal/vía), el otro
   // prerequisito de Cotización -- ver DistributionModule. ---
   {

@@ -151,6 +151,18 @@ export const routes: Routes = [
             loadComponent: () =>
               import('./features/rate-tables/rate-tables.component').then((m) => m.RateTablesComponent),
           },
+          {
+            // "Requisitos" (SProductRequirement) -- feature nueva
+            // 2026-09-24, ver product-requirements.component.ts. El
+            // catálogo simple SRequirement ya vive en 'catalogos' (se
+            // agregó a PRODUCT_CATALOG_REGISTRY); acá solo la asignación
+            // por producto, que es bespoke (sin código propio).
+            path: 'requisitos',
+            loadComponent: () =>
+              import('./features/requirements/product-requirements.component').then(
+                (m) => m.ProductRequirementsComponent,
+              ),
+          },
         ],
       },
     ],

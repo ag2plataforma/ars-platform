@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { Prisma, PrismaService } from '@ars-platform/database';
 import { RulesEngineService, StateMachineService } from '@ars-platform/shared-common';
 import { QuotesService } from '../quoting/quotes.service';
+import { RequirementsService } from '../requirements/requirements.service';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { CancelContractDto } from './dto/cancel-contract.dto';
 import { ListContractsDto } from './dto/list-contracts.dto';
@@ -85,6 +86,7 @@ export class ContractsService {
     private readonly stateMachine: StateMachineService,
     private readonly rulesEngine: RulesEngineService,
     private readonly quotesService: QuotesService,
+    private readonly requirementsService: RequirementsService,
   ) {}
 
   /**
@@ -1043,6 +1045,20 @@ export class ContractsService {
         },
       });
 
+      const idePlanProduct = (
+        await tx.sPlanProductRisk.findUnique({ where: { IdePlanProductRisk: selectedPlan.IdePlanProductRisk } })
+      )?.IdePlanProduct ?? null;
+      await this.requirementsService.resolveContractRequirementsForRisk(
+        {
+          ideFileRisk: fileRisk.IdeFileRisk,
+          ideRiskProduct: quoteRisk.IdeRiskProduct,
+          idePlanProduct,
+          ideProduct,
+          actor,
+        },
+        tx,
+      );
+
       for (const requirement of quoteRisk.TQuoteRequirement.filter((r) => !r.IdeQuoteCoverage)) {
         await tx.tContractRequirement.create({
           data: {
@@ -1083,6 +1099,19 @@ export class ContractsService {
           ideProduct,
           prime: Number(coverage.Prime),
         });
+
+        await this.requirementsService.resolveContractRequirementsForCoverage(
+          {
+            ideFileRisk: fileRisk.IdeFileRisk,
+            ideRiskCoverage: riskCoverage.IdeRiskCoverage,
+            ideRiskProduct: quoteRisk.IdeRiskProduct,
+            idePlanProduct,
+            ideCoveragePlan: coverage.IdeCoveragePlan,
+            ideProduct,
+            actor,
+          },
+          tx,
+        );
 
         const coverageRequirements = quoteRisk.TQuoteRequirement.filter(
           (r) => r.IdeQuoteCoverage === coverage.IdeQuoteCoverage,

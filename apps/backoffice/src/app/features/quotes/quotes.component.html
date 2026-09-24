@@ -446,7 +446,55 @@
           icon="pi pi-arrow-right"
           iconPos="right"
           [disabled]="!canContinueToSummary()"
+          [loading]="loadingRequirements()"
           (click)="goToSummary()"
+        ></button>
+      </div>
+    </div>
+  }
+
+  @case ('requirements') {
+    <div class="mx-auto flex max-w-2xl flex-col gap-6">
+      <div>
+        <h1 class="text-lg font-semibold text-slate-900">{{ 'requirements.wizardStep.title' | transloco }}</h1>
+        <p class="text-sm text-slate-500">{{ 'requirements.wizardStep.subtitle' | transloco }}</p>
+      </div>
+
+      @if (requirementRows().length === 0) {
+        <p class="text-sm text-slate-500">{{ 'requirements.wizardStep.emptyState' | transloco }}</p>
+      } @else {
+        <div class="flex flex-col divide-y divide-slate-200 rounded-lg border border-slate-200">
+          @for (row of requirementRows(); track row.IdeQuoteRequirement) {
+            <div class="flex items-center justify-between gap-3 p-3">
+              <div class="flex items-center gap-3">
+                <p-checkbox
+                  [binary]="true"
+                  [ngModel]="!!row.Data?.indDelivered"
+                  (onChange)="toggleRequirementDelivered(row)"
+                  [inputId]="'req-' + row.IdeQuoteRequirement"
+                />
+                <label [for]="'req-' + row.IdeQuoteRequirement" class="text-sm text-slate-800">
+                  {{ row.SProductRequirement.DesShort ?? row.SProductRequirement.SRequirement.DesRequirement }}
+                </label>
+              </div>
+              <p-tag
+                [value]="(row.SProductRequirement.IndMandatory ? 'requirements.wizardStep.mandatoryTag' : 'requirements.wizardStep.optionalTag') | transloco"
+                [severity]="row.SProductRequirement.IndMandatory ? 'warn' : 'secondary'"
+              />
+            </div>
+          }
+        </div>
+      }
+
+      <div class="flex justify-between">
+        <button pButton type="button" [label]="'quotes.backButton' | transloco" severity="secondary" [text]="true" (click)="backFromRequirements()"></button>
+        <button
+          pButton
+          type="button"
+          [label]="'quotes.continueToSummaryButton' | transloco"
+          icon="pi pi-arrow-right"
+          iconPos="right"
+          (click)="continueFromRequirements()"
         ></button>
       </div>
     </div>

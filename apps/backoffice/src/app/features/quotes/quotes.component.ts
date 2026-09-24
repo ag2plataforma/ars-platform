@@ -22,6 +22,7 @@ import {
   QuoteCoverage,
   QuotePerson,
   QuoteSummary,
+  QuoteRequirementRow,
   QuotingService,
   SubmitSocialImpactAnswersPayload,
 } from './quoting.service';
@@ -33,7 +34,7 @@ const DISTRIBUTION_CHANNELS_PATH = '/party/distribution-channels';
 const DISTRIBUTION_WAYS_PATH = '/party/distribution-ways';
 const RISK_PRODUCTS_PATH = '/product-rating/risk-products';
 
-type QuoteStep = 'form' | 'plans' | 'socialImpact' | 'persons' | 'summary' | 'contract';
+type QuoteStep = 'form' | 'plans' | 'socialImpact' | 'persons' | 'requirements' | 'summary' | 'contract';
 
 /** Un "slot" de persona a asociar a la cotización (Tomador/Titular --
  * los dos únicos roles que `ContractsService.setContractPersons` copia
@@ -236,6 +237,10 @@ export class QuotesComponent {
     buildPersonSlot(this.fb, 'TITULAR', 'quotes.personSlotTitular'),
   ];
   readonly quotePersons = signal<QuotePerson[]>([]);
+
+  // --- Etapa 3.5: Requisitos (checklist, ver goToSummary más abajo) ---
+  readonly requirementRows = signal<QuoteRequirementRow[]>([]);
+  readonly loadingRequirements = signal(false);
 
   // --- Etapa 4: resumen ---
   readonly summary = signal<QuoteSummary | null>(null);
@@ -794,9 +799,39 @@ export class QuotesComponent {
     );
   }
 
-  // --- Etapa 4: resumen ---
+  // --- Etapa 3.5: Requisitos (checklist, Etapa 1 de la feature -- ver
+  // docs/02-roadmap.md y el doc-comment de `RequirementsService` en
+  // underwriting-service). Auto-gestionado: se muestra solo si el
+  // backend resuelve al menos un documento exigido para esta cotización
+  // (no depende de `ProcessFlowResolver`/`SProductProcessFlow`, decisión
+  // explícita del usuario al acordar el alcance -- Requisitos queda
+  // fuera de ese motor de gating por ahora). Informativo/no bloqueante:
+  // se puede continuar a "Resumen" sin marcar nada como entregado. ---
 
   goToSummary(): void {
+    if (!this.ideQuote) return;
+    const ideQuote = this.ideQuote;
+    this.loadingRequirements.set(true);
+    this.quoting.listRequirements(ideQuote).subscribe({
+      next: (rows) => {
+        this.loadingRequirements.set(false);
+        this.requirementRows.set(rows);
+        if (rows.length > 0) {
+          this.step.set('requirements');
+        } else {
+          this.loadSummaryAndShow();
+        }
+      },
+      error: () => {
+        this.loadingRequirements.set(false);
+        // Si el checklist no se pudo resolver, no bloquea el flujo --
+        // sigue directo a Resumen (Etapa 1 es informativa, no crítica).
+        this.loadSummaryAndShow();
+      },
+    });
+  }
+
+  private loadSummaryAndShow(): void {
     if (!this.ideQuote) return;
     this.quoting.getSummary(this.ideQuote).subscribe({
       next: (result) => {
@@ -807,8 +842,33 @@ export class QuotesComponent {
     });
   }
 
-  backToPersons(): void {
+  continueFromRequirements(): void {
+    this.loadSummaryAndShow();
+  }
+
+  backFromRequirements(): void {
     this.step.set('persons');
+  }
+
+  toggleRequirementDelivered(row: QuoteRequirementRow): void {
+    if (!this.ideQuote) return;
+    const nextDelivered = !row.Data?.indDelivered;
+    this.quoting.setRequirementDelivered(this.ideQuote, row.IdeQuoteRequirement, nextDelivered).subscribe({
+      next: (updated) => {
+        this.requirementRows.set(this.requirementRows().map((r) => (r.IdeQuoteRequirement === updated.IdeQuoteRequirement ? updated : r)));
+      },
+      error: () => {
+        this.messages.add({
+          severity: 'error',
+          summary: this.transloco.translate('common.error'),
+          detail: this.transloco.translate('requirements.wizardStep.updateErrorDetail'),
+        });
+      },
+    });
+  }
+
+  backToPersons(): void {
+    this.step.set(this.requirementRows().length > 0 ? 'requirements' : 'persons');
   }
 
   // --- Etapa 5: aceptar / contratar ---
@@ -924,13 +984,7 @@ export class QuotesComponent {
           next: (rows) => {
             this.quotePersons.set(rows);
             if (this.canContinueToSummary()) {
-              this.quoting.getSummary(ideQuote).subscribe({
-                next: (summary) => {
-                  this.summary.set(summary);
-                  this.step.set('summary');
-                },
-                error: (err: HttpErrorResponse) => this.showError(err),
-              });
+              this.goToSummary();
             } else {
               this.step.set('persons');
             }

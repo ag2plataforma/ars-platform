@@ -239,6 +239,23 @@ export interface QuotePerson {
   SPersonRol: { CodPersonRol: string; DesPersonRol: string };
 }
 
+/** `GET/PATCH :id/requirements` -- checklist de documentos exigidos
+ * (feature "Requisitos", Etapa 1, 2026-09-24: ver `RequirementsService`
+ * en `underwriting-service`). Objeto Prisma crudo (PascalCase), igual
+ * criterio que `QuotePerson` arriba -- `Data` es el flag "entregado"
+ * (`{ indDelivered, usrDelivered, tstDelivered }` o `null` si todavía no
+ * se marcó, ver el doc-comment de `RequirementsService` sobre por qué va
+ * ahí y no en `IdeState`). */
+export interface QuoteRequirementRow {
+  IdeQuoteRequirement: string;
+  Data: { indDelivered: boolean; usrDelivered: string; tstDelivered: string } | null;
+  SProductRequirement: {
+    IndMandatory: boolean;
+    DesShort: string | null;
+    SRequirement: { CodRequirement: string; DesRequirement: string };
+  };
+}
+
 interface CreateContractResponse {
   IdeContract: string;
   NumContract: string;
@@ -363,5 +380,23 @@ export class QuotingService {
    * a punta todavía contra la BD real. */
   createContract(ideQuote: string): Observable<CreateContractResponse> {
     return this.http.post<CreateContractResponse>(`${this.base}/${ideQuote}/contract`, {});
+  }
+  /** `GET :id/requirements` -- resuelve (lazy, del lado del backend) y
+   * lista el checklist de documentos exigidos por la cotización. */
+  listRequirements(ideQuote: string): Observable<QuoteRequirementRow[]> {
+    return this.http.get<QuoteRequirementRow[]>(`${this.base}/${ideQuote}/requirements`);
+  }
+
+  /** `PATCH :id/requirements/:ideQuoteRequirement` -- marca/desmarca un
+   * documento como entregado. */
+  setRequirementDelivered(
+    ideQuote: string,
+    ideQuoteRequirement: string,
+    delivered: boolean,
+  ): Observable<QuoteRequirementRow> {
+    return this.http.patch<QuoteRequirementRow>(
+      `${this.base}/${ideQuote}/requirements/${ideQuoteRequirement}`,
+      { delivered },
+    );
   }
 }

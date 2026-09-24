@@ -103,6 +103,13 @@ async function main() {
       'TContractBilling',
       'TContractOperation',
       'TContractRequirement',
+      // Agregada 2026-09-24: feature "Requisitos" (checklist de
+      // documentos exigidos, ver RequirementsService en
+      // underwriting-service) -- misma razón que TContractRequirement,
+      // "entregado" se guarda en Data (JSON), no como transición real de
+      // estado; sin esta entrada, stateMachine.getInitialState('TQuoteRequirement')
+      // lanzaría (no existiría ninguna fila SEntity/SStateRule para ella).
+      'TQuoteRequirement',
       'TReceipt',
       'TReceiptDetail',
     ];

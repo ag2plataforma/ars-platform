@@ -1,0 +1,220 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex flex-col gap-4">
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold text-slate-900">{{ 'requirements.assignments.title' | transloco }}</h2>
+      <p class="text-sm text-slate-500">{{ 'requirements.assignments.subtitle' | transloco }}</p>
+    </div>
+    <button pButton type="button" icon="pi pi-plus" [label]="'requirements.assignments.newButton' | transloco" (click)="openCreate()"></button>
+  </div>
+
+  <p-table
+    [value]="rows()"
+    [loading]="loading()"
+    dataKey="IdeProductRequirement"
+    [paginator]="true"
+    [rows]="10"
+    [rowsPerPageOptions]="[10, 25, 50]"
+    [showCurrentPageReport]="true"
+    currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+    styleClass="p-datatable-sm"
+  >
+    <ng-template #header>
+      <tr>
+        <th pSortableColumn="SProcess.DesProcess">
+          <span class="ars-th-flex">{{ 'requirements.assignments.processColumn' | transloco }} <p-sortIcon field="SProcess.DesProcess" /></span>
+        </th>
+        <th pSortableColumn="SProduct.DesProduct">
+          <span class="ars-th-flex">{{ 'requirements.assignments.productColumn' | transloco }} <p-sortIcon field="SProduct.DesProduct" /></span>
+        </th>
+        <th>{{ 'requirements.assignments.requirementColumn' | transloco }}</th>
+        <th>{{ 'requirements.assignments.riskProductColumn' | transloco }}</th>
+        <th>{{ 'requirements.assignments.planProductColumn' | transloco }}</th>
+        <th>{{ 'requirements.assignments.coveragePlanColumn' | transloco }}</th>
+        <th pSortableColumn="IndMandatory">
+          <span class="ars-th-flex">{{ 'requirements.assignments.mandatoryColumn' | transloco }} <p-sortIcon field="IndMandatory" /></span>
+        </th>
+        <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+        <th class="w-32">{{ 'catalogs.actionsColumn' | transloco }}</th>
+      </tr>
+    </ng-template>
+    <ng-template #body let-row>
+      <tr>
+        <td>{{ row.SProcess?.DesProcess }}</td>
+        <td>{{ row.SProduct?.DesProduct }}</td>
+        <td>{{ requirementLabel(row) }}</td>
+        <td>{{ riskProductLabel(row) }}</td>
+        <td>{{ planProductLabel(row) }}</td>
+        <td>{{ coveragePlanLabel(row) }}</td>
+        <td>
+          <p-tag [value]="(row.IndMandatory ? 'common.yes' : 'common.no') | transloco" [severity]="row.IndMandatory ? 'warn' : 'secondary'" />
+        </td>
+        <td>
+          <p-tag [value]="(isActive(row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isActive(row) ? 'success' : 'danger'" />
+        </td>
+        <td>
+          <div class="flex gap-1">
+            <button
+              pButton
+              type="button"
+              icon="pi pi-pencil"
+              [text]="true"
+              severity="secondary"
+              [pTooltip]="'locations.editTooltip' | transloco"
+              tooltipPosition="top"
+              (click)="openEdit(row)"
+            ></button>
+            <button
+              pButton
+              type="button"
+              [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'"
+              [text]="true"
+              [severity]="isActive(row) ? 'danger' : 'success'"
+              [pTooltip]="(isActive(row) ? 'catalogs.deactivateHeader' : 'catalogs.activateHeader') | transloco"
+              tooltipPosition="top"
+              (click)="toggleState(row)"
+            ></button>
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="9" class="text-center text-slate-500">{{ 'requirements.assignments.emptyState' | transloco }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-dialog
+  [header]="(dialogMode() === 'create' ? 'requirements.assignments.createDialogTitle' : 'requirements.assignments.editDialogTitle') | transloco"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  [style]="{ width: '34rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'requirements.assignments.processColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codProcess"
+        [options]="processes()"
+        optionLabel="DesProcess"
+        optionValue="CodProcess"
+        [placeholder]="'requirements.assignments.processSelectPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'requirements.assignments.productColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codProduct"
+        [options]="products()"
+        optionLabel="DesProduct"
+        optionValue="CodProduct"
+        [placeholder]="'requirements.assignments.productSelectPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'requirements.assignments.requirementColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codRequirement"
+        [options]="requirements()"
+        optionLabel="DesRequirement"
+        optionValue="CodRequirement"
+        [placeholder]="'requirements.assignments.requirementSelectPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'requirements.assignments.riskProductColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codRiskProduct"
+        [options]="[{ _label: ('requirements.assignments.anyValue' | transloco), CodRiskProduct: ANY_VALUE }, ...riskProducts()]"
+        optionLabel="_label"
+        optionValue="CodRiskProduct"
+        styleClass="w-full"
+      />
+      <p class="text-xs text-slate-500">{{ 'requirements.assignments.riskProductHint' | transloco }}</p>
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'requirements.assignments.planProductColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codPlanProduct"
+        [options]="[{ DesPlanProduct: ('requirements.assignments.anyValue' | transloco), CodPlanProduct: ANY_VALUE }, ...planProducts()]"
+        optionLabel="DesPlanProduct"
+        optionValue="CodPlanProduct"
+        styleClass="w-full"
+      />
+      <p class="text-xs text-slate-500">{{ 'requirements.assignments.planProductHint' | transloco }}</p>
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'requirements.assignments.coveragePlanColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="ideCoveragePlan"
+        [options]="[{ _label: ('requirements.assignments.anyValue' | transloco), IdeCoveragePlan: ANY_VALUE }, ...coveragePlanOptions()]"
+        optionLabel="_label"
+        optionValue="IdeCoveragePlan"
+        [loading]="coveragePlanLoading()"
+        [disabled]="form.controls.codPlanProduct.value === ANY_VALUE || form.controls.codRiskProduct.value === ANY_VALUE"
+        styleClass="w-full"
+      />
+      <p class="text-xs text-slate-500">{{ 'requirements.assignments.coveragePlanHint' | transloco }}</p>
+    </div>
+
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'catalogFields.desShort' | transloco }}</label>
+      <input pInputText formControlName="desShort" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'catalogFields.desLarge' | transloco }}</label>
+      <textarea pTextarea formControlName="desLarge" rows="2" class="w-full"></textarea>
+    </div>
+
+    <div class="flex gap-6">
+      <div class="flex items-center gap-2">
+        <p-checkbox formControlName="indMandatory" [binary]="true" inputId="pr-mandatory" />
+        <label for="pr-mandatory" class="text-sm text-slate-700">{{ 'requirements.assignments.mandatoryColumn' | transloco }}</label>
+      </div>
+      <div class="flex items-center gap-2">
+        <p-checkbox formControlName="indReviewable" [binary]="true" inputId="pr-reviewable" />
+        <label for="pr-reviewable" class="text-sm text-slate-700">{{ 'requirements.assignments.reviewableLabel' | transloco }}</label>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <p-checkbox formControlName="indApplyOCR" [binary]="true" inputId="pr-ocr" />
+      <label for="pr-ocr" class="text-sm text-slate-700">{{ 'requirements.assignments.applyOcrLabel' | transloco }}</label>
+    </div>
+    <p class="-mt-2 text-xs text-slate-500">{{ 'requirements.assignments.applyOcrHint' | transloco }}</p>
+
+    <div class="flex gap-4">
+      <div class="flex flex-1 flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'requirements.assignments.requirementTypeLabel' | transloco }}</label>
+        <input pInputText formControlName="codRequirementType" class="w-full" />
+      </div>
+      <div class="flex flex-1 flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'requirements.assignments.documentTypeLabel' | transloco }}</label>
+        <input pInputText formControlName="codDocumentType" class="w-full" />
+      </div>
+      <div class="flex w-24 flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'requirements.assignments.orderLabel' | transloco }}</label>
+        <p-inputNumber formControlName="order" [useGrouping]="false" styleClass="w-full" />
+      </div>
+    </div>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
+    </div>
+  </form>
+</p-dialog>

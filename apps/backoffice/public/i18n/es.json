@@ -137,6 +137,10 @@
     "process-flows": {
       "label": "Flujos",
       "singular": "flujo"
+    },
+    "requirements": {
+      "label": "Requisitos",
+      "singular": "requisito"
     }
   },
   "catalogFields": {
@@ -793,6 +797,47 @@
       "productSelectPlaceholder": "Selecciona un producto",
       "channelSelectPlaceholder": "Selecciona un canal",
       "loadErrorDetail": "No se pudieron cargar las asignaciones de flujo."
+    }
+  },
+  "requirements": {
+    "assignments": {
+      "title": "Requisitos por producto",
+      "subtitle": "Define qué documentos exige cada producto (opcionalmente, por riesgo, plan o cobertura).",
+      "newButton": "Nuevo requisito",
+      "processColumn": "Proceso",
+      "productColumn": "Producto",
+      "requirementColumn": "Requisito",
+      "riskProductColumn": "Riesgo de producto",
+      "planProductColumn": "Plan",
+      "coveragePlanColumn": "Cobertura",
+      "mandatoryColumn": "Obligatorio",
+      "anyValue": "(cualquiera)",
+      "riskProductHint": "Déjalo en \"(cualquiera)\" para que aplique a cualquier riesgo del producto.",
+      "planProductHint": "Déjalo en \"(cualquiera)\" para que aplique a cualquier plan. Fíjalo junto con el riesgo para poder elegir una cobertura específica.",
+      "coveragePlanHint": "Solo se puede elegir una cobertura específica cuando el riesgo y el plan están fijados (no en \"cualquiera\").",
+      "reviewableLabel": "Revisable",
+      "applyOcrLabel": "Aplicar OCR",
+      "applyOcrHint": "Reservado para una etapa futura -- por ahora se guarda pero no ejecuta ningún reconocimiento automático (no existe subida de archivos todavía).",
+      "requirementTypeLabel": "Tipo de requisito",
+      "documentTypeLabel": "Tipo de documento",
+      "orderLabel": "Orden",
+      "emptyState": "No hay requisitos configurados todavía.",
+      "createDialogTitle": "Nuevo requisito",
+      "editDialogTitle": "Editar requisito",
+      "processSelectPlaceholder": "Selecciona un proceso",
+      "productSelectPlaceholder": "Selecciona un producto",
+      "requirementSelectPlaceholder": "Selecciona un requisito",
+      "loadErrorDetail": "No se pudieron cargar los requisitos."
+    },
+    "wizardStep": {
+      "title": "Requisitos",
+      "subtitle": "Documentos que se deben presentar para continuar. Márcalos como entregados a medida que los recibas.",
+      "mandatoryTag": "Obligatorio",
+      "optionalTag": "Opcional",
+      "deliveredLabel": "Entregado",
+      "emptyState": "Este producto no exige documentos para esta cotización.",
+      "loadErrorDetail": "No se pudieron cargar los requisitos de la cotización.",
+      "updateErrorDetail": "No se pudo actualizar el requisito."
     }
   }
 }
