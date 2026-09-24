@@ -12,6 +12,10 @@ const INCLUDE = {
   SRiskProduct: true,
   SCoveragePlan: true,
   SRequirement: true,
+  // Fase 4 (Siniestros), 2026-09-24 -- ver doc-comment de la clase y de
+  // `CreateProductRequirementDto`.
+  SClaimType: true,
+  SClaimEvent: true,
   SState: true,
 } as const;
 
@@ -39,11 +43,11 @@ const INCLUDE = {
  *    (confirmado con el usuario, no hay constante commiteada en el repo
  *    -- ver `PROCESS_CODE_QUOTE`/`PROCESS_CODE_CONTRACT` en
  *    `underwriting-service/src/requirements/requirements.constants.ts`).
- *  - `IdeCoverageGuarantee`/`IdeClaimType`/`IdeClaimEvent` (columnas de
- *    Siniestros) existen en la tabla real pero NO se exponen en el DTO
- *    de este CRUD todavía -- alcance acordado "Solo
- *    Cotización/Contratación por ahora"; quedan siempre NULL hasta que
- *    arranque la Fase 4.
+ *  - `IdeClaimType`/`IdeClaimEvent` (columnas de Siniestros) se agregaron
+ *    al DTO de este CRUD el 2026-09-24 (Fase 4, Etapa 1) -- ver
+ *    `CreateProductRequirementDto` y `ClaimRequirementsService` en
+ *    `claims-service` (motor de resolución del lado de Siniestros).
+ *    `IdeCoverageGuarantee` (garantías, Etapa 2) sigue sin exponerse.
  *  - Etapa 1 = checklist SIN archivo real: no existe mecanismo de
  *    subida de archivos en todo el monorepo (confirmado por búsqueda),
  *    así que `IndApplyOCR` se guarda pero no dispara ninguna ejecución
@@ -76,16 +80,27 @@ export class ProductRequirementService {
   }
 
   async create(dto: CreateProductRequirementDto, actor: string): Promise<SProductRequirement> {
-    const [ideProcess, ideOperation, ideProduct, idePlanProduct, ideRiskProduct, ideCoveragePlan, ideRequirement] =
-      await Promise.all([
-        this.resolveProcess(dto.codProcess),
-        dto.codOperation ? this.resolveOperation(dto.codOperation) : Promise.resolve(null),
-        this.resolveProduct(dto.codProduct),
-        dto.codPlanProduct ? this.resolvePlanProduct(dto.codPlanProduct) : Promise.resolve(null),
-        dto.codRiskProduct ? this.resolveRiskProduct(dto.codRiskProduct) : Promise.resolve(null),
-        dto.ideCoveragePlan ? this.assertCoveragePlan(dto.ideCoveragePlan) : Promise.resolve(null),
-        this.resolveRequirement(dto.codRequirement),
-      ]);
+    const [
+      ideProcess,
+      ideOperation,
+      ideProduct,
+      idePlanProduct,
+      ideRiskProduct,
+      ideCoveragePlan,
+      ideClaimType,
+      ideClaimEvent,
+      ideRequirement,
+    ] = await Promise.all([
+      this.resolveProcess(dto.codProcess),
+      dto.codOperation ? this.resolveOperation(dto.codOperation) : Promise.resolve(null),
+      this.resolveProduct(dto.codProduct),
+      dto.codPlanProduct ? this.resolvePlanProduct(dto.codPlanProduct) : Promise.resolve(null),
+      dto.codRiskProduct ? this.resolveRiskProduct(dto.codRiskProduct) : Promise.resolve(null),
+      dto.ideCoveragePlan ? this.assertCoveragePlan(dto.ideCoveragePlan) : Promise.resolve(null),
+      dto.codClaimType ? this.resolveClaimType(dto.codClaimType) : Promise.resolve(null),
+      dto.codClaimEvent ? this.resolveClaimEvent(dto.codClaimEvent) : Promise.resolve(null),
+      this.resolveRequirement(dto.codRequirement),
+    ]);
 
     const existing = await this.prisma.sProductRequirement.findFirst({
       where: { IdeProcess: ideProcess, IdeProduct: ideProduct, IdeRequirement: ideRequirement },
@@ -106,6 +121,8 @@ export class ProductRequirementService {
         IdePlanProduct: idePlanProduct,
         IdeRiskProduct: ideRiskProduct,
         IdeCoveragePlan: ideCoveragePlan,
+        IdeClaimType: ideClaimType,
+        IdeClaimEvent: ideClaimEvent,
         IdeRequirement: ideRequirement,
         DesShort: dto.desShort,
         DesLarge: dto.desLarge,
@@ -144,6 +161,12 @@ export class ProductRequirementService {
     }
     if (dto.ideCoveragePlan !== undefined) {
       data.IdeCoveragePlan = dto.ideCoveragePlan ? await this.assertCoveragePlan(dto.ideCoveragePlan) : null;
+    }
+    if (dto.codClaimType !== undefined) {
+      data.IdeClaimType = dto.codClaimType ? await this.resolveClaimType(dto.codClaimType) : null;
+    }
+    if (dto.codClaimEvent !== undefined) {
+      data.IdeClaimEvent = dto.codClaimEvent ? await this.resolveClaimEvent(dto.codClaimEvent) : null;
     }
     if (dto.codRequirement !== undefined) data.IdeRequirement = await this.resolveRequirement(dto.codRequirement);
     if (dto.desShort !== undefined) data.DesShort = dto.desShort;
@@ -209,5 +232,17 @@ export class ProductRequirementService {
     const row = await this.prisma.sCoveragePlan.findUnique({ where: { IdeCoveragePlan: ideCoveragePlan } });
     if (!row) throw new NotFoundException(`No existe cobertura de plan con id "${ideCoveragePlan}"`);
     return row.IdeCoveragePlan;
+  }
+
+  private async resolveClaimType(codClaimType: string): Promise<string> {
+    const row = await this.prisma.sClaimType.findFirst({ where: { CodClaimType: codClaimType } });
+    if (!row) throw new NotFoundException(`No existe tipo de siniestro con código "${codClaimType}"`);
+    return row.IdeClaimType;
+  }
+
+  private async resolveClaimEvent(codClaimEvent: string): Promise<string> {
+    const row = await this.prisma.sClaimEvent.findFirst({ where: { CodClaimEvent: codClaimEvent } });
+    if (!row) throw new NotFoundException(`No existe evento de siniestro con código "${codClaimEvent}"`);
+    return row.IdeClaimEvent;
   }
 }

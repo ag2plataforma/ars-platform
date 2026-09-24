@@ -28,6 +28,14 @@ export class UpdateProductRequirementDto {
 
   @IsOptional()
   @IsString()
+  codClaimType?: string;
+
+  @IsOptional()
+  @IsString()
+  codClaimEvent?: string;
+
+  @IsOptional()
+  @IsString()
   codRequirement?: string;
 
   @IsOptional()

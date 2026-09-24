@@ -10,11 +10,15 @@ import { IsBoolean, IsInt, IsOptional, IsString, IsUUID } from 'class-validator'
  * en cascada Plan -> Riesgo -> Cobertura, no escribiendo un código a
  * mano).
  *
- * `IdeCoverageGuarantee`/`IdeClaimType`/`IdeClaimEvent` (columnas reales
- * de `SProductRequirement` ligadas a Siniestros) NO se exponen en este
- * DTO -- quedan siempre NULL en esta etapa (alcance acordado con el
- * usuario 2026-09-24: "Solo Cotización/Contratación por ahora", Fase 4
- * -- Siniestros -- decide después si necesita su propio flujo).
+ * `codClaimType`/`codClaimEvent` (Fase 4 -- Siniestros, 2026-09-24):
+ * agregados para que el admin pueda configurar requisitos exigidos por
+ * siniestro (`ClaimRequirementsService` en `claims-service` los resuelve
+ * filtrando por `IdeClaimType`/`IdeClaimEvent`, NO por `IdeProcess`). Una
+ * fila de siniestro sigue necesitando un `codProcess` porque la columna
+ * es NOT NULL -- convención de esta implementación (no confirmada con el
+ * usuario): usar `GENERICO`, ver el doc-comment de
+ * `ClaimRequirementsService`. `IdeCoverageGuarantee` (columna real de
+ * `SProductRequirement`, de Etapa 2 -- garantías) sigue sin exponerse.
  */
 export class CreateProductRequirementDto {
   /** CodProcess del proceso al que aplica (ej. COTIZACION/CONTRATACION; debe existir). */
@@ -44,6 +48,16 @@ export class CreateProductRequirementDto {
   @IsOptional()
   @IsUUID()
   ideCoveragePlan?: string;
+
+  /** CodClaimType opcional -- comodín NULL si se omite (fila sin alcance de Siniestros, ver doc-comment de la clase). */
+  @IsOptional()
+  @IsString()
+  codClaimType?: string;
+
+  /** CodClaimEvent opcional -- comodín NULL si se omite (aplica a cualquier evento de ese tipo de siniestro). */
+  @IsOptional()
+  @IsString()
+  codClaimEvent?: string;
 
   /** CodRequirement del documento exigido (debe existir). */
   @IsString()

@@ -141,6 +141,14 @@
     "requirements": {
       "label": "Requisitos",
       "singular": "requisito"
+    },
+    "claim-types": {
+      "label": "Tipos de siniestro",
+      "singular": "tipo de siniestro"
+    },
+    "claim-events": {
+      "label": "Eventos de siniestro",
+      "singular": "evento de siniestro"
     }
   },
   "catalogFields": {
@@ -153,7 +161,8 @@
     "codInsuranceLine": "Línea de seguro",
     "symbolCurrency": "Símbolo",
     "codConceptType": "Tipo de concepto",
-    "codChannelType": "Tipo de canal"
+    "codChannelType": "Tipo de canal",
+    "codClaimType": "Tipo de siniestro"
   },
   "common": {
     "error": "Error",
@@ -838,6 +847,67 @@
       "emptyState": "Este producto no exige documentos para esta cotización.",
       "loadErrorDetail": "No se pudieron cargar los requisitos de la cotización.",
       "updateErrorDetail": "No se pudo actualizar el requisito."
+    }
+  },
+  "claims": {
+    "catalogsPageTitle": "Catálogos de Siniestros",
+    "catalogsPageSubtitle": "Eventos de siniestro (el tipo de siniestro se administra en \"Tipos de siniestro\").",
+    "claimTypes": {
+      "title": "Tipos de siniestro",
+      "subtitle": "Define los tipos de siniestro que aplican a cada producto, su límite de uso anual y la provisión inicial sugerida.",
+      "newButton": "Nuevo tipo de siniestro",
+      "productColumn": "Producto",
+      "claimsPerYearColumn": "Siniestros/año",
+      "initialProvisionColumn": "Provisión inicial",
+      "deadlineColumn": "Plazo de reporte (días)",
+      "emptyState": "No hay tipos de siniestro configurados todavía.",
+      "createDialogTitle": "Nuevo tipo de siniestro",
+      "editDialogTitle": "Editar tipo de siniestro",
+      "loadErrorDetail": "No se pudieron cargar los tipos de siniestro."
+    },
+    "list": {
+      "title": "Siniestros",
+      "subtitle": "Siniestros declarados sobre contratos vigentes.",
+      "newButton": "Nuevo siniestro",
+      "searchPlaceholder": "Buscar por número de siniestro",
+      "numClaimColumn": "Número",
+      "claimTypeColumn": "Tipo",
+      "contractColumn": "Contrato",
+      "occurrenceColumn": "Fecha de ocurrencia",
+      "emptyState": "No hay siniestros declarados todavía."
+    },
+    "declare": {
+      "title": "Declarar siniestro",
+      "subtitle": "Busca el contrato afectado, indica el tipo y evento del siniestro, y marca los riesgos afectados.",
+      "searchContractLabel": "Número de contrato",
+      "searchButton": "Buscar",
+      "selectButton": "Seleccionar",
+      "productColumn": "Producto",
+      "changeContractButton": "Cambiar contrato",
+      "claimTypeLabel": "Tipo de siniestro",
+      "claimEventLabel": "Evento",
+      "currencyLabel": "Moneda",
+      "occurrenceDateLabel": "Fecha de ocurrencia",
+      "notificationDateLabel": "Fecha de notificación",
+      "constitutionDateLabel": "Fecha de constitución",
+      "affectedRisksLabel": "Riesgos afectados",
+      "riskColumn": "Riesgo",
+      "noRisksInContract": "Este contrato no tiene riesgos vigentes.",
+      "noRisksSelected": "Selecciona al menos un riesgo afectado.",
+      "submitButton": "Declarar siniestro",
+      "createdDetail": "Siniestro {numClaim} declarado."
+    },
+    "detail": {
+      "backButton": "Volver",
+      "coverageColumn": "Cobertura",
+      "invoicedColumn": "Reclamado",
+      "coveredColumn": "Cubierto",
+      "approvedColumn": "Aprobado",
+      "indemnifiedColumn": "Indemnizado",
+      "receivedColumn": "Recibido",
+      "pendingTag": "Pendiente",
+      "markReceivedButton": "Marcar recibido",
+      "requirementReceivedDetail": "Requisito marcado como recibido."
     }
   }
 }

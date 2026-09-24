@@ -1,0 +1,117 @@
+<p-toast />
+
+@if (claim(); as c) {
+  <div class="flex flex-col gap-6">
+    <div>
+      <button pButton type="button" icon="pi pi-arrow-left" [text]="true" severity="secondary" [label]="'claims.detail.backButton' | transloco" (click)="volver()"></button>
+      <h2 class="mt-1 text-lg font-semibold text-slate-900">{{ c.NumClaim }}</h2>
+      <p class="text-sm text-slate-500">{{ c.SClaimType.DesClaimType }} &middot; {{ c.TContractFile.TContract.NumContract }} &middot; {{ c.TContractFile.TContract.SProduct.DesProduct }}</p>
+    </div>
+    <!-- Sin máquina de estados real todavía para el ciclo de vida del
+         siniestro (abierto/cerrado/rechazado) -- Etapa 2 la va a diseñar
+         junto con el flujo de aprobación. Mostrar acá el estado "sin
+         transición" con el que nace hoy (`c.SState.DesState`, el mismo
+         "[SEED] Borrador" que usan TContractRequirement/TQuoteRequirement)
+         solo confunde, así que deliberadamente no se muestra. -->
+
+    <div class="grid grid-cols-1 gap-4 rounded border border-slate-200 bg-slate-50 p-4 sm:grid-cols-3">
+      <div>
+        <p class="text-xs text-slate-500">{{ 'claims.declare.occurrenceDateLabel' | transloco }}</p>
+        <p class="text-sm font-medium text-slate-900">{{ c.TstOcurrence | date: 'short' }}</p>
+      </div>
+      <div>
+        <p class="text-xs text-slate-500">{{ 'claims.declare.notificationDateLabel' | transloco }}</p>
+        <p class="text-sm font-medium text-slate-900">{{ c.TstNotification | date: 'short' }}</p>
+      </div>
+      <div>
+        <p class="text-xs text-slate-500">{{ 'claims.declare.constitutionDateLabel' | transloco }}</p>
+        <p class="text-sm font-medium text-slate-900">{{ c.TstConstitution | date: 'short' }}</p>
+      </div>
+    </div>
+
+    @for (file of c.TClaimFile; track file.IdeClaimFile) {
+      <div class="flex flex-col gap-3 rounded border border-slate-200 p-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-semibold text-slate-900">{{ file.NumClaimFile }} &middot; {{ file.SClaimEvent.DesClaimEvent }}</p>
+            @if (file.DesLarge) {
+              <p class="text-sm text-slate-500">{{ file.DesLarge }}</p>
+            }
+          </div>
+        </div>
+
+        @for (risk of file.TClaimRisk; track risk.IdeClaimRisk) {
+          <div class="flex flex-col gap-2 rounded border border-slate-100 bg-slate-50 p-3">
+            <p class="text-sm font-medium text-slate-800">{{ riskLabel(risk) }} &middot; {{ planLabel(risk) }}</p>
+
+            <p-table [value]="risk.TCoverageProvision" styleClass="p-datatable-sm">
+              <ng-template #header>
+                <tr>
+                  <th>{{ 'claims.detail.coverageColumn' | transloco }}</th>
+                  <th>{{ 'claims.detail.invoicedColumn' | transloco }}</th>
+                  <th>{{ 'claims.detail.coveredColumn' | transloco }}</th>
+                  <th>{{ 'claims.detail.approvedColumn' | transloco }}</th>
+                  <th>{{ 'claims.detail.indemnifiedColumn' | transloco }}</th>
+                </tr>
+              </ng-template>
+              <ng-template #body let-provision>
+                <tr>
+                  <td>{{ provision.TRiskCoverage.SCoveragePlan.SCoverage.DesCoverage }}</td>
+                  <td>{{ provision.InvoicedAmount | number: '1.2-2' }}</td>
+                  <td>{{ provision.CoveredAmount | number: '1.2-2' }}</td>
+                  <td>{{ provision.ApprovedAmount | number: '1.2-2' }}</td>
+                  <td>{{ provision.IndemnifiedAmount | number: '1.2-2' }}</td>
+                </tr>
+              </ng-template>
+            </p-table>
+
+            @if (risk.TClaimRequirement.length > 0) {
+              <p-table [value]="risk.TClaimRequirement" styleClass="p-datatable-sm">
+                <ng-template #header>
+                  <tr>
+                    <th>{{ 'requirements.assignments.requirementColumn' | transloco }}</th>
+                    <th>{{ 'requirements.assignments.mandatoryColumn' | transloco }}</th>
+                    <th>{{ 'claims.detail.receivedColumn' | transloco }}</th>
+                    <th class="w-32"></th>
+                  </tr>
+                </ng-template>
+                <ng-template #body let-requirement>
+                  <tr>
+                    <td>{{ requirementLabel(requirement) }}</td>
+                    <td>
+                      <p-tag
+                        [value]="(requirement.SProductRequirement.IndMandatory ? 'common.yes' : 'common.no') | transloco"
+                        [severity]="requirement.SProductRequirement.IndMandatory ? 'warn' : 'secondary'"
+                      />
+                    </td>
+                    <td>
+                      @if (isReceived(requirement)) {
+                        <p-tag [value]="(requirement.TstReception | date: 'short') ?? ''" severity="success" />
+                      } @else {
+                        <p-tag [value]="'claims.detail.pendingTag' | transloco" severity="secondary" />
+                      }
+                    </td>
+                    <td>
+                      @if (!isReceived(requirement)) {
+                        <button
+                          pButton
+                          type="button"
+                          size="small"
+                          [text]="true"
+                          [label]="'claims.detail.markReceivedButton' | transloco"
+                          (click)="marcarRecibido(file.IdeClaimFile, requirement)"
+                        ></button>
+                      }
+                    </td>
+                  </tr>
+                </ng-template>
+              </p-table>
+            }
+          </div>
+        }
+      </div>
+    }
+  </div>
+} @else if (loading()) {
+  <p class="text-sm text-slate-500">{{ 'common.loading' | transloco }}</p>
+}

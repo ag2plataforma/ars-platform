@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth/auth.guard';
-import { PRODUCT_CATALOG_REGISTRY, PROCESS_FLOW_CATALOG_REGISTRY } from './core/catalogs/catalog.model';
+import { PRODUCT_CATALOG_REGISTRY, PROCESS_FLOW_CATALOG_REGISTRY, CLAIMS_CATALOG_REGISTRY } from './core/catalogs/catalog.model';
 
 export const routes: Routes = [
   {
@@ -71,6 +71,45 @@ export const routes: Routes = [
         path: 'catalogos',
         loadComponent: () =>
           import('./features/catalogs/catalogs.component').then((m) => m.CatalogsComponent),
+      },
+      {
+        // "Siniestros" -- Fase 4, Etapa 1 (2026-09-24). Orden importante:
+        // 'nuevo'/'tipos-de-siniestro'/'catalogos' (segmentos literales)
+        // ANTES que ':id' -- mismo motivo que 'nueva' en 'cotizacion'.
+        path: 'siniestros',
+        children: [
+          {
+            path: '',
+            pathMatch: 'full',
+            loadComponent: () =>
+              import('./features/claims/claims-list.component').then((m) => m.ClaimsListComponent),
+          },
+          {
+            path: 'nuevo',
+            loadComponent: () =>
+              import('./features/claims/declare-claim.component').then((m) => m.DeclareClaimComponent),
+          },
+          {
+            path: 'tipos-de-siniestro',
+            loadComponent: () =>
+              import('./features/claims/claim-types.component').then((m) => m.ClaimTypesComponent),
+          },
+          {
+            path: 'catalogos',
+            loadComponent: () =>
+              import('./features/catalogs/catalogs.component').then((m) => m.CatalogsComponent),
+            data: {
+              registry: CLAIMS_CATALOG_REGISTRY,
+              pageTitle: 'claims.catalogsPageTitle',
+              pageSubtitle: 'claims.catalogsPageSubtitle',
+            },
+          },
+          {
+            path: ':id',
+            loadComponent: () =>
+              import('./features/claims/claim-detail.component').then((m) => m.ClaimDetailComponent),
+          },
+        ],
       },
       {
         path: 'ubicaciones',

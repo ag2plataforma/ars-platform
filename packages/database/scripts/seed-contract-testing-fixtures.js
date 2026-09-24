@@ -110,6 +110,17 @@ async function main() {
       // estado; sin esta entrada, stateMachine.getInitialState('TQuoteRequirement')
       // lanzaría (no existiría ninguna fila SEntity/SStateRule para ella).
       'TQuoteRequirement',
+      // Agregadas 2026-09-24: Fase 4 (Siniestros), Etapa 1 -- declarar un
+      // siniestro (ver ClaimsService.declare en claims-service) crea
+      // filas en estas 5 entidades, y ninguna tiene todavía una máquina
+      // de estados real (Etapa 2 -- aprobación/cierre -- la va a
+      // necesitar). Sin esta entrada, stateMachine.getInitialState(...)
+      // lanzaría 404 para cada una.
+      'TClaim',
+      'TClaimFile',
+      'TClaimRisk',
+      'TCoverageProvision',
+      'TClaimRequirement',
       'TReceipt',
       'TReceiptDetail',
     ];

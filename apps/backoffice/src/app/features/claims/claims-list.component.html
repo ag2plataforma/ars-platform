@@ -1,0 +1,39 @@
+<p-toast />
+
+<div class="flex flex-col gap-4">
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold text-slate-900">{{ 'claims.list.title' | transloco }}</h2>
+      <p class="text-sm text-slate-500">{{ 'claims.list.subtitle' | transloco }}</p>
+    </div>
+    <button pButton type="button" icon="pi pi-plus" [label]="'claims.list.newButton' | transloco" (click)="nuevo()"></button>
+  </div>
+
+  <form [formGroup]="filters" class="max-w-sm">
+    <input pInputText formControlName="filterNumClaim" [placeholder]="'claims.list.searchPlaceholder' | transloco" class="w-full" />
+  </form>
+
+  <p-table [value]="items()" [loading]="loading()" dataKey="IdeClaim" [paginator]="true" [rows]="15" styleClass="p-datatable-sm">
+    <ng-template #header>
+      <tr>
+        <th>{{ 'claims.list.numClaimColumn' | transloco }}</th>
+        <th>{{ 'claims.list.claimTypeColumn' | transloco }}</th>
+        <th>{{ 'claims.list.contractColumn' | transloco }}</th>
+        <th>{{ 'claims.list.occurrenceColumn' | transloco }}</th>
+      </tr>
+    </ng-template>
+    <ng-template #body let-row>
+      <tr class="cursor-pointer hover:bg-slate-50" (click)="abrir(row)">
+        <td class="font-medium text-slate-900">{{ row.NumClaim }}</td>
+        <td>{{ row.SClaimType?.DesClaimType }}</td>
+        <td>{{ row.TContractFile?.TContract?.NumContract }}</td>
+        <td>{{ row.TstOcurrence | date: 'short' }}</td>
+      </tr>
+    </ng-template>
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="4" class="text-center text-slate-500">{{ 'claims.list.emptyState' | transloco }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>

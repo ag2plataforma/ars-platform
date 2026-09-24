@@ -1,0 +1,169 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex flex-col gap-4">
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold text-slate-900">{{ 'claims.claimTypes.title' | transloco }}</h2>
+      <p class="text-sm text-slate-500">{{ 'claims.claimTypes.subtitle' | transloco }}</p>
+    </div>
+    <button pButton type="button" icon="pi pi-plus" [label]="'claims.claimTypes.newButton' | transloco" (click)="openCreate()"></button>
+  </div>
+
+  <p-table
+    [value]="rows()"
+    [loading]="loading()"
+    dataKey="IdeClaimType"
+    [paginator]="true"
+    [rows]="10"
+    [rowsPerPageOptions]="[10, 25, 50]"
+    [showCurrentPageReport]="true"
+    currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+    styleClass="p-datatable-sm"
+  >
+    <ng-template #header>
+      <tr>
+        <th>{{ 'catalogsRegistry.claim-types.singular' | transloco }}</th>
+        <th>{{ 'claims.claimTypes.productColumn' | transloco }}</th>
+        <th>{{ 'claims.claimTypes.claimsPerYearColumn' | transloco }}</th>
+        <th>{{ 'claims.claimTypes.initialProvisionColumn' | transloco }}</th>
+        <th>{{ 'claims.claimTypes.deadlineColumn' | transloco }}</th>
+        <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+        <th class="w-32">{{ 'catalogs.actionsColumn' | transloco }}</th>
+      </tr>
+    </ng-template>
+    <ng-template #body let-row>
+      <tr>
+        <td>{{ row.CodClaimType }} - {{ row.DesClaimType }}</td>
+        <td>{{ productLabel(row) }}</td>
+        <td>{{ row.NumClaimsPerYear }}</td>
+        <td>{{ row.InitialProvisionAmount | number: '1.2-2' }}</td>
+        <td>{{ row.NumDeadLineReport }}</td>
+        <td>
+          <p-tag [value]="(isActive(row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isActive(row) ? 'success' : 'danger'" />
+        </td>
+        <td>
+          <div class="flex gap-1">
+            <button
+              pButton
+              type="button"
+              icon="pi pi-pencil"
+              [text]="true"
+              severity="secondary"
+              [pTooltip]="'locations.editTooltip' | transloco"
+              tooltipPosition="top"
+              (click)="openEdit(row)"
+            ></button>
+            <button
+              pButton
+              type="button"
+              [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'"
+              [text]="true"
+              [severity]="isActive(row) ? 'danger' : 'success'"
+              [pTooltip]="(isActive(row) ? 'catalogs.deactivateHeader' : 'catalogs.activateHeader') | transloco"
+              tooltipPosition="top"
+              (click)="toggleState(row)"
+            ></button>
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="7" class="text-center text-slate-500">{{ 'claims.claimTypes.emptyState' | transloco }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-dialog
+  [header]="(dialogMode() === 'create' ? 'claims.claimTypes.createDialogTitle' : 'claims.claimTypes.editDialogTitle') | transloco"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  [style]="{ width: '34rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'catalogs.codeColumn' | transloco }}</label>
+      <input pInputText formControlName="codClaimType" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'catalogs.descriptionColumn' | transloco }}</label>
+      <input pInputText formControlName="desClaimType" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'claims.claimTypes.productColumn' | transloco }}</label>
+      <p-select appendTo="body" formControlName="codProduct" [options]="products()" optionLabel="DesProduct" optionValue="CodProduct" (onChange)="onProductChange()" styleClass="w-full" />
+    </div>
+
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'requirements.assignments.riskProductColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codRiskProduct"
+        [options]="[{ _label: ('requirements.assignments.anyValue' | transloco), CodRiskProduct: ANY_VALUE }, ...riskProducts()]"
+        optionLabel="_label"
+        optionValue="CodRiskProduct"
+        [disabled]="!form.controls.codProduct.value"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'requirements.assignments.planProductColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codPlanProduct"
+        [options]="[{ DesPlanProduct: ('requirements.assignments.anyValue' | transloco), CodPlanProduct: ANY_VALUE }, ...planProducts()]"
+        optionLabel="DesPlanProduct"
+        optionValue="CodPlanProduct"
+        [disabled]="!form.controls.codProduct.value"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'catalogsRegistry.coverages.singular' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codCoverage"
+        [options]="[{ DesCoverage: ('requirements.assignments.anyValue' | transloco), CodCoverage: ANY_VALUE }, ...coverages()]"
+        optionLabel="DesCoverage"
+        optionValue="CodCoverage"
+        styleClass="w-full"
+      />
+    </div>
+
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'catalogFields.desShort' | transloco }}</label>
+      <input pInputText formControlName="desShort" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'catalogFields.desLarge' | transloco }}</label>
+      <textarea pTextarea formControlName="desLarge" rows="2" class="w-full"></textarea>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div class="flex min-w-0 flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'claims.claimTypes.claimsPerYearColumn' | transloco }}</label>
+        <p-inputNumber formControlName="numClaimsPerYear" [useGrouping]="false" [min]="0" [style]="{ width: '100%' }" inputStyleClass="w-full" />
+      </div>
+      <div class="flex min-w-0 flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'claims.claimTypes.deadlineColumn' | transloco }}</label>
+        <p-inputNumber formControlName="numDeadLineReport" [useGrouping]="false" [min]="0" [style]="{ width: '100%' }" inputStyleClass="w-full" />
+      </div>
+      <div class="flex min-w-0 flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'claims.claimTypes.initialProvisionColumn' | transloco }}</label>
+        <p-inputNumber formControlName="initialProvisionAmount" mode="decimal" [minFractionDigits]="2" [min]="0" [style]="{ width: '100%' }" inputStyleClass="w-full" />
+      </div>
+      <div class="flex min-w-0 flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'requirements.assignments.orderLabel' | transloco }}</label>
+        <p-inputNumber formControlName="order" [useGrouping]="false" [style]="{ width: '100%' }" inputStyleClass="w-full" />
+      </div>
+    </div>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
+    </div>
+  </form>
+</p-dialog>

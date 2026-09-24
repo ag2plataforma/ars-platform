@@ -1,0 +1,125 @@
+<p-toast />
+
+<div class="flex flex-col gap-4">
+  <div>
+    <h2 class="text-base font-semibold text-slate-900">{{ 'claims.declare.title' | transloco }}</h2>
+    <p class="text-sm text-slate-500">{{ 'claims.declare.subtitle' | transloco }}</p>
+  </div>
+
+  @if (!contract()) {
+    <form [formGroup]="searchForm" (ngSubmit)="buscarContrato()" class="flex max-w-lg items-end gap-2">
+      <div class="flex flex-1 flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'claims.declare.searchContractLabel' | transloco }}</label>
+        <input pInputText formControlName="numContract" class="w-full" />
+      </div>
+      <button pButton type="submit" [label]="'claims.declare.searchButton' | transloco" [loading]="searching()"></button>
+    </form>
+
+    @if (searchResults().length > 0) {
+      <p-table [value]="searchResults()" styleClass="p-datatable-sm max-w-2xl">
+        <ng-template #header>
+          <tr>
+            <th>{{ 'claims.list.contractColumn' | transloco }}</th>
+            <th>{{ 'claims.declare.productColumn' | transloco }}</th>
+            <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+            <th></th>
+          </tr>
+        </ng-template>
+        <ng-template #body let-row>
+          <tr>
+            <td>{{ row.numContract }}</td>
+            <td>{{ row.desProduct }}</td>
+            <td><p-tag [value]="row.desState" /></td>
+            <td>
+              <button pButton type="button" size="small" [label]="'claims.declare.selectButton' | transloco" (click)="seleccionarContrato(row)"></button>
+            </td>
+          </tr>
+        </ng-template>
+      </p-table>
+    }
+  } @else {
+    <div class="flex items-center justify-between rounded border border-slate-200 bg-slate-50 px-4 py-3">
+      <div>
+        <p class="text-sm font-semibold text-slate-900">{{ contract()!.NumContract }}</p>
+        <p class="text-xs text-slate-500">{{ contract()!.SProduct.DesProduct }}</p>
+      </div>
+      <button pButton type="button" [text]="true" severity="secondary" [label]="'claims.declare.changeContractButton' | transloco" (click)="cambiarContrato()"></button>
+    </div>
+
+    <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div class="flex flex-col gap-2">
+          <label class="text-sm font-medium text-slate-700">{{ 'claims.declare.claimTypeLabel' | transloco }}</label>
+          <p-select appendTo="body" formControlName="codClaimType" [options]="claimTypes()" optionLabel="DesClaimType" optionValue="CodClaimType" styleClass="w-full" />
+        </div>
+        <div class="flex flex-col gap-2">
+          <label class="text-sm font-medium text-slate-700">{{ 'claims.declare.claimEventLabel' | transloco }}</label>
+          <p-select
+            appendTo="body"
+            formControlName="codClaimEvent"
+            [options]="claimEvents()"
+            optionLabel="DesClaimEvent"
+            optionValue="CodClaimEvent"
+            [disabled]="!form.controls.codClaimType.value"
+            styleClass="w-full"
+          />
+        </div>
+        <div class="flex flex-col gap-2">
+          <label class="text-sm font-medium text-slate-700">{{ 'claims.declare.currencyLabel' | transloco }}</label>
+          <p-select appendTo="body" formControlName="codCurrency" [options]="currencies()" optionLabel="DesCurrency" optionValue="CodCurrency" styleClass="w-full" />
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div class="flex flex-col gap-2">
+          <label class="text-sm font-medium text-slate-700">{{ 'claims.declare.occurrenceDateLabel' | transloco }}</label>
+          <input pInputText type="datetime-local" formControlName="tstOcurrence" class="w-full" />
+        </div>
+        <div class="flex flex-col gap-2">
+          <label class="text-sm font-medium text-slate-700">{{ 'claims.declare.notificationDateLabel' | transloco }}</label>
+          <input pInputText type="datetime-local" formControlName="tstNotification" class="w-full" />
+        </div>
+        <div class="flex flex-col gap-2">
+          <label class="text-sm font-medium text-slate-700">{{ 'claims.declare.constitutionDateLabel' | transloco }}</label>
+          <input pInputText type="datetime-local" formControlName="tstConstitution" class="w-full" />
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'catalogFields.desLarge' | transloco }}</label>
+        <textarea pTextarea formControlName="desLarge" rows="2" class="w-full"></textarea>
+      </div>
+
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'claims.declare.affectedRisksLabel' | transloco }}</label>
+        <p-table [value]="contractFile()?.TFileRisk ?? []" styleClass="p-datatable-sm">
+          <ng-template #header>
+            <tr>
+              <th class="w-12"></th>
+              <th>{{ 'claims.declare.riskColumn' | transloco }}</th>
+              <th>{{ 'requirements.assignments.planProductColumn' | transloco }}</th>
+            </tr>
+          </ng-template>
+          <ng-template #body let-risk>
+            <tr>
+              <td>
+                <p-checkbox [binary]="true" [ngModel]="isRiskSelected(risk)" [ngModelOptions]="{ standalone: true }" (onChange)="toggleRisk(risk, $event.checked)" />
+              </td>
+              <td>{{ riskLabel(risk) }}</td>
+              <td>{{ planLabel(risk) }}</td>
+            </tr>
+          </ng-template>
+          <ng-template #emptymessage>
+            <tr>
+              <td colspan="3" class="text-center text-slate-500">{{ 'claims.declare.noRisksInContract' | transloco }}</td>
+            </tr>
+          </ng-template>
+        </p-table>
+      </div>
+
+      <div class="mt-2 flex justify-end">
+        <button pButton type="submit" [label]="'claims.declare.submitButton' | transloco" [loading]="submitting()"></button>
+      </div>
+    </form>
+  }
+</div>

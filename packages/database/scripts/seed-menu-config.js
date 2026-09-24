@@ -128,6 +128,35 @@ const SITE_MAP_ITEMS = [
   },
   { cod: 'COMISIONES', des: 'Comisiones', order: 8, path: '/comisiones', icon: 'pi-wallet' },
   {
+    // "Siniestros" -- Fase 4, Etapa 1 (2026-09-24): declarar/ver un
+    // siniestro + sus catálogos propios (SClaimType/SClaimEvent). Mismo
+    // patrón de ítem padre con hijos que CONFIG_PRODUCTOS/FLUJOS_PROCESO.
+    // "Nuevo siniestro" no es un ítem de menú propio -- se llega desde el
+    // botón "Nuevo" del listado (mismo criterio que Cotización).
+    cod: 'SINIESTROS',
+    des: 'Siniestros',
+    order: 9,
+    path: null,
+    icon: 'pi-exclamation-triangle',
+    children: [
+      { cod: 'SINIESTROS_LISTADO', des: 'Siniestros', order: 1, path: '/siniestros', icon: 'pi-list' },
+      {
+        cod: 'SINIESTROS_TIPOS',
+        des: 'Tipos de siniestro',
+        order: 2,
+        path: '/siniestros/tipos-de-siniestro',
+        icon: 'pi-tag',
+      },
+      {
+        cod: 'SINIESTROS_CATALOGOS',
+        des: 'Catálogos',
+        order: 3,
+        path: '/siniestros/catalogos',
+        icon: 'pi-tags',
+      },
+    ],
+  },
+  {
     // "Flujos de proceso" -- pedido explícito del usuario (2026-09-23):
     // exponer `SProductProcessFlow` (la pieza que faltaba de "flujos de
     // contratación configurables por producto") + el resto del motor
@@ -136,7 +165,7 @@ const SITE_MAP_ITEMS = [
     // patrón de ítem padre con hijos que CONFIG_PRODUCTOS.
     cod: 'FLUJOS_PROCESO',
     des: 'Flujos de proceso',
-    order: 9,
+    order: 10,
     path: null,
     icon: 'pi-directions',
     children: [

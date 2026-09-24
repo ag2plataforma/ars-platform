@@ -233,7 +233,7 @@ export interface ContractDetail {
   TstInitial: string;
   TstEnd: string | null;
   TstSubscription: string;
-  SProduct: { DesProduct: string; SCurrency: { SymbolCurrency: string } };
+  SProduct: { CodProduct: string; DesProduct: string; SCurrency: { SymbolCurrency: string } };
   SValidityType: { DesValidityType: string };
   SPaymentFraction: { DesPaymentFraction: string };
   SState: ContractStateRef;

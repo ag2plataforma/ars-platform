@@ -414,6 +414,41 @@ export const PRODUCT_CATALOG_REGISTRY: CatalogConfig[] = [
 ];
 
 
+/** Catálogos propios de Siniestros (Fase 4, Etapa 1, 2026-09-24):
+ * `SClaimEvent` es un catálogo simple (Cod/Des + FK obligatoria a
+ * `SClaimType`), así que entra en el componente genérico de catálogo
+ * (mismo criterio que `countries`/`risks`, ver `PRODUCT_CATALOG_REGISTRY`).
+ * `SClaimType` NO entra acá -- tiene 3 campos numéricos (`numClaimsPerYear`/
+ * `initialProvisionAmount`/`numDeadLineReport`) que el formulario genérico
+ * no sabe editar (`CatalogFieldType` no tiene un tipo `number`), así que
+ * es una pantalla bespoke (`ClaimTypesComponent`), mismo criterio que
+ * `SProductRequirement`. */
+export const CLAIMS_CATALOG_REGISTRY: CatalogConfig[] = [
+  {
+    key: 'claim-events',
+    label: 'catalogsRegistry.claim-events.label',
+    singular: 'catalogsRegistry.claim-events.singular',
+    path: '/claims/claim-events',
+    codField: 'CodClaimEvent',
+    desField: 'DesClaimEvent',
+    idField: 'IdeClaimEvent',
+    extraFields: [
+      {
+        key: 'codClaimType',
+        label: 'catalogFields.codClaimType',
+        type: 'select',
+        required: true,
+        optionsPath: '/claims/claim-types',
+        optionCodField: 'CodClaimType',
+        optionDesField: 'DesClaimType',
+        columnRelation: 'SClaimType',
+      },
+      { key: 'desShort', label: 'catalogFields.desShort', type: 'text', required: false },
+      { key: 'desLarge', label: 'catalogFields.desLarge', type: 'textarea', required: false, hideInList: true },
+    ],
+  },
+];
+
 /** Catálogos simples del motor de flujo configurable (`SStep`/`SScreen`/
  * `SProcessFlow`) -- pantalla "Flujos de proceso" (`/flujos-de-proceso/catalogos`),
  * agrupada en el menú junto con "Pasos de flujo" y "Asignación por
