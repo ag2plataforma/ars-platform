@@ -9,6 +9,7 @@ const INCLUDE = {
   SScreen: true,
   SStep_SFlowStep_IdeStepCurrentToSStep: true,
   SStep_SFlowStep_IdeStepForwardToSStep: true,
+  SState: true,
 } as const;
 
 /**

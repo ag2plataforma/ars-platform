@@ -125,6 +125,18 @@
     "distribution-channels": {
       "label": "Canales de distribución",
       "singular": "canal de distribución"
+    },
+    "steps": {
+      "label": "Pasos",
+      "singular": "paso"
+    },
+    "screens": {
+      "label": "Pantallas",
+      "singular": "pantalla"
+    },
+    "process-flows": {
+      "label": "Flujos",
+      "singular": "flujo"
     }
   },
   "catalogFields": {
@@ -179,7 +191,9 @@
     "toggleConfirm": "¿Confirmás {{action}} \"{{item}}\"?",
     "toggleActivateAction": "activar",
     "toggleDeactivateAction": "inactivar",
-    "toggledDetail": "\"{{item}}\" ahora está {{state}}."
+    "toggledDetail": "\"{{item}}\" ahora está {{state}}.",
+    "processFlowsPageTitle": "Catálogos de flujo de proceso",
+    "processFlowsPageSubtitle": "Pasos, pantallas y flujos reutilizables del motor de flujo configurable."
   },
   "locations": {
     "title": "Ubicaciones",
@@ -726,6 +740,59 @@
       "orSearchByNameLabel": "o buscar por nombre",
       "nameSearchPlaceholder": "Nombre y/o apellido",
       "nameSearchEmptyDetail": "No se encontró ninguna persona con ese nombre."
+    }
+  },
+  "processFlows": {
+    "flowSteps": {
+      "title": "Pasos de flujo",
+      "subtitle": "Configura, para cada flujo, qué paso sigue a cuál según el resultado obtenido.",
+      "newButton": "Nuevo paso de flujo",
+      "processFlowColumn": "Flujo de proceso",
+      "stepCurrentColumn": "Paso actual",
+      "resultColumn": "Resultado",
+      "stepForwardColumn": "Paso siguiente",
+      "screenColumn": "Pantalla",
+      "initialColumn": "Paso inicial",
+      "initialYes": "Sí",
+      "resultOK": "OK",
+      "resultNotOK": "No OK",
+      "emptyState": "No hay pasos de flujo configurados todavía.",
+      "createDialogTitle": "Nuevo paso de flujo",
+      "editDialogTitle": "Editar paso de flujo",
+      "processFlowSelectPlaceholder": "Selecciona un flujo",
+      "stepSelectPlaceholder": "Selecciona un paso",
+      "screenSelectPlaceholder": "Selecciona una pantalla",
+      "loadErrorDetail": "No se pudieron cargar los pasos de flujo.",
+      "createdDetail": "Paso de flujo creado.",
+      "updatedDetail": "Paso de flujo actualizado.",
+      "toggledDetail": "Estado del paso de flujo actualizado."
+    },
+    "assignments": {
+      "title": "Asignación de flujo por producto",
+      "subtitle": "Define qué flujo de proceso aplica a cada combinación de producto y canal (opcionalmente, por riesgo y vía de distribución).",
+      "newButton": "Nueva asignación",
+      "testerButton": "Probar",
+      "testerRunButton": "Resolver",
+      "testerDialogTitle": "Probar resolución de flujo",
+      "testerResultFlow": "Flujo resuelto",
+      "testerResultNoFlow": "Ninguno (sin configuración -- comportamiento actual sin cambios)",
+      "testerResultSteps": "Pasos activos",
+      "testerResultEmpty": "Ninguno",
+      "processFlowColumn": "Flujo de proceso",
+      "productColumn": "Producto",
+      "riskProductColumn": "Riesgo de producto",
+      "channelColumn": "Canal de distribución",
+      "wayColumn": "Vía de distribución",
+      "anyValue": "(cualquiera)",
+      "riskProductHint": "Déjalo en \"(cualquiera)\" para que la asignación aplique a cualquier riesgo del producto.",
+      "wayHint": "Déjalo en \"(cualquiera)\" para que la asignación aplique a cualquier vía de distribución.",
+      "emptyState": "No hay asignaciones de flujo configuradas todavía.",
+      "createDialogTitle": "Nueva asignación de flujo",
+      "editDialogTitle": "Editar asignación de flujo",
+      "processFlowSelectPlaceholder": "Selecciona un flujo",
+      "productSelectPlaceholder": "Selecciona un producto",
+      "channelSelectPlaceholder": "Selecciona un canal",
+      "loadErrorDetail": "No se pudieron cargar las asignaciones de flujo."
     }
   }
 }

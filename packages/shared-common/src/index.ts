@@ -19,3 +19,5 @@ export * from './email/email.module';
 export * from './catalog-crud/catalog-crud.service';
 export * from './social-impact/social-impact.module';
 export * from './social-impact/social-impact-config.interface';
+export * from './process-flow/process-flow.module';
+export * from './process-flow/process-flow.interface';

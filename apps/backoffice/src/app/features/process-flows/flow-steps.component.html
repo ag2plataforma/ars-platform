@@ -1,0 +1,179 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex flex-col gap-4">
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold text-slate-900">{{ 'processFlows.flowSteps.title' | transloco }}</h2>
+      <p class="text-sm text-slate-500">{{ 'processFlows.flowSteps.subtitle' | transloco }}</p>
+    </div>
+    <button pButton type="button" icon="pi pi-plus" [label]="'processFlows.flowSteps.newButton' | transloco" (click)="openCreate()"></button>
+  </div>
+
+  <p-table
+    [value]="rows()"
+    [loading]="loading()"
+    dataKey="IdeFlowStep"
+    [paginator]="true"
+    [rows]="10"
+    [rowsPerPageOptions]="[10, 25, 50]"
+    [showCurrentPageReport]="true"
+    currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+    styleClass="p-datatable-sm"
+  >
+    <ng-template #header>
+      <tr>
+        <th pSortableColumn="SProcessFlow.DesProcessFlow">
+          <span class="ars-th-flex">
+            {{ 'processFlows.flowSteps.processFlowColumn' | transloco }}
+            <p-sortIcon field="SProcessFlow.DesProcessFlow" />
+            <p-columnFilter type="text" field="SProcessFlow.DesProcessFlow" display="menu" />
+          </span>
+        </th>
+        <th>{{ 'processFlows.flowSteps.stepCurrentColumn' | transloco }}</th>
+        <th>{{ 'processFlows.flowSteps.resultColumn' | transloco }}</th>
+        <th>{{ 'processFlows.flowSteps.stepForwardColumn' | transloco }}</th>
+        <th pSortableColumn="SScreen.DesScreen">
+          <span class="ars-th-flex">
+            {{ 'processFlows.flowSteps.screenColumn' | transloco }}
+            <p-sortIcon field="SScreen.DesScreen" />
+          </span>
+        </th>
+        <th>{{ 'processFlows.flowSteps.initialColumn' | transloco }}</th>
+        <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+        <th class="w-32">{{ 'catalogs.actionsColumn' | transloco }}</th>
+      </tr>
+    </ng-template>
+    <ng-template #body let-row>
+      <tr>
+        <td>{{ row.SProcessFlow?.DesProcessFlow }}</td>
+        <td>{{ stepCurrentDes(row) }}</td>
+        <td>
+          <p-tag
+            [value]="(row.IndResultOK ? 'processFlows.flowSteps.resultOK' : 'processFlows.flowSteps.resultNotOK') | transloco"
+            [severity]="row.IndResultOK ? 'success' : 'warn'"
+          />
+        </td>
+        <td>{{ stepForwardDes(row) }}</td>
+        <td>{{ row.SScreen?.DesScreen }}</td>
+        <td>
+          <p-tag *ngIf="row.IndInitialStep" [value]="'processFlows.flowSteps.initialYes' | transloco" severity="info" />
+        </td>
+        <td>
+          <p-tag [value]="(isActive(row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isActive(row) ? 'success' : 'danger'" />
+        </td>
+        <td>
+          <div class="flex gap-1">
+            <button
+              pButton
+              type="button"
+              icon="pi pi-pencil"
+              [text]="true"
+              severity="secondary"
+              [pTooltip]="'locations.editTooltip' | transloco"
+              tooltipPosition="top"
+              (click)="openEdit(row)"
+            ></button>
+            <button
+              pButton
+              type="button"
+              [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'"
+              [text]="true"
+              [severity]="isActive(row) ? 'danger' : 'success'"
+              [pTooltip]="(isActive(row) ? 'catalogs.deactivateHeader' : 'catalogs.activateHeader') | transloco"
+              tooltipPosition="top"
+              (click)="toggleState(row)"
+            ></button>
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="8" class="text-center text-slate-500">{{ 'processFlows.flowSteps.emptyState' | transloco }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-dialog
+  [header]="(dialogMode() === 'create' ? 'processFlows.flowSteps.createDialogTitle' : 'processFlows.flowSteps.editDialogTitle') | transloco"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  [style]="{ width: '30rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'processFlows.flowSteps.processFlowColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codProcessFlow"
+        [options]="processFlows()"
+        optionLabel="DesProcessFlow"
+        optionValue="CodProcessFlow"
+        [placeholder]="'processFlows.flowSteps.processFlowSelectPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'processFlows.flowSteps.stepCurrentColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codStepCurrent"
+        [options]="steps()"
+        optionLabel="DesStep"
+        optionValue="CodStep"
+        [placeholder]="'processFlows.flowSteps.stepSelectPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'processFlows.flowSteps.resultColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="indResultOK"
+        [options]="[
+          { label: ('processFlows.flowSteps.resultOK' | transloco), value: true },
+          { label: ('processFlows.flowSteps.resultNotOK' | transloco), value: false },
+        ]"
+        optionLabel="label"
+        optionValue="value"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'processFlows.flowSteps.stepForwardColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codStepForward"
+        [options]="steps()"
+        optionLabel="DesStep"
+        optionValue="CodStep"
+        [placeholder]="'processFlows.flowSteps.stepSelectPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'processFlows.flowSteps.screenColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codScreen"
+        [options]="screens()"
+        optionLabel="DesScreen"
+        optionValue="CodScreen"
+        [placeholder]="'processFlows.flowSteps.screenSelectPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex items-center gap-2">
+      <p-checkbox formControlName="indInitialStep" [binary]="true" inputId="flow-step-initial" />
+      <label for="flow-step-initial" class="text-sm text-slate-700">{{ 'processFlows.flowSteps.initialColumn' | transloco }}</label>
+    </div>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
+    </div>
+  </form>
+</p-dialog>

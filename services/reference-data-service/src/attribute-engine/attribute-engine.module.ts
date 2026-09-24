@@ -16,6 +16,8 @@ import { AttributePropertiesController } from './attribute-properties/attribute-
 import { AttributePropertiesService } from './attribute-properties/attribute-properties.service';
 import { FlowStepsController } from './flow-steps/flow-steps.controller';
 import { FlowStepsService } from './flow-steps/flow-steps.service';
+import { ProductProcessFlowsController } from './product-process-flows/product-process-flows.controller';
+import { ProductProcessFlowsService } from './product-process-flows/product-process-flows.service';
 
 /**
  * Motor de atributos personalizables + flujo configurable de cotización,
@@ -32,8 +34,15 @@ import { FlowStepsService } from './flow-steps/flow-steps.service';
  *  - Configuración del flujo/wizard: `SProcessFlow`, `SStep`, `SScreen`,
  *    `SFlowStep` -- la CONFIGURACIÓN del flujo (qué pasos existen y en
  *    qué orden), no su ejecución en una sesión concreta
- *    (`TFlowStepInstance`/`FPInstanceFlow`), que queda pendiente de que
- *    `underwriting-service` tenga el flujo real de cotización.
+ *    (`TFlowStepInstance`/`FPInstanceFlow`).
+ *  - `SProductProcessFlow`: asigna un flujo a un producto/canal real
+ *    (+ riesgo/vía opcionales) -- pieza agregada 2026-09-23 a pedido
+ *    del usuario, único de los 5 que no tenía CRUD (ver el doc-comment
+ *    de `ProductProcessFlowsService` y de `ProcessFlowResolver` en
+ *    `@ars-platform/shared-common`). Incluye `GET .../resolve-steps`,
+ *    consumido por la nueva pantalla de administración y usado como
+ *    referencia por `underwriting-service` para decidir qué pasos
+ *    opcionales del wizard de cotización mostrar.
  */
 @Module({
   imports: [ReferenceDataStateMachineModule],
@@ -46,6 +55,7 @@ import { FlowStepsService } from './flow-steps/flow-steps.service';
     ModelAttributesController,
     AttributePropertiesController,
     FlowStepsController,
+    ProductProcessFlowsController,
   ],
   providers: [
     EntitiesService,
@@ -56,6 +66,7 @@ import { FlowStepsService } from './flow-steps/flow-steps.service';
     ModelAttributesService,
     AttributePropertiesService,
     FlowStepsService,
+    ProductProcessFlowsService,
   ],
 })
 export class AttributeEngineModule {}

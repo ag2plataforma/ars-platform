@@ -1,0 +1,269 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex flex-col gap-4">
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold text-slate-900">{{ 'processFlows.assignments.title' | transloco }}</h2>
+      <p class="text-sm text-slate-500">{{ 'processFlows.assignments.subtitle' | transloco }}</p>
+    </div>
+    <div class="flex gap-2">
+      <button pButton type="button" icon="pi pi-play" severity="secondary" [label]="'processFlows.assignments.testerButton' | transloco" (click)="openTester()"></button>
+      <button pButton type="button" icon="pi pi-plus" [label]="'processFlows.assignments.newButton' | transloco" (click)="openCreate()"></button>
+    </div>
+  </div>
+
+  <p-table
+    [value]="rows()"
+    [loading]="loading()"
+    dataKey="IdeProductProcessFlow"
+    [paginator]="true"
+    [rows]="10"
+    [rowsPerPageOptions]="[10, 25, 50]"
+    [showCurrentPageReport]="true"
+    currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+    styleClass="p-datatable-sm"
+  >
+    <ng-template #header>
+      <tr>
+        <th pSortableColumn="CodProductProcessFlow">
+          <span class="ars-th-flex">
+            {{ 'catalogs.codeColumn' | transloco }}
+            <p-sortIcon field="CodProductProcessFlow" />
+            <p-columnFilter type="text" field="CodProductProcessFlow" display="menu" />
+          </span>
+        </th>
+        <th pSortableColumn="DesProductProcessFlow">
+          <span class="ars-th-flex">
+            {{ 'catalogs.descriptionColumn' | transloco }}
+            <p-sortIcon field="DesProductProcessFlow" />
+            <p-columnFilter type="text" field="DesProductProcessFlow" display="menu" />
+          </span>
+        </th>
+        <th pSortableColumn="SProcessFlow.DesProcessFlow">
+          <span class="ars-th-flex">
+            {{ 'processFlows.assignments.processFlowColumn' | transloco }}
+            <p-sortIcon field="SProcessFlow.DesProcessFlow" />
+          </span>
+        </th>
+        <th pSortableColumn="SProduct.DesProduct">
+          <span class="ars-th-flex">
+            {{ 'processFlows.assignments.productColumn' | transloco }}
+            <p-sortIcon field="SProduct.DesProduct" />
+          </span>
+        </th>
+        <th>{{ 'processFlows.assignments.riskProductColumn' | transloco }}</th>
+        <th pSortableColumn="SDistributionChannel.DesDistributionChannel">
+          <span class="ars-th-flex">
+            {{ 'processFlows.assignments.channelColumn' | transloco }}
+            <p-sortIcon field="SDistributionChannel.DesDistributionChannel" />
+          </span>
+        </th>
+        <th>{{ 'processFlows.assignments.wayColumn' | transloco }}</th>
+        <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+        <th class="w-32">{{ 'catalogs.actionsColumn' | transloco }}</th>
+      </tr>
+    </ng-template>
+    <ng-template #body let-row>
+      <tr>
+        <td>{{ row.CodProductProcessFlow }}</td>
+        <td>{{ row.DesProductProcessFlow }}</td>
+        <td>{{ row.SProcessFlow?.DesProcessFlow }}</td>
+        <td>{{ row.SProduct?.DesProduct }}</td>
+        <td>{{ riskProductLabel(row) }}</td>
+        <td>{{ row.SDistributionChannel?.DesDistributionChannel }}</td>
+        <td>{{ distributionWayLabel(row) }}</td>
+        <td>
+          <p-tag [value]="(isActive(row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isActive(row) ? 'success' : 'danger'" />
+        </td>
+        <td>
+          <div class="flex gap-1">
+            <button
+              pButton
+              type="button"
+              icon="pi pi-pencil"
+              [text]="true"
+              severity="secondary"
+              [pTooltip]="'locations.editTooltip' | transloco"
+              tooltipPosition="top"
+              (click)="openEdit(row)"
+            ></button>
+            <button
+              pButton
+              type="button"
+              [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'"
+              [text]="true"
+              [severity]="isActive(row) ? 'danger' : 'success'"
+              [pTooltip]="(isActive(row) ? 'catalogs.deactivateHeader' : 'catalogs.activateHeader') | transloco"
+              tooltipPosition="top"
+              (click)="toggleState(row)"
+            ></button>
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="9" class="text-center text-slate-500">{{ 'processFlows.assignments.emptyState' | transloco }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-dialog
+  [header]="(dialogMode() === 'create' ? 'processFlows.assignments.createDialogTitle' : 'processFlows.assignments.editDialogTitle') | transloco"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  [style]="{ width: '32rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-2">
+      <label for="ppf-cod" class="text-sm font-medium text-slate-700">{{ 'catalogs.codeColumn' | transloco }}</label>
+      <input pInputText id="ppf-cod" formControlName="codProductProcessFlow" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label for="ppf-des" class="text-sm font-medium text-slate-700">{{ 'catalogs.descriptionColumn' | transloco }}</label>
+      <input pInputText id="ppf-des" formControlName="desProductProcessFlow" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'processFlows.assignments.processFlowColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codProcessFlow"
+        [options]="processFlows()"
+        optionLabel="DesProcessFlow"
+        optionValue="CodProcessFlow"
+        [placeholder]="'processFlows.assignments.processFlowSelectPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'processFlows.assignments.productColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codProduct"
+        [options]="products()"
+        optionLabel="DesProduct"
+        optionValue="CodProduct"
+        [placeholder]="'processFlows.assignments.productSelectPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'processFlows.assignments.channelColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codDistributionChannel"
+        [options]="channels()"
+        optionLabel="DesDistributionChannel"
+        optionValue="CodDistributionChannel"
+        [placeholder]="'processFlows.assignments.channelSelectPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'processFlows.assignments.riskProductColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codRiskProduct"
+        [options]="[{ _label: ('processFlows.assignments.anyValue' | transloco), CodRiskProduct: ANY_VALUE }, ...riskProducts()]"
+        optionLabel="_label"
+        optionValue="CodRiskProduct"
+        styleClass="w-full"
+      />
+      <p class="text-xs text-slate-500">{{ 'processFlows.assignments.riskProductHint' | transloco }}</p>
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'processFlows.assignments.wayColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codDistributionWay"
+        [options]="[{ DesDistributionWay: ('processFlows.assignments.anyValue' | transloco), CodDistributionWay: ANY_VALUE }, ...ways()]"
+        optionLabel="DesDistributionWay"
+        optionValue="CodDistributionWay"
+        styleClass="w-full"
+      />
+      <p class="text-xs text-slate-500">{{ 'processFlows.assignments.wayHint' | transloco }}</p>
+    </div>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
+    </div>
+  </form>
+</p-dialog>
+
+<p-dialog
+  [header]="'processFlows.assignments.testerDialogTitle' | transloco"
+  [visible]="testerVisible()"
+  [modal]="true"
+  [style]="{ width: '28rem' }"
+  (visibleChange)="!$event && closeTester()"
+>
+  <form [formGroup]="testerForm" (ngSubmit)="runTester()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'processFlows.assignments.productColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codProduct"
+        [options]="products()"
+        optionLabel="DesProduct"
+        optionValue="CodProduct"
+        [placeholder]="'processFlows.assignments.productSelectPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'processFlows.assignments.channelColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codDistributionChannel"
+        [options]="channels()"
+        optionLabel="DesDistributionChannel"
+        optionValue="CodDistributionChannel"
+        [placeholder]="'processFlows.assignments.channelSelectPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'processFlows.assignments.riskProductColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codRiskProduct"
+        [options]="[{ _label: ('processFlows.assignments.anyValue' | transloco), CodRiskProduct: ANY_VALUE }, ...riskProducts()]"
+        optionLabel="_label"
+        optionValue="CodRiskProduct"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'processFlows.assignments.wayColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codDistributionWay"
+        [options]="[{ DesDistributionWay: ('processFlows.assignments.anyValue' | transloco), CodDistributionWay: ANY_VALUE }, ...ways()]"
+        optionLabel="DesDistributionWay"
+        optionValue="CodDistributionWay"
+        styleClass="w-full"
+      />
+    </div>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeTester()"></button>
+      <button pButton type="submit" [label]="'processFlows.assignments.testerRunButton' | transloco" [loading]="testerLoading()"></button>
+    </div>
+  </form>
+
+  <div *ngIf="testerResult() as result" class="mt-4 flex flex-col gap-2 rounded border border-slate-200 bg-slate-50 p-3">
+    <p class="text-sm text-slate-700">
+      <span class="font-medium">{{ 'processFlows.assignments.testerResultFlow' | transloco }}:</span>
+      {{ result.codProcessFlow ?? ('processFlows.assignments.testerResultNoFlow' | transloco) }}
+    </p>
+    <p class="text-sm text-slate-700">{{ 'processFlows.assignments.testerResultSteps' | transloco }}:</p>
+    <div class="flex flex-wrap gap-1">
+      <p-tag *ngFor="let step of result.activeSteps" [value]="step" severity="info" />
+      <span *ngIf="result.activeSteps.length === 0" class="text-sm text-slate-500">{{ 'processFlows.assignments.testerResultEmpty' | transloco }}</span>
+    </div>
+  </div>
+</p-dialog>

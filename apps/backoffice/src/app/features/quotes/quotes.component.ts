@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormsModule, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
+import { forkJoin, of } from 'rxjs';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { CheckboxModule } from 'primeng/checkbox';
@@ -25,7 +26,7 @@ import {
   SubmitSocialImpactAnswersPayload,
 } from './quoting.service';
 import { MOBILE_PHONE_CONTACT_CLASS, Person, PersonsService } from '../../core/party/persons.service';
-import { RiskAttributeField, RiskAttributesService } from './risk-attributes.service';
+import { RiskAttributeField, RiskAttributesService, STEP_CODE_CUSTOM_ATTRIBUTES } from './risk-attributes.service';
 
 const PRODUCTS_PATH = '/product-rating/products';
 const DISTRIBUTION_CHANNELS_PATH = '/party/distribution-channels';
@@ -351,13 +352,37 @@ export class QuotesComponent {
     const ideRiskProduct = String(row['IdeRiskProduct']);
     const state = buildRiskFieldsState(this.fb, codRiskProduct);
     this.riskFieldsMap.set(codRiskProduct, state);
-    this.riskAttributes.getSchema(ideRiskProduct).subscribe({
-      next: (schema) => {
-        for (const field of schema.fields) {
+
+    // Además del schema (¿tiene este riesgo campos personalizados
+    // configurados?), consulta si el flujo asignado al producto/canal
+    // (`SProductProcessFlow`, pedido explícito del usuario, 2026-09-23)
+    // deja ACTIVO el paso "Atributos personalizados" -- comportamiento
+    // por defecto SEGURO: sin `codDistributionChannel` todavía elegido,
+    // o sin ningún flujo configurado para la combinación
+    // (`codProcessFlow: null`), no se oculta nada (ver el doc-comment de
+    // `ProcessFlowResolver` en `@ars-platform/shared-common`).
+    const codProduct = this.form.controls.codProduct.value;
+    const codDistributionChannel = this.form.controls.codDistributionChannel.value;
+    const codDistributionWay = this.form.controls.codDistributionWay.value;
+    const activeSteps$ =
+      codProduct && codDistributionChannel
+        ? this.riskAttributes.resolveActiveSteps({
+            codProduct,
+            codDistributionChannel,
+            codRiskProduct,
+            codDistributionWay: codDistributionWay || undefined,
+          })
+        : of(null);
+
+    forkJoin({ schema: this.riskAttributes.getSchema(ideRiskProduct), flow: activeSteps$ }).subscribe({
+      next: ({ schema, flow }) => {
+        const stepActive = !flow || flow.codProcessFlow === null || flow.activeSteps.includes(STEP_CODE_CUSTOM_ATTRIBUTES);
+        const fields = stepActive ? schema.fields : [];
+        for (const field of fields) {
           const initialValue = field.type === 'checkbox' ? false : null;
           state.form.addControl(field.ideAttributeProperty, this.fb.control(initialValue, buildValidators(field.validators)));
         }
-        state.fields.set(schema.fields);
+        state.fields.set(fields);
         state.loading.set(false);
       },
       error: (err: HttpErrorResponse) => {

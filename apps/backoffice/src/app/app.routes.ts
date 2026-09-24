@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth/auth.guard';
-import { PRODUCT_CATALOG_REGISTRY } from './core/catalogs/catalog.model';
+import { PRODUCT_CATALOG_REGISTRY, PROCESS_FLOW_CATALOG_REGISTRY } from './core/catalogs/catalog.model';
 
 export const routes: Routes = [
   {
@@ -86,6 +86,40 @@ export const routes: Routes = [
         path: 'comisiones',
         loadComponent: () =>
           import('./features/commissions/commissions.component').then((m) => m.CommissionsComponent),
+      },
+      {
+        // "Flujos de proceso" -- ítem padre en el sidebar con 3 hijos,
+        // mismo patrón que "Configuración de productos": Catálogos
+        // (Pasos/Pantallas/Flujos, catálogos simples que reutilizan
+        // `CatalogsComponent`), Pasos de flujo (`SFlowStep`) y
+        // Asignación por producto (`SProductProcessFlow`, la pieza que
+        // faltaba -- ver `product-process-flows.component.ts`). Pedido
+        // explícito del usuario, 2026-09-23.
+        path: 'flujos-de-proceso',
+        children: [
+          {
+            path: 'catalogos',
+            loadComponent: () =>
+              import('./features/catalogs/catalogs.component').then((m) => m.CatalogsComponent),
+            data: {
+              registry: PROCESS_FLOW_CATALOG_REGISTRY,
+              pageTitle: 'catalogs.processFlowsPageTitle',
+              pageSubtitle: 'catalogs.processFlowsPageSubtitle',
+            },
+          },
+          {
+            path: 'pasos-de-flujo',
+            loadComponent: () =>
+              import('./features/process-flows/flow-steps.component').then((m) => m.FlowStepsComponent),
+          },
+          {
+            path: 'asignacion-por-producto',
+            loadComponent: () =>
+              import('./features/process-flows/product-process-flows.component').then(
+                (m) => m.ProductProcessFlowsComponent,
+              ),
+          },
+        ],
       },
       {
         // "Configuración de productos" -- ítem padre en el sidebar (ver

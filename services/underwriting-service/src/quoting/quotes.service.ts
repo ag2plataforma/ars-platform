@@ -3,10 +3,13 @@ import { Prisma, PrismaService } from '@ars-platform/database';
 import {
   ADJUSTMENT_VALUE_RESOLVER,
   AdjustmentValueResolver,
+  PROCESS_FLOW_RESOLVER,
+  ProcessFlowResolver,
   RulesEngineService,
   SOCIAL_IMPACT_CONFIG_RESOLVER,
   SocialImpactConfigResolver,
   StateMachineService,
+  STEP_CODE_SOCIAL_IMPACT,
 } from '@ars-platform/shared-common';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { ListQuotesDto } from './dto/list-quotes.dto';
@@ -69,6 +72,8 @@ export class QuotesService {
     private readonly socialImpactHttpClient: SocialImpactHttpClient,
     @Inject(ADJUSTMENT_VALUE_RESOLVER)
     private readonly adjustmentValueResolver: AdjustmentValueResolver,
+    @Inject(PROCESS_FLOW_RESOLVER)
+    private readonly processFlowResolver: ProcessFlowResolver,
   ) {}
 
   async create(dto: CreateQuoteDto, actor: string) {
@@ -896,7 +901,12 @@ export class QuotesService {
     // (el usuario no lleno el formulario todavia), se expone
     // `answered: false` para que el frontend sepa que falta ese paso --
     // ver `submitSocialImpactAnswers` mas abajo, que es quien lo crea.
-    const socialImpact = await this.resolveSocialImpact(quote.IdeProduct, ideQuote);
+    const socialImpact = await this.resolveSocialImpact(
+      quote.IdeProduct,
+      quote.IdeDistributionChannel,
+      quote.IdeDistributionWay,
+      ideQuote,
+    );
 
     return {
       ideQuote: quote.IdeQuote,
@@ -995,12 +1005,39 @@ export class QuotesService {
     return row.IdeRiskProduct;
   }
 
-  /** Ver el comentario en `buildPricingResult` -- resuelve si el producto
-   *  participa de Impacto Social y, si participa, si esta cotización ya
-   *  tiene una respuesta real persistida (`TQuoteSocialImpactAnswer`). */
-  private async resolveSocialImpact(ideProduct: string, ideQuote: string): Promise<SocialImpactInfo> {
+  /**
+   * Ver el comentario en `buildPricingResult` -- resuelve si el producto
+   * participa de Impacto Social y, si participa, si esta cotización ya
+   * tiene una respuesta real persistida (`TQuoteSocialImpactAnswer`).
+   *
+   * Desde 2026-09-23 también consulta `PROCESS_FLOW_RESOLVER`
+   * (`SProductProcessFlow`/`SFlowStep`, ver el doc-comment de
+   * `ProcessFlowResolver` en `@ars-platform/shared-common`) para poder
+   * OCULTAR el paso en productos donde el flujo configurado no lo
+   * incluye -- comportamiento aditivo/opt-in: si no hay ningún
+   * `SProductProcessFlow` para esta combinación (`ideProcessFlow ===
+   * null`), no cambia nada de lo que ya funcionaba (`SSocialImpactConfig`
+   * sigue siendo la única fuente de verdad, igual que antes de esta
+   * fecha). Solo un flujo EXPLÍCITAMENTE configurado que no incluya
+   * `STEP_CODE_SOCIAL_IMPACT` puede apagar el paso.
+   */
+  private async resolveSocialImpact(
+    ideProduct: string,
+    ideDistributionChannel: string,
+    ideDistributionWay: string,
+    ideQuote: string,
+  ): Promise<SocialImpactInfo> {
     const config = await this.socialImpactConfigResolver.resolveActiveConfig(ideProduct);
     if (!config) {
+      return { active: false };
+    }
+
+    const flowResolution = await this.processFlowResolver.resolveActiveSteps({
+      ideProduct,
+      ideDistributionChannel,
+      ideDistributionWay,
+    });
+    if (flowResolution.ideProcessFlow !== null && !flowResolution.activeSteps.includes(STEP_CODE_SOCIAL_IMPACT)) {
       return { active: false };
     }
 

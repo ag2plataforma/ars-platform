@@ -397,3 +397,43 @@ export const PRODUCT_CATALOG_REGISTRY: CatalogConfig[] = [
     ],
   },
 ];
+
+
+/** Catálogos simples del motor de flujo configurable (`SStep`/`SScreen`/
+ * `SProcessFlow`) -- pantalla "Flujos de proceso" (`/flujos-de-proceso/catalogos`),
+ * agrupada en el menú junto con "Pasos de flujo" y "Asignación por
+ * producto" (ver `product-process-flows.component.ts`). `SScreen` no
+ * expone `screenContent` acá -- ver el doc-comment de `ScreensService`
+ * en reference-data-service: es JSON libre, "efectivamente sin uso" para
+ * esta primera vuelta del motor (decisión explícita del usuario,
+ * 2026-09-23), así que el generic-catalog-form no lo edita (el backend
+ * lo deja en `{}` por defecto). */
+export const PROCESS_FLOW_CATALOG_REGISTRY: CatalogConfig[] = [
+  {
+    key: 'steps',
+    label: 'catalogsRegistry.steps.label',
+    singular: 'catalogsRegistry.steps.singular',
+    path: '/reference-data/steps',
+    codField: 'CodStep',
+    desField: 'DesStep',
+    idField: 'IdeStep',
+  },
+  {
+    key: 'screens',
+    label: 'catalogsRegistry.screens.label',
+    singular: 'catalogsRegistry.screens.singular',
+    path: '/reference-data/screens',
+    codField: 'CodScreen',
+    desField: 'DesScreen',
+    idField: 'IdeScreen',
+  },
+  {
+    key: 'process-flows',
+    label: 'catalogsRegistry.process-flows.label',
+    singular: 'catalogsRegistry.process-flows.singular',
+    path: '/reference-data/process-flows',
+    codField: 'CodProcessFlow',
+    desField: 'DesProcessFlow',
+    idField: 'IdeProcessFlow',
+  },
+];

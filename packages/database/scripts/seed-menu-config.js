@@ -116,6 +116,42 @@ const SITE_MAP_ITEMS = [
     ],
   },
   { cod: 'COMISIONES', des: 'Comisiones', order: 8, path: '/comisiones', icon: 'pi-wallet' },
+  {
+    // "Flujos de proceso" -- pedido explícito del usuario (2026-09-23):
+    // exponer `SProductProcessFlow` (la pieza que faltaba de "flujos de
+    // contratación configurables por producto") + el resto del motor
+    // (`SStep`/`SScreen`/`SProcessFlow`/`SFlowStep`), que ya tenía CRUD
+    // desde la fase del motor de atributos pero ninguna pantalla. Mismo
+    // patrón de ítem padre con hijos que CONFIG_PRODUCTOS.
+    cod: 'FLUJOS_PROCESO',
+    des: 'Flujos de proceso',
+    order: 9,
+    path: null,
+    icon: 'pi-directions',
+    children: [
+      {
+        cod: 'FLUJOS_PROCESO_CATALOGOS',
+        des: 'Catálogos',
+        order: 1,
+        path: '/flujos-de-proceso/catalogos',
+        icon: 'pi-tags',
+      },
+      {
+        cod: 'FLUJOS_PROCESO_PASOS',
+        des: 'Pasos de flujo',
+        order: 2,
+        path: '/flujos-de-proceso/pasos-de-flujo',
+        icon: 'pi-sitemap',
+      },
+      {
+        cod: 'FLUJOS_PROCESO_ASIGNACION',
+        des: 'Asignación por producto',
+        order: 3,
+        path: '/flujos-de-proceso/asignacion-por-producto',
+        icon: 'pi-link',
+      },
+    ],
+  },
 ];
 
 async function main() {

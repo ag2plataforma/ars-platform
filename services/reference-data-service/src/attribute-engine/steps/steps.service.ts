@@ -23,6 +23,7 @@ export class StepsService {
       'DesStep',
       'IdeStep',
       'paso',
+      { SState: true },
     );
   }
 

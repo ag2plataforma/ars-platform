@@ -23,6 +23,7 @@ export class ProcessFlowsService {
       'DesProcessFlow',
       'IdeProcessFlow',
       'flujo de proceso',
+      { SState: true },
     );
   }
 

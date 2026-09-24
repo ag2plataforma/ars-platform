@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { UnderwritingStateMachineModule } from '../state-machine/underwriting-state-machine.module';
 import { UnderwritingRulesEngineModule } from '../rules-engine/underwriting-rules-engine.module';
 import { UnderwritingSocialImpactModule } from '../social-impact/underwriting-social-impact.module';
+import { UnderwritingProcessFlowModule } from '../process-flow/underwriting-process-flow.module';
 import { QuotesController } from './quotes.controller';
 import { QuotesService } from './quotes.service';
 
@@ -13,7 +14,12 @@ import { QuotesService } from './quotes.service';
  * reglas ya construidos y validados, sin modificarlos.
  */
 @Module({
-  imports: [UnderwritingStateMachineModule, UnderwritingRulesEngineModule, UnderwritingSocialImpactModule],
+  imports: [
+    UnderwritingStateMachineModule,
+    UnderwritingRulesEngineModule,
+    UnderwritingSocialImpactModule,
+    UnderwritingProcessFlowModule,
+  ],
   controllers: [QuotesController],
   providers: [QuotesService],
   exports: [QuotesService],

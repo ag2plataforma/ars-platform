@@ -27,6 +27,7 @@ export class ScreensService {
       'DesScreen',
       'IdeScreen',
       'pantalla',
+      { SState: true },
     );
   }
 
