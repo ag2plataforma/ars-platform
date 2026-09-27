@@ -1,0 +1,175 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex flex-col gap-4">
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold text-slate-900">{{ 'claims.approvalThresholds.title' | transloco }}</h2>
+      <p class="text-sm text-slate-500">{{ 'claims.approvalThresholds.subtitle' | transloco }}</p>
+    </div>
+    <button pButton type="button" icon="pi pi-plus" [label]="'claims.approvalThresholds.newButton' | transloco" (click)="openCreate()"></button>
+  </div>
+
+  <p-table
+    [value]="rows()"
+    [loading]="loading()"
+    dataKey="IdeClaimApprovalThreshold"
+    [paginator]="true"
+    [rows]="10"
+    [rowsPerPageOptions]="[10, 25, 50]"
+    [showCurrentPageReport]="true"
+    currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+    styleClass="p-datatable-sm"
+  >
+    <ng-template #header>
+      <tr>
+        <th>{{ 'claims.approvalThresholds.productColumn' | transloco }}</th>
+        <th>{{ 'claims.approvalThresholds.planColumn' | transloco }}</th>
+        <th>{{ 'claims.approvalThresholds.coverageColumn' | transloco }}</th>
+        <th>{{ 'claims.approvalThresholds.currencyColumn' | transloco }}</th>
+        <th pSortableColumn="Level">
+          <span class="ars-th-flex">{{ 'claims.approvalThresholds.levelColumn' | transloco }} <p-sortIcon field="Level" /></span>
+        </th>
+        <th>{{ 'claims.approvalThresholds.maxAmountColumn' | transloco }}</th>
+        <th>{{ 'claims.approvalThresholds.rolColumn' | transloco }}</th>
+        <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+        <th class="w-32">{{ 'catalogs.actionsColumn' | transloco }}</th>
+      </tr>
+    </ng-template>
+    <ng-template #body let-row>
+      <tr>
+        <td>{{ productLabel(row) }}</td>
+        <td>{{ planProductLabel(row) }}</td>
+        <td>{{ coveragePlanLabel(row) }}</td>
+        <td>{{ currencyLabel(row) }}</td>
+        <td>{{ row.Level }}</td>
+        <td>{{ row.MaxAmount !== null && row.MaxAmount !== undefined ? (row.MaxAmount | number: '1.2-2') : ('claims.approvalThresholds.noCeiling' | transloco) }}</td>
+        <td>{{ rolLabel(row) }}</td>
+        <td>
+          <p-tag [value]="(isActive(row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isActive(row) ? 'success' : 'danger'" />
+        </td>
+        <td>
+          <div class="flex gap-1">
+            <button pButton type="button" icon="pi pi-pencil" [text]="true" severity="secondary" (click)="openEdit(row)"></button>
+            <button
+              pButton
+              type="button"
+              [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'"
+              [text]="true"
+              [severity]="isActive(row) ? 'danger' : 'success'"
+              (click)="toggleState(row)"
+            ></button>
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="9" class="text-center text-slate-500">{{ 'claims.approvalThresholds.emptyState' | transloco }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-dialog
+  [header]="(dialogMode() === 'create' ? 'claims.approvalThresholds.createDialogTitle' : 'claims.approvalThresholds.editDialogTitle') | transloco"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  [style]="{ width: '34rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'claims.approvalThresholds.productColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codProduct"
+        [options]="products()"
+        optionLabel="DesProduct"
+        optionValue="CodProduct"
+        (onChange)="onProductChange()"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'claims.approvalThresholds.riskProductColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codRiskProduct"
+        [options]="[{ _label: ('requirements.assignments.anyValue' | transloco), CodRiskProduct: ANY_VALUE }, ...riskProducts()]"
+        optionLabel="_label"
+        optionValue="CodRiskProduct"
+        [disabled]="!form.controls.codProduct.value"
+        styleClass="w-full"
+      />
+      <p class="text-xs text-slate-500">{{ 'claims.approvalThresholds.riskProductHint' | transloco }}</p>
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'claims.approvalThresholds.planColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codPlanProduct"
+        [options]="[{ DesPlanProduct: ('requirements.assignments.anyValue' | transloco), CodPlanProduct: ANY_VALUE }, ...planProducts()]"
+        optionLabel="DesPlanProduct"
+        optionValue="CodPlanProduct"
+        [disabled]="!form.controls.codProduct.value"
+        styleClass="w-full"
+      />
+      <p class="text-xs text-slate-500">{{ 'claims.approvalThresholds.planHint' | transloco }}</p>
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'claims.approvalThresholds.coverageColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="ideCoveragePlan"
+        [options]="[{ _label: ('requirements.assignments.anyValue' | transloco), IdeCoveragePlan: ANY_VALUE }, ...coveragePlanOptions()]"
+        optionLabel="_label"
+        optionValue="IdeCoveragePlan"
+        [loading]="coveragePlanLoading()"
+        [disabled]="form.controls.codPlanProduct.value === ANY_VALUE || form.controls.codRiskProduct.value === ANY_VALUE"
+        styleClass="w-full"
+      />
+      <p class="text-xs text-slate-500">{{ 'claims.approvalThresholds.coverageHint' | transloco }}</p>
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'claims.approvalThresholds.currencyColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codCurrency"
+        [options]="currencies()"
+        optionLabel="CodCurrency"
+        optionValue="CodCurrency"
+        styleClass="w-full"
+      />
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div class="flex min-w-0 flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'claims.approvalThresholds.levelColumn' | transloco }}</label>
+        <p-inputNumber formControlName="level" [min]="1" [useGrouping]="false" [style]="{ width: '100%' }" inputStyleClass="w-full" />
+      </div>
+      <div class="flex min-w-0 flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'claims.approvalThresholds.maxAmountColumn' | transloco }}</label>
+        <p-inputNumber formControlName="maxAmount" mode="decimal" [minFractionDigits]="2" [style]="{ width: '100%' }" inputStyleClass="w-full" [placeholder]="'claims.approvalThresholds.noCeiling' | transloco" />
+      </div>
+    </div>
+    <p class="-mt-2 text-xs text-slate-500">{{ 'claims.approvalThresholds.maxAmountHint' | transloco }}</p>
+
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'claims.approvalThresholds.rolColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codRol"
+        [options]="roles()"
+        optionLabel="DesRol"
+        optionValue="CodRol"
+        styleClass="w-full"
+      />
+    </div>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
+    </div>
+  </form>
+</p-dialog>

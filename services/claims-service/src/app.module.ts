@@ -7,6 +7,7 @@ import { HealthController } from './health/health.controller';
 import { CatalogsModule } from './catalogs/catalogs.module';
 import { ClaimRequirementsModule } from './requirements/claim-requirements.module';
 import { ClaimsModule } from './claims/claims.module';
+import { ApprovalsModule } from './approvals/approvals.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { ClaimsModule } from './claims/claims.module';
     CatalogsModule,
     ClaimRequirementsModule,
     ClaimsModule,
+    ApprovalsModule,
   ],
   controllers: [HealthController],
 })

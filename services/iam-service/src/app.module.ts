@@ -7,6 +7,7 @@ import { HealthController } from './health/health.controller';
 import { IamStateMachineModule } from './state-machine/iam-state-machine.module';
 import { IamAuthModule } from './auth/iam-auth.module';
 import { UsersModule } from './users/users.module';
+import { RolesModule } from './roles/roles.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { UsersModule } from './users/users.module';
     IamAuthModule, // POST /auth/login, change-password, forgot/reset-password
     IamStateMachineModule,
     UsersModule, // CRUD de TUser/TRol
+    RolesModule, // listado de solo lectura de TRol (Fase 4, Etapa 2)
     // TODO (Fase 2): doble factor de autenticación, FGetSiteMap.
   ],
   controllers: [HealthController],

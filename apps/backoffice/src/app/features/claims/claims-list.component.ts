@@ -63,6 +63,22 @@ export class ClaimsListComponent {
     });
   }
 
+  /** Estado real de la carpeta (`TClaimFile.SState`) -- un solo `TClaimFile`
+   *  por siniestro en esta primera vuelta (ver el doc-comment de
+   *  `ClaimListItem`). El `SState` de `TClaim` en sí no se muestra: sigue
+   *  siendo el placeholder "sin transición" de Etapa 1. */
+  fileState(item: ClaimListItem) {
+    return item.TClaimFile[0]?.SState ?? null;
+  }
+
+  fileStateSeverity(item: ClaimListItem): 'success' | 'danger' | 'warn' | 'secondary' {
+    const codState = this.fileState(item)?.CodState;
+    if (codState === 'APROBADO' || codState === 'PAGADO' || codState === 'CERRADO') return 'success';
+    if (codState === 'RECHAZADO') return 'danger';
+    if (!codState) return 'secondary';
+    return 'warn';
+  }
+
   nuevo(): void {
     this.router.navigate(['/siniestros', 'nuevo']);
   }

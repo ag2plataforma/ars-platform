@@ -7,12 +7,6 @@
       <h2 class="mt-1 text-lg font-semibold text-slate-900">{{ c.NumClaim }}</h2>
       <p class="text-sm text-slate-500">{{ c.SClaimType.DesClaimType }} &middot; {{ c.TContractFile.TContract.NumContract }} &middot; {{ c.TContractFile.TContract.SProduct.DesProduct }}</p>
     </div>
-    <!-- Sin máquina de estados real todavía para el ciclo de vida del
-         siniestro (abierto/cerrado/rechazado) -- Etapa 2 la va a diseñar
-         junto con el flujo de aprobación. Mostrar acá el estado "sin
-         transición" con el que nace hoy (`c.SState.DesState`, el mismo
-         "[SEED] Borrador" que usan TContractRequirement/TQuoteRequirement)
-         solo confunde, así que deliberadamente no se muestra. -->
 
     <div class="grid grid-cols-1 gap-4 rounded border border-slate-200 bg-slate-50 p-4 sm:grid-cols-3">
       <div>
@@ -31,11 +25,22 @@
 
     @for (file of c.TClaimFile; track file.IdeClaimFile) {
       <div class="flex flex-col gap-3 rounded border border-slate-200 p-4">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm font-semibold text-slate-900">{{ file.NumClaimFile }} &middot; {{ file.SClaimEvent.DesClaimEvent }}</p>
-            @if (file.DesLarge) {
-              <p class="text-sm text-slate-500">{{ file.DesLarge }}</p>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <div>
+              <p class="text-sm font-semibold text-slate-900">{{ file.NumClaimFile }} &middot; {{ file.SClaimEvent.DesClaimEvent }}</p>
+              @if (file.DesLarge) {
+                <p class="text-sm text-slate-500">{{ file.DesLarge }}</p>
+              }
+            </div>
+            <p-tag [value]="file.SState.DesState" severity="info" />
+          </div>
+          <div class="flex flex-wrap gap-2">
+            @for (t of fileTransitions(file); track t.op) {
+              <button pButton type="button" size="small" severity="secondary" [outlined]="true" [label]="t.labelKey | transloco" [loading]="transitionBusy()" (click)="transitionFile(file, t.op)"></button>
+            }
+            @if (canOpenApproval(file)) {
+              <button pButton type="button" size="small" severity="success" icon="pi pi-check-circle" [label]="'claims.detail.newApprovalButton' | transloco" (click)="openApprovalDialog(file)"></button>
             }
           </div>
         </div>
@@ -57,7 +62,33 @@
               <ng-template #body let-provision>
                 <tr>
                   <td>{{ provision.TRiskCoverage.SCoveragePlan.SCoverage.DesCoverage }}</td>
-                  <td>{{ provision.InvoicedAmount | number: '1.2-2' }}</td>
+                  <td>
+                    @if (invoicedAmountEditable(file)) {
+                      <div class="flex min-w-0 items-center gap-1">
+                        <p-inputNumber
+                          [ngModel]="invoicedValue(provision)"
+                          [ngModelOptions]="{ standalone: true }"
+                          (ngModelChange)="onInvoicedInput(provision, $event)"
+                          mode="decimal"
+                          [minFractionDigits]="2"
+                          [style]="{ width: '8rem' }"
+                          inputStyleClass="w-full"
+                        />
+                        <button
+                          pButton
+                          type="button"
+                          icon="pi pi-check"
+                          size="small"
+                          [text]="true"
+                          [loading]="isSavingInvoiced(provision)"
+                          [title]="'common.save' | transloco"
+                          (click)="saveInvoicedAmount(provision)"
+                        ></button>
+                      </div>
+                    } @else {
+                      {{ provision.InvoicedAmount | number: '1.2-2' }}
+                    }
+                  </td>
                   <td>{{ provision.CoveredAmount | number: '1.2-2' }}</td>
                   <td>{{ provision.ApprovedAmount | number: '1.2-2' }}</td>
                   <td>{{ provision.IndemnifiedAmount | number: '1.2-2' }}</td>
@@ -109,9 +140,213 @@
             }
           </div>
         }
+
+        <div class="mt-2 flex flex-col gap-3">
+          <p class="text-sm font-semibold text-slate-800">{{ 'claims.detail.approvalsSectionTitle' | transloco }}</p>
+          @if ((approvalsByFile()[file.IdeClaimFile] ?? []).length === 0) {
+            <p class="text-sm text-slate-500">{{ 'claims.detail.noApprovalsDetail' | transloco }}</p>
+          }
+          @for (approval of approvalsByFile()[file.IdeClaimFile] ?? []; track approval.IdeApproval) {
+            <div class="flex flex-col gap-2 rounded border border-slate-200 p-3">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-sm font-medium text-slate-900">{{ approval.NumApproval }} &middot; {{ approval.SPaymentType.DesPaymentType }}</p>
+                  <p class="text-xs text-slate-500">{{ approval.TPerson.DesFirstName }} {{ approval.TPerson.DesLastName1 }}</p>
+                  @if (approval.DesObservation) {
+                    <p class="text-xs text-slate-500">{{ approval.DesObservation }}</p>
+                  }
+                </div>
+                <p-tag [value]="approval.SState.DesState" [severity]="approval.SState.CodState === 'CERRADA' ? 'success' : 'warn'" />
+              </div>
+
+              <p-table [value]="approval.TApprovalDetail" styleClass="p-datatable-sm">
+                <ng-template #header>
+                  <tr>
+                    <th>{{ 'claims.detail.detailCoverageColumn' | transloco }}</th>
+                    <th>{{ 'claims.detail.detailAmountColumn' | transloco }}</th>
+                    <th>{{ 'claims.detail.detailStateColumn' | transloco }}</th>
+                    <th class="w-56">{{ 'claims.detail.detailActionsColumn' | transloco }}</th>
+                  </tr>
+                </ng-template>
+                <ng-template #body let-detail>
+                  <tr>
+                    <td>{{ detail.TCoverageProvision.TRiskCoverage.SCoveragePlan.SCoverage.DesCoverage }}</td>
+                    <td>{{ detail.ApprovedAmount | number: '1.2-2' }}</td>
+                    <td>
+                      <p-tag
+                        [value]="detail.SState.DesState"
+                        [severity]="detail.SState.CodState === 'APROBADO' ? 'success' : detail.SState.CodState === 'RECHAZADO' ? 'danger' : 'warn'"
+                      />
+                    </td>
+                    <td>
+                      @if (isPendingDetail(detail)) {
+                        <div class="flex flex-wrap gap-1">
+                          <button pButton type="button" size="small" [text]="true" severity="success" [label]="'claims.detail.approveButton' | transloco" (click)="transitionApprovalDetail(detail, 'APROBAR')"></button>
+                          <button pButton type="button" size="small" [text]="true" severity="danger" [label]="'claims.detail.rejectButton' | transloco" (click)="transitionApprovalDetail(detail, 'RECHAZAR')"></button>
+                          @if (canEscalate(detail)) {
+                            <button pButton type="button" size="small" [text]="true" severity="warn" [label]="'claims.detail.escalateButton' | transloco" (click)="transitionApprovalDetail(detail, 'ESCALAR')"></button>
+                          }
+                        </div>
+                      }
+                    </td>
+                  </tr>
+                </ng-template>
+              </p-table>
+
+              @if (approval.TClaimPayment.length > 0) {
+                <p-table [value]="approval.TClaimPayment" styleClass="p-datatable-sm">
+                  <ng-template #header>
+                    <tr>
+                      <th>{{ 'claims.detail.paymentNumberColumn' | transloco }}</th>
+                      <th>{{ 'claims.detail.amountLabel' | transloco }}</th>
+                      <th>{{ 'claims.detail.paymentDateLabel' | transloco }}</th>
+                      <th>{{ 'claims.detail.externalRefColumn' | transloco }}</th>
+                      <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+                    </tr>
+                  </ng-template>
+                  <ng-template #body let-payment>
+                    <tr>
+                      <td>{{ payment.NumPayment }}</td>
+                      <td>{{ payment.Amount | number: '1.2-2' }}</td>
+                      <td>{{ payment.TstPayment | date: 'short' }}</td>
+                      <td>{{ payment.NumExternalPayment ?? '-' }}</td>
+                      <td>
+                        <p-tag [value]="payment.SState.DesState" [severity]="payment.SState.CodState === 'ACTIVO' ? 'success' : 'secondary'" />
+                      </td>
+                    </tr>
+                  </ng-template>
+                </p-table>
+              } @else if (canRegisterPayment(file, approval)) {
+                <div>
+                  <button pButton type="button" size="small" [label]="'claims.detail.registerPaymentButton' | transloco" (click)="openPaymentDialog(approval)"></button>
+                </div>
+              }
+            </div>
+          }
+        </div>
       </div>
     }
   </div>
 } @else if (loading()) {
   <p class="text-sm text-slate-500">{{ 'common.loading' | transloco }}</p>
 }
+
+<p-dialog
+  [header]="'claims.detail.approvalDialogTitle' | transloco"
+  [visible]="approvalDialogVisible()"
+  [modal]="true"
+  [style]="{ width: '46rem' }"
+  (visibleChange)="!$event && closeApprovalDialog()"
+>
+  <form [formGroup]="approvalForm" (ngSubmit)="submitApproval()" class="flex flex-col gap-4 pt-2">
+    <p class="text-sm font-medium text-slate-700">{{ 'claims.detail.selectCoveragesLabel' | transloco }}</p>
+    @if (coverageSelections().length === 0) {
+      <p class="text-sm text-slate-500">{{ 'claims.detail.noSelectablePendingCoveragesDetail' | transloco }}</p>
+    }
+    <div class="flex flex-col gap-2">
+      @for (row of coverageSelections(); track row.provision.IdeCoverageProvision) {
+        <div class="grid grid-cols-[auto_1fr_10rem] items-center gap-3 rounded border border-slate-200 p-2">
+          <p-checkbox [binary]="true" [ngModel]="row.selected" [ngModelOptions]="{ standalone: true }" (onChange)="toggleCoverageSelected(row, $event.checked)" />
+          <div class="min-w-0">
+            <p class="text-sm text-slate-900">{{ row.provision.TRiskCoverage.SCoveragePlan.SCoverage.DesCoverage }}</p>
+            <p class="text-xs text-slate-500">{{ row.riskLabel }}</p>
+          </div>
+          <p-inputNumber
+            [ngModel]="row.approvedAmount"
+            [ngModelOptions]="{ standalone: true }"
+            (ngModelChange)="updateCoverageAmount(row, $event)"
+            mode="decimal"
+            [minFractionDigits]="2"
+            [disabled]="!row.selected"
+            [style]="{ width: '100%' }"
+            inputStyleClass="w-full"
+          />
+        </div>
+      }
+    </div>
+
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'claims.detail.paymentTypeLabel' | transloco }}</label>
+      <p-select appendTo="body" formControlName="codPaymentType" [options]="paymentTypes()" optionLabel="DesPaymentType" optionValue="CodPaymentType" styleClass="w-full" />
+    </div>
+
+    <div class="flex flex-col gap-2 rounded-lg border border-slate-200 p-3">
+      <label class="text-sm font-medium text-slate-700">{{ 'claims.detail.personLabel' | transloco }}</label>
+      @if (selectedPayeePerson(); as person) {
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-slate-900">{{ person.DesFirstName }} {{ person.DesLastName1 }} ({{ person.NumIdentification ?? person.DesEmail }})</span>
+          <button pButton type="button" [label]="'claims.detail.changePersonButton' | transloco" severity="secondary" [text]="true" (click)="changePayee()"></button>
+        </div>
+      } @else {
+        <div class="flex flex-col gap-2">
+          <div class="flex gap-2">
+            <input
+              pInputText
+              [formControl]="payeeSearchControl"
+              [placeholder]="'claims.detail.personSearchPlaceholder' | transloco"
+              class="w-full"
+              (keydown.enter)="$event.preventDefault(); searchPayeeByName()"
+            />
+            <button pButton type="button" [label]="'quotes.searchButton' | transloco" [loading]="payeeSearching()" (click)="searchPayeeByName()"></button>
+          </div>
+          @if (payeeSearchResults().length > 0) {
+            <div class="flex max-h-40 flex-col gap-1 overflow-y-auto">
+              @for (person of payeeSearchResults(); track person.IdePerson) {
+                <div class="flex items-center justify-between rounded border border-slate-200 p-2 text-sm">
+                  <span>{{ person.DesFirstName }} {{ person.DesLastName1 }} <span class="text-slate-400">({{ person.NumIdentification ?? person.DesEmail }})</span></span>
+                  <button pButton type="button" [label]="'commissions.brokers.selectPersonButton' | transloco" severity="success" [text]="true" (click)="pickPayee(person)"></button>
+                </div>
+              }
+            </div>
+          }
+          @if (payeeSearchedEmpty()) {
+            <p class="text-xs text-slate-500">{{ 'commissions.brokers.nameSearchEmptyDetail' | transloco }}</p>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'claims.detail.observationLabel' | transloco }}</label>
+      <input pInputText formControlName="desObservation" class="w-full" />
+    </div>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeApprovalDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco" [loading]="approvalSubmitting()"></button>
+    </div>
+  </form>
+</p-dialog>
+
+<p-dialog
+  [header]="'claims.detail.paymentDialogTitle' | transloco"
+  [visible]="paymentDialogVisible()"
+  [modal]="true"
+  [style]="{ width: '28rem' }"
+  (visibleChange)="!$event && closePaymentDialog()"
+>
+  <form [formGroup]="paymentForm" (ngSubmit)="submitPayment()" class="flex flex-col gap-4 pt-2">
+    <div class="grid grid-cols-2 gap-4">
+      <div class="flex min-w-0 flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'claims.detail.amountLabel' | transloco }}</label>
+        <p-inputNumber formControlName="amount" mode="decimal" [minFractionDigits]="2" [style]="{ width: '100%' }" inputStyleClass="w-full" />
+      </div>
+      <div class="flex min-w-0 flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'claims.detail.paymentDateLabel' | transloco }}</label>
+        <input pInputText type="datetime-local" formControlName="tstPayment" class="w-full" />
+      </div>
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'claims.detail.externalRefColumn' | transloco }}</label>
+      <input pInputText formControlName="numExternalPayment" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'claims.detail.observationLabel' | transloco }}</label>
+      <input pInputText formControlName="desObservation" class="w-full" />
+    </div>
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closePaymentDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco" [loading]="paymentSubmitting()"></button>
+    </div>
+  </form>
+</p-dialog>

@@ -112,12 +112,15 @@ async function main() {
       'TQuoteRequirement',
       // Agregadas 2026-09-24: Fase 4 (Siniestros), Etapa 1 -- declarar un
       // siniestro (ver ClaimsService.declare en claims-service) crea
-      // filas en estas 5 entidades, y ninguna tiene todavía una máquina
-      // de estados real (Etapa 2 -- aprobación/cierre -- la va a
-      // necesitar). Sin esta entrada, stateMachine.getInitialState(...)
-      // lanzaría 404 para cada una.
+      // filas en estas entidades. `TClaimFile` SALIÓ de esta lista el
+      // 2026-09-24 (Etapa 2): ahora tiene una máquina de estados real
+      // propia, sembrada por `seed-claims-approval-workflow.js` (que
+      // además limpia el marcador de estado inicial obsoleto que este
+      // script le había dejado apuntando a `SEED_BORRADOR`). El resto
+      // se queda "sin transición" -- Etapa 2 no les da máquina propia
+      // todavía (ver docs/02-roadmap.md): el estado de aprobación real
+      // por cobertura vive en `TApprovalDetail`, no en `TCoverageProvision`.
       'TClaim',
-      'TClaimFile',
       'TClaimRisk',
       'TCoverageProvision',
       'TClaimRequirement',
@@ -135,7 +138,18 @@ async function main() {
     // tabla) -- si naciera en Borrador se quedaría ahí para siempre, y
     // FReceipt/generateCancellationReceipts nunca encontraría el canal
     // principal (404 "no tiene un canal de distribución principal vigente").
-    const CATALOG_ACTIVE_ENTITIES = ['SPlanProductRisk', 'SCoveragePlan', 'TContractDistributionChannel'];
+    // TGuaranteeProvision/TClaimPayment agregadas 2026-09-24 (Fase 4,
+    // Etapa 2): ambas registran un hecho ya consumado (uso de garantía
+    // ya evaluado, pago ya ejecutado) en el momento en que se crean --
+    // no tiene sentido que nazcan en un "borrador" intermedio, mismo
+    // criterio que las demás entidades de esta lista.
+    const CATALOG_ACTIVE_ENTITIES = [
+      'SPlanProductRisk',
+      'SCoveragePlan',
+      'TContractDistributionChannel',
+      'TGuaranteeProvision',
+      'TClaimPayment',
+    ];
     // Entidades del árbol de cotización: BORRADOR -> ACTIVO vía 'Aceptar',
     // ACTIVO -> ACTIVO vía 'Contratar' (auto-transición: solo marca que la
     // cotización se convirtió, no cambia de "fase" en sí).

@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { Person } from '../../core/party/persons.service';
 
 export type DecimalString = string;
 
@@ -10,7 +11,11 @@ export interface ClaimStateRef {
   DesState: string;
 }
 
-/** `GET /claims` (plural) -- fila liviana del listado, ver `ClaimsService.findAll` en el backend real. */
+/** `GET /claims` (plural) -- fila liviana del listado, ver `ClaimsService.findAll` en el backend real.
+ * `SState` acá es el de `TClaim` (siempre "sin transición", no se muestra en
+ * pantalla -- ver el doc-comment de `ClaimDetailComponent`). El estado que sí
+ * es real y se muestra es el de la carpeta (`TClaimFile[0].SState`, un solo
+ * `TClaimFile` por siniestro en esta primera vuelta). */
 export interface ClaimListItem {
   IdeClaim: string;
   NumClaim: string;
@@ -20,6 +25,7 @@ export interface ClaimListItem {
   SState: ClaimStateRef;
   SClaimType: { CodClaimType: string; DesClaimType: string };
   TContractFile: { TContract: { NumContract: string } };
+  TClaimFile: { SState: ClaimStateRef }[];
 }
 
 export interface ClaimCoverageProvision {
@@ -31,6 +37,53 @@ export interface ClaimCoverageProvision {
   NoCoveredAmount: DecimalString;
   SState: ClaimStateRef;
   TRiskCoverage: { SCoveragePlan: { SCoverage: { DesCoverage: string } } };
+}
+
+/** `TApprovalDetail` -- decisión de aprobación POR COBERTURA (Fase 4, Etapa 2). Ver el doc-comment de `ApprovalsService` en el backend real. */
+export interface ApprovalDetail {
+  IdeApprovalDetail: string;
+  ApprovedAmount: DecimalString;
+  SState: ClaimStateRef;
+  TCoverageProvision: { IdeCoverageProvision: string; TRiskCoverage: { SCoveragePlan: { SCoverage: { DesCoverage: string } } } };
+}
+
+export interface ClaimPayment {
+  IdeClaimPayment: string;
+  NumPayment: string;
+  Amount: DecimalString;
+  TstPayment: string;
+  NumExternalPayment: string | null;
+  DesObservation: string | null;
+  SState: ClaimStateRef;
+}
+
+/** `TApproval` -- cabecera de aprobación (agrupa el pago de varias coberturas). */
+export interface Approval {
+  IdeApproval: string;
+  NumApproval: string;
+  DesObservation: string | null;
+  SState: ClaimStateRef;
+  SPaymentType: { CodPaymentType: string; DesPaymentType: string };
+  TPerson: Person;
+  TApprovalDetail: ApprovalDetail[];
+  TClaimPayment: ClaimPayment[];
+}
+
+export interface CreateApprovalRequest {
+  codPaymentType: string;
+  idePersonPayment: string;
+  desObservation?: string;
+  details: { ideCoverageProvision: string; approvedAmount: number }[];
+}
+
+export type ApprovalDetailOperative = 'APROBAR' | 'RECHAZAR' | 'ESCALAR';
+export type ClaimFileOperative = 'ENVIAR_A_REVISION' | 'ENVIAR_A_EVALUACION' | 'CERRAR' | 'REABRIR';
+
+export interface CreatePaymentRequest {
+  amount: number;
+  tstPayment: string;
+  numExternalPayment?: string;
+  desObservation?: string;
 }
 
 export interface ClaimRequirement {
@@ -68,6 +121,7 @@ export interface ClaimFile {
   SClaimEvent: { CodClaimEvent: string; DesClaimEvent: string };
   SCurrency: { CodCurrency: string; SymbolCurrency: string };
   TClaimRisk: ClaimRisk[];
+  IdeCurrency?: string;
 }
 
 export interface ClaimDetail {
@@ -124,5 +178,35 @@ export class ClaimsApiService {
       `${this.claimFilesBase}/${ideClaimFile}/requirements/${ideClaimRequirement}/received`,
       {},
     );
+  }
+
+  transitionClaimFileState(ideClaimFile: string, codOperative: ClaimFileOperative): Observable<ClaimFile> {
+    return this.http.patch<ClaimFile>(`${this.claimFilesBase}/${ideClaimFile}/state`, { codOperative });
+  }
+
+  updateInvoicedAmount(ideCoverageProvision: string, invoicedAmount: number): Observable<ClaimCoverageProvision> {
+    return this.http.patch<ClaimCoverageProvision>(
+      `${environment.apiUrl}/claims/coverage-provisions/${ideCoverageProvision}/invoiced-amount`,
+      { invoicedAmount },
+    );
+  }
+
+  createApproval(ideClaimFile: string, dto: CreateApprovalRequest): Observable<Approval> {
+    return this.http.post<Approval>(`${this.claimFilesBase}/${ideClaimFile}/approvals`, dto);
+  }
+
+  listApprovals(ideClaimFile: string): Observable<Approval[]> {
+    return this.http.get<Approval[]>(`${this.claimFilesBase}/${ideClaimFile}/approvals`);
+  }
+
+  transitionApprovalDetail(ideApprovalDetail: string, codOperative: ApprovalDetailOperative): Observable<ApprovalDetail> {
+    return this.http.patch<ApprovalDetail>(
+      `${environment.apiUrl}/claims/approval-details/${ideApprovalDetail}/state`,
+      { codOperative },
+    );
+  }
+
+  createPayment(ideApproval: string, dto: CreatePaymentRequest): Observable<ClaimPayment> {
+    return this.http.post<ClaimPayment>(`${environment.apiUrl}/claims/approvals/${ideApproval}/payments`, dto);
   }
 }

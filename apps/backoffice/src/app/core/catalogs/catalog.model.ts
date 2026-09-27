@@ -299,6 +299,19 @@ export const PRODUCT_CATALOG_REGISTRY: CatalogConfig[] = [
     idField: 'IdeLimitType',
   },
   {
+    // Agregado 2026-09-24 (Fase 4, Etapa 2) -- `SPaymentType` ya existía
+    // en el esquema legado pero sin CRUD/listado expuesto todavía; la
+    // pantalla de aprobación de siniestros necesita elegir un tipo de
+    // pago real (ver `PaymentTypesService` en reference-data-service).
+    key: 'payment-types',
+    label: 'catalogsRegistry.payment-types.label',
+    singular: 'catalogsRegistry.payment-types.singular',
+    path: '/reference-data/payment-types',
+    codField: 'CodPaymentType',
+    desField: 'DesPaymentType',
+    idField: 'IdePaymentType',
+  },
+  {
     key: 'coverages',
     label: 'catalogsRegistry.coverages.label',
     singular: 'catalogsRegistry.coverages.singular',

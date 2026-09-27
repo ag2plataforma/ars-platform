@@ -20,6 +20,7 @@
         <th>{{ 'claims.list.claimTypeColumn' | transloco }}</th>
         <th>{{ 'claims.list.contractColumn' | transloco }}</th>
         <th>{{ 'claims.list.occurrenceColumn' | transloco }}</th>
+        <th>{{ 'catalogs.stateColumn' | transloco }}</th>
       </tr>
     </ng-template>
     <ng-template #body let-row>
@@ -28,11 +29,16 @@
         <td>{{ row.SClaimType?.DesClaimType }}</td>
         <td>{{ row.TContractFile?.TContract?.NumContract }}</td>
         <td>{{ row.TstOcurrence | date: 'short' }}</td>
+        <td>
+          @if (fileState(row); as state) {
+            <p-tag [value]="state.DesState" [severity]="fileStateSeverity(row)" />
+          }
+        </td>
       </tr>
     </ng-template>
     <ng-template #emptymessage>
       <tr>
-        <td colspan="4" class="text-center text-slate-500">{{ 'claims.list.emptyState' | transloco }}</td>
+        <td colspan="5" class="text-center text-slate-500">{{ 'claims.list.emptyState' | transloco }}</td>
       </tr>
     </ng-template>
   </p-table>

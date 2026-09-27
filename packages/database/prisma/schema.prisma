@@ -531,54 +531,55 @@ model SCoverageGuarantee {
 }
 
 model SCoveragePlan {
-  IdeCoveragePlan        String                @id(map: "PK_SCoveragePlan") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  IdePlanProductRisk     String                @db.Uuid
-  IdeCoverage            String                @db.Uuid
-  DesShort               String?               @db.VarChar(150)
-  DesLarge               String?               @db.VarChar
-  IndMandatory           Boolean
-  GetPrime               Boolean
-  RefundPrime            Boolean
-  ProratedGetPrime       Boolean
-  ProratedRefundPrime    Boolean
-  NumMonthsWaitingPeriod Int
-  IndSplitPayment        Boolean
-  IdeDeductibleType      String                @db.Uuid
-  DeductibleTypeValue    Decimal?              @db.Decimal
-  IdeLimitType           String                @db.Uuid
-  LimitTypeValue         Decimal?              @db.Decimal
-  IndPayPerUse           Boolean
-  IndFixedAmount         Boolean
-  LowerAmount            Decimal               @db.Decimal
-  UpperAmount            Decimal               @db.Decimal
-  IndFixedRate           Boolean
-  LowerRate              Decimal               @db.Decimal
-  UpperRate              Decimal               @db.Decimal
-  IndFixedPrime          Boolean
-  LowerPrime             Decimal               @db.Decimal
-  UpperPrime             Decimal               @db.Decimal
-  TstInitial             DateTime              @db.Timestamp(6)
-  TstEnd                 DateTime?             @db.Timestamp(6)
-  InclusiveCoverage      Json?                 @db.Json
-  ExclusiveCoverage      Json?                 @db.Json
-  Order                  Int
-  IdeState               String                @db.Uuid
-  UsrCreation            String                @db.VarChar(60)
-  TstCreation            DateTime              @db.Timestamp(6)
-  UsrModification        String                @db.VarChar(60)
-  TstModification        DateTime              @db.Timestamp(6)
-  SCalculationRule       SCalculationRule[]
-  SCommissionTable       SCommissionTable[]
-  SCoverageGuarantee     SCoverageGuarantee[]
-  SCoverage              SCoverage             @relation(fields: [IdeCoverage], references: [IdeCoverage], onDelete: NoAction, onUpdate: NoAction, map: "FK_SCoveragePlan_SCoverage")
-  SDeductibleType        SDeductibleType       @relation(fields: [IdeDeductibleType], references: [IdeDeductibleType], onDelete: NoAction, onUpdate: NoAction, map: "FK_SCoveragePlan_SDeductibleType")
-  SLimitType             SLimitType            @relation(fields: [IdeLimitType], references: [IdeLimitType], onDelete: NoAction, onUpdate: NoAction, map: "FK_SCoveragePlan_SLimitType")
-  SPlanProductRisk       SPlanProductRisk      @relation(fields: [IdePlanProductRisk], references: [IdePlanProductRisk], onDelete: NoAction, onUpdate: NoAction, map: "FK_SCoveragePlan_SPlanProductRisk")
-  SState                 SState                @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_SCoveragePlan_SState")
-  SPricingRuleSet        SPricingRuleSet[]
-  SProductRequirement    SProductRequirement[]
-  TQuoteCoverage         TQuoteCoverage[]
-  TRiskCoverage          TRiskCoverage[]
+  IdeCoveragePlan         String                    @id(map: "PK_SCoveragePlan") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  IdePlanProductRisk      String                    @db.Uuid
+  IdeCoverage             String                    @db.Uuid
+  DesShort                String?                   @db.VarChar(150)
+  DesLarge                String?                   @db.VarChar
+  IndMandatory            Boolean
+  GetPrime                Boolean
+  RefundPrime             Boolean
+  ProratedGetPrime        Boolean
+  ProratedRefundPrime     Boolean
+  NumMonthsWaitingPeriod  Int
+  IndSplitPayment         Boolean
+  IdeDeductibleType       String                    @db.Uuid
+  DeductibleTypeValue     Decimal?                  @db.Decimal
+  IdeLimitType            String                    @db.Uuid
+  LimitTypeValue          Decimal?                  @db.Decimal
+  IndPayPerUse            Boolean
+  IndFixedAmount          Boolean
+  LowerAmount             Decimal                   @db.Decimal
+  UpperAmount             Decimal                   @db.Decimal
+  IndFixedRate            Boolean
+  LowerRate               Decimal                   @db.Decimal
+  UpperRate               Decimal                   @db.Decimal
+  IndFixedPrime           Boolean
+  LowerPrime              Decimal                   @db.Decimal
+  UpperPrime              Decimal                   @db.Decimal
+  TstInitial              DateTime                  @db.Timestamp(6)
+  TstEnd                  DateTime?                 @db.Timestamp(6)
+  InclusiveCoverage       Json?                     @db.Json
+  ExclusiveCoverage       Json?                     @db.Json
+  Order                   Int
+  IdeState                String                    @db.Uuid
+  UsrCreation             String                    @db.VarChar(60)
+  TstCreation             DateTime                  @db.Timestamp(6)
+  UsrModification         String                    @db.VarChar(60)
+  TstModification         DateTime                  @db.Timestamp(6)
+  SCalculationRule        SCalculationRule[]
+  SClaimApprovalThreshold SClaimApprovalThreshold[]
+  SCommissionTable        SCommissionTable[]
+  SCoverageGuarantee      SCoverageGuarantee[]
+  SCoverage               SCoverage                 @relation(fields: [IdeCoverage], references: [IdeCoverage], onDelete: NoAction, onUpdate: NoAction, map: "FK_SCoveragePlan_SCoverage")
+  SDeductibleType         SDeductibleType           @relation(fields: [IdeDeductibleType], references: [IdeDeductibleType], onDelete: NoAction, onUpdate: NoAction, map: "FK_SCoveragePlan_SDeductibleType")
+  SLimitType              SLimitType                @relation(fields: [IdeLimitType], references: [IdeLimitType], onDelete: NoAction, onUpdate: NoAction, map: "FK_SCoveragePlan_SLimitType")
+  SPlanProductRisk        SPlanProductRisk          @relation(fields: [IdePlanProductRisk], references: [IdePlanProductRisk], onDelete: NoAction, onUpdate: NoAction, map: "FK_SCoveragePlan_SPlanProductRisk")
+  SState                  SState                    @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_SCoveragePlan_SState")
+  SPricingRuleSet         SPricingRuleSet[]
+  SProductRequirement     SProductRequirement[]
+  TQuoteCoverage          TQuoteCoverage[]
+  TRiskCoverage           TRiskCoverage[]
 
   @@index([IdeCoverage], map: "IX_SCoveragePlan_SCoverage")
   @@index([IdeDeductibleType], map: "IX_SCoveragePlan_SDeductibleType")
@@ -588,20 +589,21 @@ model SCoveragePlan {
 }
 
 model SCurrency {
-  IdeCurrency     String        @id(map: "PK_SCurrency") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  CodCurrency     String        @unique(map: "UK_SCurrency_01") @db.VarChar(30)
-  DesCurrency     String        @db.VarChar(200)
-  SymbolCurrency  String        @db.VarChar(30)
-  IdeTextContent  String?       @db.Uuid
-  IdeState        String        @db.Uuid
-  UsrCreation     String        @db.VarChar(60)
-  TstCreation     DateTime      @db.Timestamp(6)
-  UsrModification String        @db.VarChar(60)
-  TstModification DateTime      @db.Timestamp(6)
-  SState          SState        @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_SCurrency_SState")
-  STextContent    STextContent? @relation(fields: [IdeTextContent], references: [IdeTextContent], onDelete: NoAction, onUpdate: NoAction, map: "FK_SCurrency_STextContent")
-  SProduct        SProduct[]
-  TClaimFile      TClaimFile[]
+  IdeCurrency             String                    @id(map: "PK_SCurrency") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  CodCurrency             String                    @unique(map: "UK_SCurrency_01") @db.VarChar(30)
+  DesCurrency             String                    @db.VarChar(200)
+  SymbolCurrency          String                    @db.VarChar(30)
+  IdeTextContent          String?                   @db.Uuid
+  IdeState                String                    @db.Uuid
+  UsrCreation             String                    @db.VarChar(60)
+  TstCreation             DateTime                  @db.Timestamp(6)
+  UsrModification         String                    @db.VarChar(60)
+  TstModification         DateTime                  @db.Timestamp(6)
+  SClaimApprovalThreshold SClaimApprovalThreshold[]
+  SState                  SState                    @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_SCurrency_SState")
+  STextContent            STextContent?             @relation(fields: [IdeTextContent], references: [IdeTextContent], onDelete: NoAction, onUpdate: NoAction, map: "FK_SCurrency_STextContent")
+  SProduct                SProduct[]
+  TClaimFile              TClaimFile[]
 
   @@index([IdeState], map: "IX_SCurrency_SState")
   @@index([IdeTextContent], map: "IX_SCurrency_STextContent")
@@ -1224,26 +1226,27 @@ model SPersonRol {
 }
 
 model SPlanProduct {
-  IdePlanProduct      String                @id(map: "PK_SPlanProduct") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  CodPlanProduct      String                @unique(map: "UK_SPlanProduct_01") @db.VarChar(30)
-  DesPlanProduct      String                @db.VarChar(200)
-  DesShort            String?               @db.VarChar(150)
-  DesLarge            String?               @db.VarChar
-  IdeProduct          String                @db.Uuid
-  TstInitial          DateTime              @db.Timestamp(6)
-  TstEnd              DateTime?             @db.Timestamp(6)
-  IdeTextContent      String?               @db.Uuid
-  IdeState            String                @db.Uuid
-  UsrCreation         String                @db.VarChar(60)
-  TstCreation         DateTime              @db.Timestamp(6)
-  UsrModification     String                @db.VarChar(60)
-  TstModification     DateTime              @db.Timestamp(6)
-  SClaimType          SClaimType[]
-  SProduct            SProduct              @relation(fields: [IdeProduct], references: [IdeProduct], onDelete: NoAction, onUpdate: NoAction, map: "FK_SPlanProduct_SProduct")
-  SState              SState                @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_SPlanProduct_SState")
-  STextContent        STextContent?         @relation(fields: [IdeTextContent], references: [IdeTextContent], onDelete: NoAction, onUpdate: NoAction, map: "FK_SPlanProduct_STextContent")
-  SPlanProductRisk    SPlanProductRisk[]
-  SProductRequirement SProductRequirement[]
+  IdePlanProduct          String                    @id(map: "PK_SPlanProduct") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  CodPlanProduct          String                    @unique(map: "UK_SPlanProduct_01") @db.VarChar(30)
+  DesPlanProduct          String                    @db.VarChar(200)
+  DesShort                String?                   @db.VarChar(150)
+  DesLarge                String?                   @db.VarChar
+  IdeProduct              String                    @db.Uuid
+  TstInitial              DateTime                  @db.Timestamp(6)
+  TstEnd                  DateTime?                 @db.Timestamp(6)
+  IdeTextContent          String?                   @db.Uuid
+  IdeState                String                    @db.Uuid
+  UsrCreation             String                    @db.VarChar(60)
+  TstCreation             DateTime                  @db.Timestamp(6)
+  UsrModification         String                    @db.VarChar(60)
+  TstModification         DateTime                  @db.Timestamp(6)
+  SClaimApprovalThreshold SClaimApprovalThreshold[]
+  SClaimType              SClaimType[]
+  SProduct                SProduct                  @relation(fields: [IdeProduct], references: [IdeProduct], onDelete: NoAction, onUpdate: NoAction, map: "FK_SPlanProduct_SProduct")
+  SState                  SState                    @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_SPlanProduct_SState")
+  STextContent            STextContent?             @relation(fields: [IdeTextContent], references: [IdeTextContent], onDelete: NoAction, onUpdate: NoAction, map: "FK_SPlanProduct_STextContent")
+  SPlanProductRisk        SPlanProductRisk[]
+  SProductRequirement     SProductRequirement[]
 
   @@index([IdeProduct], map: "IX_SPlanProduct_SProduct")
   @@index([IdeState], map: "IX_SPlanProduct_SState")
@@ -1381,6 +1384,7 @@ model SProduct {
   UsrModification         String                    @db.VarChar(60)
   TstModification         DateTime                  @db.Timestamp(6)
   SCalculationRule        SCalculationRule[]
+  SClaimApprovalThreshold SClaimApprovalThreshold[]
   SClaimType              SClaimType[]
   SCommissionProduct      SCommissionProduct[]
   SCommissionTable        SCommissionTable[]
@@ -1951,6 +1955,7 @@ model SState {
   SBusinessActivity                                SBusinessActivity[]
   SCalculationRule                                 SCalculationRule[]
   SChannelType                                     SChannelType[]
+  SClaimApprovalThreshold                          SClaimApprovalThreshold[]
   SClaimEvent                                      SClaimEvent[]
   SClaimType                                       SClaimType[]
   SCommission                                      SCommission[]
@@ -2038,6 +2043,7 @@ model SState {
   TClaim                                           TClaim[]
   TClaimFile                                       TClaimFile[]
   TClaimOperation                                  TClaimOperation[]
+  TClaimPayment                                    TClaimPayment[]
   TClaimRequirement                                TClaimRequirement[]
   TClaimRisk                                       TClaimRisk[]
   TContactData                                     TContactData[]
@@ -2281,6 +2287,7 @@ model TApproval {
   TClaimFile       TClaimFile        @relation(fields: [IdeClaimFile], references: [IdeClaimFile], onDelete: NoAction, onUpdate: NoAction, map: "FK_TApproval_TClaimFile")
   TPerson          TPerson           @relation(fields: [IdePersonPayment], references: [IdePerson], onDelete: NoAction, onUpdate: NoAction, map: "FK_TApproval_TPerson")
   TApprovalDetail  TApprovalDetail[]
+  TClaimPayment    TClaimPayment[]
 
   @@index([IdePaymentType], map: "IX_TApproval_SPaymentType")
   @@index([IdeState], map: "IX_TApproval_SState")
@@ -3256,16 +3263,17 @@ model TRiskCoverage {
 }
 
 model TRol {
-  IdeRol          String   @id(map: "PK_TRol") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  CodRol          String   @unique(map: "UK_TRol_01") @db.VarChar(30)
-  DesRol          String   @db.VarChar(250)
-  IdeState        String   @db.Uuid
-  UsrCreation     String   @db.VarChar(60)
-  TstCreation     DateTime @db.Timestamp(6)
-  UsrModification String   @db.VarChar(60)
-  TstModification DateTime @db.Timestamp(6)
-  SState          SState   @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_TRol_SState")
-  TUser           TUser[]
+  IdeRol                  String                    @id(map: "PK_TRol") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  CodRol                  String                    @unique(map: "UK_TRol_01") @db.VarChar(30)
+  DesRol                  String                    @db.VarChar(250)
+  IdeState                String                    @db.Uuid
+  UsrCreation             String                    @db.VarChar(60)
+  TstCreation             DateTime                  @db.Timestamp(6)
+  UsrModification         String                    @db.VarChar(60)
+  TstModification         DateTime                  @db.Timestamp(6)
+  SClaimApprovalThreshold SClaimApprovalThreshold[]
+  SState                  SState                    @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_TRol_SState")
+  TUser                   TUser[]
 
   @@index([IdeState], map: "IX_TRol_SState")
 }
@@ -3333,4 +3341,53 @@ model TUserBackupCode {
   TUser             TUser    @relation(fields: [IdeUser], references: [IdeUser], onDelete: NoAction, onUpdate: NoAction, map: "FK_TUserBackupCode_TUser")
 
   @@index([IdeUser], map: "IX_TUserBackupCode_TUser")
+}
+
+model SClaimApprovalThreshold {
+  IdeClaimApprovalThreshold String         @id(map: "PK_SClaimApprovalThreshold") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  IdeProduct                String         @db.Uuid
+  IdePlanProduct            String?        @db.Uuid
+  IdeCoveragePlan           String?        @db.Uuid
+  IdeCurrency               String         @db.Uuid
+  Level                     Int
+  MaxAmount                 Decimal?       @db.Decimal
+  IdeRol                    String         @db.Uuid
+  IdeState                  String         @db.Uuid
+  UsrCreation               String         @db.VarChar(60)
+  TstCreation               DateTime       @db.Timestamp(6)
+  UsrModification           String         @db.VarChar(60)
+  TstModification           DateTime       @db.Timestamp(6)
+  SCoveragePlan             SCoveragePlan? @relation(fields: [IdeCoveragePlan], references: [IdeCoveragePlan], onDelete: NoAction, onUpdate: NoAction, map: "FK_SClaimApprovalThreshold_SCoveragePlan")
+  SCurrency                 SCurrency      @relation(fields: [IdeCurrency], references: [IdeCurrency], onDelete: NoAction, onUpdate: NoAction, map: "FK_SClaimApprovalThreshold_SCurrency")
+  SPlanProduct              SPlanProduct?  @relation(fields: [IdePlanProduct], references: [IdePlanProduct], onDelete: NoAction, onUpdate: NoAction, map: "FK_SClaimApprovalThreshold_SPlanProduct")
+  SProduct                  SProduct       @relation(fields: [IdeProduct], references: [IdeProduct], onDelete: NoAction, onUpdate: NoAction, map: "FK_SClaimApprovalThreshold_SProduct")
+  SState                    SState         @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_SClaimApprovalThreshold_SState")
+  TRol                      TRol           @relation(fields: [IdeRol], references: [IdeRol], onDelete: NoAction, onUpdate: NoAction, map: "FK_SClaimApprovalThreshold_TRol")
+
+  @@index([IdeCoveragePlan], map: "IX_SClaimApprovalThreshold_SCoveragePlan")
+  @@index([IdeCurrency], map: "IX_SClaimApprovalThreshold_SCurrency")
+  @@index([IdePlanProduct], map: "IX_SClaimApprovalThreshold_SPlanProduct")
+  @@index([IdeProduct], map: "IX_SClaimApprovalThreshold_SProduct")
+  @@index([IdeState], map: "IX_SClaimApprovalThreshold_SState")
+  @@index([IdeRol], map: "IX_SClaimApprovalThreshold_TRol")
+}
+
+model TClaimPayment {
+  IdeClaimPayment    String    @id(map: "PK_TClaimPayment") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  IdeApproval        String    @db.Uuid
+  NumPayment         String    @unique(map: "UK_TClaimPayment_01") @db.VarChar(30)
+  Amount             Decimal   @db.Decimal
+  TstPayment         DateTime  @db.Timestamp(6)
+  NumExternalPayment String?   @db.VarChar
+  DesObservation     String?   @db.VarChar
+  IdeState           String    @db.Uuid
+  UsrCreation        String    @db.VarChar(60)
+  TstCreation        DateTime  @db.Timestamp(6)
+  UsrModification    String    @db.VarChar(60)
+  TstModification    DateTime  @db.Timestamp(6)
+  SState             SState    @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_TClaimPayment_SState")
+  TApproval          TApproval @relation(fields: [IdeApproval], references: [IdeApproval], onDelete: NoAction, onUpdate: NoAction, map: "FK_TClaimPayment_TApproval")
+
+  @@index([IdeState], map: "IX_TClaimPayment_SState")
+  @@index([IdeApproval], map: "IX_TClaimPayment_TApproval")
 }

@@ -105,6 +105,15 @@ export const routes: Routes = [
             },
           },
           {
+            // "Umbrales de aprobación" -- Fase 4, Etapa 2 (2026-09-27).
+            // Segmento literal, debe ir ANTES que ':id'.
+            path: 'umbrales-aprobacion',
+            loadComponent: () =>
+              import('./features/claims/claim-approval-thresholds.component').then(
+                (m) => m.ClaimApprovalThresholdsComponent,
+              ),
+          },
+          {
             path: ':id',
             loadComponent: () =>
               import('./features/claims/claim-detail.component').then((m) => m.ClaimDetailComponent),

@@ -154,6 +154,18 @@ const SITE_MAP_ITEMS = [
         path: '/siniestros/catalogos',
         icon: 'pi-tags',
       },
+      {
+        // Etapa 2 (2026-09-27): catálogo `SClaimApprovalThreshold`
+        // (niveles/montos de aprobación configurables por
+        // producto/plan/cobertura/moneda). Pantalla propia (no encaja
+        // en el CRUD genérico de "Catálogos" porque tiene selects
+        // en cascada), mismo criterio que Requisitos de producto.
+        cod: 'SINIESTROS_UMBRALES',
+        des: 'Umbrales de aprobación',
+        order: 4,
+        path: '/siniestros/umbrales-aprobacion',
+        icon: 'pi-percentage',
+      },
     ],
   },
   {

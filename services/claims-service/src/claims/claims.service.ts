@@ -215,14 +215,82 @@ export class ClaimsService {
     return claim;
   }
 
-  /** Listado simple (sin paginación -- alcance de Etapa 1, ver docs/02-roadmap.md), filtrable por número de siniestro/estado. */
+  /**
+   * Transiciones MANUALES de `TClaimFile` (Fase 4, Etapa 2, 2026-09-24):
+   * Declarado -> En revisión de requisitos -> En evaluación, y
+   * Cerrado -> Reabierto (-> En evaluación de nuevo). Las transiciones
+   * Aprobado/Rechazado/Pagado/Cerrado (desde En evaluación/Aprobado) NO
+   * se disparan acá -- las decide `ApprovalsService`/`ClaimPaymentsService`
+   * automáticamente según el resultado real de la aprobación/pago (ver
+   * sus doc-comments), no una acción manual del usuario.
+   */
+  async transitionClaimFileState(ideClaimFile: string, codOperative: string, actor: string) {
+    const claimFile = await this.prisma.tClaimFile.findUnique({ where: { IdeClaimFile: ideClaimFile } });
+    if (!claimFile) throw new NotFoundException(`No existe carpeta de siniestro con id "${ideClaimFile}"`);
+
+    const nextStateId = await this.stateMachine.getNextState('TClaimFile', claimFile.IdeState, codOperative);
+    return this.prisma.tClaimFile.update({
+      where: { IdeClaimFile: ideClaimFile },
+      data: { IdeState: nextStateId, UsrModification: actor, TstModification: new Date() },
+      include: { SState: true },
+    });
+  }
+
+  /** Códigos de estado de `TClaimFile` en los que todavía se puede cargar/corregir
+   *  el monto reclamado de una cobertura -- pedido explícito del usuario
+   *  (2026-09-27): editable en pantalla mientras la carpeta está Declarado/En
+   *  revisión de requisitos/En evaluación, ya no una vez que se empezó a
+   *  decidir la aprobación (`TApprovalDetail` usa `ApprovedAmount`, un monto
+   *  distinto, ver `ApprovalsService`). */
+  private static readonly INVOICED_AMOUNT_EDITABLE_STATES = new Set([
+    'DECLARADO',
+    'EN_REVISION_REQUISITOS',
+    'EN_EVALUACION',
+  ]);
+
+  /** Corrige el monto "Reclamado" (`TCoverageProvision.InvoicedAmount`) --
+   *  Etapa 1 lo creaba fijo en 0 al declarar el siniestro (no había forma de
+   *  cargarlo); esto lo hace editable desde la pantalla de detalle. */
+  async updateInvoicedAmount(ideCoverageProvision: string, invoicedAmount: number, actor: string) {
+    const provision = await this.prisma.tCoverageProvision.findUnique({
+      where: { IdeCoverageProvision: ideCoverageProvision },
+      include: { TClaimRisk: { include: { TClaimFile: { include: { SState: true } } } } },
+    });
+    if (!provision) throw new NotFoundException(`No existe provisión de cobertura con id "${ideCoverageProvision}"`);
+
+    const fileState = provision.TClaimRisk.TClaimFile.SState.CodState;
+    if (!ClaimsService.INVOICED_AMOUNT_EDITABLE_STATES.has(fileState)) {
+      throw new BadRequestException(
+        `El monto reclamado ya no se puede editar con la carpeta en estado "${provision.TClaimRisk.TClaimFile.SState.DesState}"`,
+      );
+    }
+
+    return this.prisma.tCoverageProvision.update({
+      where: { IdeCoverageProvision: ideCoverageProvision },
+      data: { InvoicedAmount: invoicedAmount, UsrModification: actor, TstModification: new Date() },
+      include: { SState: true },
+    });
+  }
+
+  /** Listado simple (sin paginación -- alcance de Etapa 1, ver docs/02-roadmap.md), filtrable por número de siniestro/estado.
+   * `codState` filtra por el `SState` de `TClaim` (siempre "sin transición",
+   * ver el doc-comment de la clase) -- se deja el parámetro por compatibilidad,
+   * pero hoy no lo usa ninguna pantalla. El "estado" que sí importa en la
+   * práctica es el de la carpeta (`TClaimFile.SState`, máquina real desde
+   * Etapa 2) -- se incluye acá para que el listado lo pueda mostrar (un solo
+   * `TClaimFile` por siniestro en esta primera vuelta, ver `declare()`). */
   async findAll(filterNumClaim?: string, codState?: string) {
     const where: Prisma.TClaimWhereInput = {};
     if (filterNumClaim) where.NumClaim = { contains: filterNumClaim, mode: 'insensitive' };
     if (codState) where.SState = { CodState: codState };
     return this.prisma.tClaim.findMany({
       where,
-      include: { SClaimType: true, SState: true, TContractFile: { include: { TContract: true } } },
+      include: {
+        SClaimType: true,
+        SState: true,
+        TContractFile: { include: { TContract: true } },
+        TClaimFile: { select: { SState: true } },
+      },
       orderBy: { TstCreation: 'desc' },
     });
   }
