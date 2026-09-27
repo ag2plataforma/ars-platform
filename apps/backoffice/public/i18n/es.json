@@ -153,6 +153,10 @@
     "claim-events": {
       "label": "Eventos de siniestro",
       "singular": "evento de siniestro"
+    },
+    "guarantees": {
+      "label": "Garantías",
+      "singular": "garantía"
     }
   },
   "catalogFields": {
@@ -432,6 +436,28 @@
       "loadErrorDetail": "No se pudieron cargar las reglas de cálculo.",
       "createdDetail": "Se creó la regla de cálculo.",
       "updatedDetail": "Se actualizó la regla de cálculo."
+    },
+    "coverageGuaranteesTab": "Garantías",
+    "coverageGuarantees": {
+      "coveragePlanLabel": "Cobertura del plan",
+      "coveragePlanPlaceholder": "Elegí una cobertura del plan",
+      "subtitle": "Garantías configuradas para esta cobertura.",
+      "newButton": "Nueva garantía",
+      "guaranteeColumn": "Garantía",
+      "deductibleColumn": "Deducible",
+      "limitColumn": "Límite",
+      "numApplyUseLabel": "Máximo de usos por vigencia",
+      "numApplyUseHint": "Dejar vacío = sin límite",
+      "noLimitLabel": "Sin límite",
+      "accumulateLabel": "Acumula con otras coberturas",
+      "emptyState": "Todavía no hay garantías configuradas acá.",
+      "createDialogTitle": "Nueva garantía de la cobertura",
+      "editDialogTitle": "Editar garantía de la cobertura",
+      "guaranteeLabel": "Garantía",
+      "guaranteePlaceholder": "Elegí una garantía",
+      "loadErrorDetail": "No se pudieron cargar las garantías de la cobertura.",
+      "createdDetail": "Se agregó la garantía a la cobertura.",
+      "updatedDetail": "Se actualizó la garantía de la cobertura."
     }
   },
   "quotes": {
@@ -946,7 +972,20 @@
       "registerPaymentButton": "Registrar pago",
       "paymentDialogTitle": "Registrar pago",
       "paymentCreatedDetail": "Pago registrado.",
-      "invoicedAmountUpdatedDetail": "Monto reclamado actualizado."
+      "invoicedAmountUpdatedDetail": "Monto reclamado actualizado.",
+      "guaranteesButton": "Garantías",
+      "guaranteeDialogTitle": "Garantías de la cobertura",
+      "guaranteeColumn": "Garantía",
+      "usesColumn": "Usos",
+      "noGuaranteeProvisionsDetail": "Todavía no se registró ningún uso de garantía para esta cobertura.",
+      "newGuaranteeProvisionLabel": "Registrar nuevo uso",
+      "noEligibleGuaranteesDetail": "Esta cobertura no tiene garantías configuradas en su plan.",
+      "guaranteeLabel": "Garantía",
+      "noCoveredColumn": "No cubierto",
+      "manualDeductibleLabel": "Deducible manual",
+      "numApplyUseLabel": "Usos que consume",
+      "registerGuaranteeButton": "Registrar uso",
+      "guaranteeProvisionCreatedDetail": "Se registró el uso de la garantía."
     },
     "approvalThresholds": {
       "title": "Umbrales de aprobación",

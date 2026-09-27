@@ -36,7 +36,36 @@ export interface ClaimCoverageProvision {
   IndemnifiedAmount: DecimalString;
   NoCoveredAmount: DecimalString;
   SState: ClaimStateRef;
-  TRiskCoverage: { SCoveragePlan: { SCoverage: { DesCoverage: string } } };
+  TRiskCoverage: { SCoveragePlan: { IdeCoveragePlan: string; SCoverage: { DesCoverage: string } } };
+}
+
+/** `TGuaranteeProvision` -- uso registrado de una garantía (`SCoverageGuarantee`)
+ * sobre una provisión de cobertura puntual (Fase 4, Etapa 2 cierre del
+ * pendiente chico, 2026-09-27). Ver el doc-comment de
+ * `GuaranteeProvisionsService` en el backend real: el backend ya existía
+ * desde Etapa 2, esta es la primera UI que lo consume. */
+export interface GuaranteeProvision {
+  IdeGuaranteeProvision: string;
+  InvoicedAmount: DecimalString;
+  CoveredAmount: DecimalString;
+  ApprovedAmount: DecimalString;
+  IndemnifiedAmount: DecimalString;
+  NoCoveredAmount: DecimalString;
+  ManualDeductibleAmount: DecimalString | null;
+  NumApplyUse: DecimalString | null;
+  SState: ClaimStateRef;
+  SCoverageGuarantee: { DesShort: string | null; SGuarantee: { DesGuarantee: string } };
+}
+
+export interface CreateGuaranteeProvisionRequest {
+  ideCoverageGuarantee: string;
+  invoicedAmount: number;
+  coveredAmount: number;
+  approvedAmount: number;
+  indemnifiedAmount: number;
+  noCoveredAmount: number;
+  manualDeductibleAmount?: number;
+  numApplyUse?: number;
 }
 
 /** `TApprovalDetail` -- decisión de aprobación POR COBERTURA (Fase 4, Etapa 2). Ver el doc-comment de `ApprovalsService` en el backend real. */
@@ -208,5 +237,21 @@ export class ClaimsApiService {
 
   createPayment(ideApproval: string, dto: CreatePaymentRequest): Observable<ClaimPayment> {
     return this.http.post<ClaimPayment>(`${environment.apiUrl}/claims/approvals/${ideApproval}/payments`, dto);
+  }
+
+  listGuaranteeProvisions(ideCoverageProvision: string): Observable<GuaranteeProvision[]> {
+    return this.http.get<GuaranteeProvision[]>(
+      `${environment.apiUrl}/claims/coverage-provisions/${ideCoverageProvision}/guarantee-provisions`,
+    );
+  }
+
+  createGuaranteeProvision(
+    ideCoverageProvision: string,
+    dto: CreateGuaranteeProvisionRequest,
+  ): Observable<GuaranteeProvision> {
+    return this.http.post<GuaranteeProvision>(
+      `${environment.apiUrl}/claims/coverage-provisions/${ideCoverageProvision}/guarantee-provisions`,
+      dto,
+    );
   }
 }

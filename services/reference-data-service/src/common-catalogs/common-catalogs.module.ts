@@ -26,6 +26,8 @@ import { ConceptsController } from './concepts.controller';
 import { ConceptsService } from './concepts.service';
 import { PaymentTypesController } from './payment-types.controller';
 import { PaymentTypesService } from './payment-types.service';
+import { GuaranteesController } from './guarantees.controller';
+import { GuaranteesService } from './guarantees.service';
 
 /**
  * Catálogos comunes que menciona el alcance original del README de este
@@ -62,6 +64,7 @@ import { PaymentTypesService } from './payment-types.service';
     ConceptTypesController,
     ConceptsController,
     PaymentTypesController,
+    GuaranteesController,
   ],
   providers: [
     LanguagesService,
@@ -77,6 +80,7 @@ import { PaymentTypesService } from './payment-types.service';
     ConceptTypesService,
     ConceptsService,
     PaymentTypesService,
+    GuaranteesService,
   ],
 })
 export class CommonCatalogsModule {}

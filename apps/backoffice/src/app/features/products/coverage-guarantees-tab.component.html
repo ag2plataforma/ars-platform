@@ -1,0 +1,210 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex flex-col gap-4">
+  <div class="grid grid-cols-2 gap-4">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'products.coveragePlans.planRiskLabel' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        [options]="planProductRisks()"
+        optionLabel="IdePlanProductRisk"
+        optionValue="IdePlanProductRisk"
+        [ngModel]="selectedPlanProductRiskId()"
+        (ngModelChange)="onSelectPlanProductRisk($event)"
+        [showClear]="true"
+        [placeholder]="'products.coveragePlans.planRiskPlaceholder' | transloco"
+        styleClass="w-full"
+      >
+        <ng-template let-item #selectedItem>{{ planProductRiskLabel(item) }}</ng-template>
+        <ng-template let-item #item>{{ planProductRiskLabel(item) }}</ng-template>
+      </p-select>
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'products.coverageGuarantees.coveragePlanLabel' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        [options]="coveragePlans()"
+        optionLabel="IdeCoveragePlan"
+        optionValue="IdeCoveragePlan"
+        [ngModel]="selectedCoveragePlanId()"
+        (ngModelChange)="onSelectCoveragePlan($event)"
+        [showClear]="true"
+        [disabled]="!selectedPlanProductRiskId()"
+        [placeholder]="'products.coverageGuarantees.coveragePlanPlaceholder' | transloco"
+        styleClass="w-full"
+      >
+        <ng-template let-item #selectedItem>{{ coveragePlanLabel(item) }}</ng-template>
+        <ng-template let-item #item>{{ coveragePlanLabel(item) }}</ng-template>
+      </p-select>
+    </div>
+  </div>
+
+  @if (selectedCoveragePlanId()) {
+    <div class="flex items-center justify-between">
+      <p class="text-sm text-slate-500">{{ 'products.coverageGuarantees.subtitle' | transloco }}</p>
+      <button pButton type="button" icon="pi pi-plus" [label]="'products.coverageGuarantees.newButton' | transloco" (click)="openCreate()"></button>
+    </div>
+
+    <p-table
+      [value]="rows()"
+      [loading]="loading()"
+      dataKey="IdeCoverageGuarantee"
+      [paginator]="true"
+      [rows]="10"
+      [rowsPerPageOptions]="[10, 25, 50]"
+      [showCurrentPageReport]="true"
+      currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+      styleClass="p-datatable-sm"
+    >
+      <ng-template #header>
+        <tr>
+          <th pSortableColumn="Order"><span class="ars-th-flex">{{ 'products.coveragePlans.orderColumn' | transloco }} <p-sortIcon field="Order" /></span></th>
+          <th>{{ 'products.coverageGuarantees.guaranteeColumn' | transloco }}</th>
+          <th>{{ 'products.coverageGuarantees.deductibleColumn' | transloco }}</th>
+          <th>{{ 'products.coverageGuarantees.limitColumn' | transloco }}</th>
+          <th>{{ 'products.coverageGuarantees.numApplyUseLabel' | transloco }}</th>
+          <th>{{ 'products.coveragePlans.validityColumn' | transloco }}</th>
+          <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+          <th class="w-32">{{ 'catalogs.actionsColumn' | transloco }}</th>
+        </tr>
+      </ng-template>
+      <ng-template #body let-row>
+        <tr>
+          <td>{{ row.Order ?? '-' }}</td>
+          <td>{{ guaranteeLabel(row) }}</td>
+          <td>{{ row.SDeductibleType?.DesDeductibleType }}{{ row.DeductibleTypeValue != null ? ' (' + row.DeductibleTypeValue + ')' : '' }}</td>
+          <td>{{ row.SLimitType?.DesLimitType }}{{ row.LimitTypeValue != null ? ' (' + row.LimitTypeValue + ')' : '' }}</td>
+          <td>{{ row.NumApplyUse ?? ('products.coverageGuarantees.noLimitLabel' | transloco) }}</td>
+          <td>{{ row.TstInitial | slice: 0 : 10 }} — {{ row.TstEnd ? (row.TstEnd | slice: 0 : 10) : ('common.noEndDate' | transloco) }}</td>
+          <td>
+            <p-tag [value]="(isActive(row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isActive(row) ? 'success' : 'danger'" />
+          </td>
+          <td>
+            <div class="flex gap-1">
+              <button pButton type="button" icon="pi pi-pencil" [text]="true" severity="secondary" (click)="openEdit(row)"></button>
+              <button
+                pButton
+                type="button"
+                [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'"
+                [text]="true"
+                [severity]="isActive(row) ? 'danger' : 'success'"
+                (click)="toggleState(row)"
+              ></button>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template #emptymessage>
+        <tr>
+          <td colspan="8" class="text-center text-slate-500">{{ 'products.coverageGuarantees.emptyState' | transloco }}</td>
+        </tr>
+      </ng-template>
+    </p-table>
+  }
+</div>
+
+<p-dialog
+  [header]="(dialogMode() === 'create' ? 'products.coverageGuarantees.createDialogTitle' : 'products.coverageGuarantees.editDialogTitle') | transloco"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  [style]="{ width: '38rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="grid grid-cols-2 gap-4">
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.coverageGuarantees.guaranteeLabel' | transloco }}</label>
+        <p-select
+          appendTo="body"
+          formControlName="codGuarantee"
+          [options]="guarantees()"
+          optionLabel="DesGuarantee"
+          optionValue="CodGuarantee"
+          [placeholder]="'products.coverageGuarantees.guaranteePlaceholder' | transloco"
+          styleClass="w-full"
+        />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.coveragePlans.orderLabel' | transloco }}</label>
+        <input pInputText type="number" formControlName="order" class="w-full" />
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.shortDescriptionLabel' | transloco }}</label>
+        <input pInputText formControlName="desShort" class="w-full" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.longDescriptionLabel' | transloco }}</label>
+        <textarea pTextarea rows="2" formControlName="desLarge" class="w-full"></textarea>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.coveragePlans.deductibleTypeLabel' | transloco }}</label>
+        <p-select
+          appendTo="body"
+          formControlName="codDeductibleType"
+          [options]="deductibleTypes()"
+          optionLabel="DesDeductibleType"
+          optionValue="CodDeductibleType"
+          [placeholder]="'products.coveragePlans.deductibleTypePlaceholder' | transloco"
+          styleClass="w-full"
+        />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.coveragePlans.deductibleValueLabel' | transloco }}</label>
+        <input pInputText type="number" formControlName="deductibleTypeValue" class="w-full" />
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.coveragePlans.limitTypeLabel' | transloco }}</label>
+        <p-select
+          appendTo="body"
+          formControlName="codLimitType"
+          [options]="limitTypes()"
+          optionLabel="DesLimitType"
+          optionValue="CodLimitType"
+          [placeholder]="'products.coveragePlans.limitTypePlaceholder' | transloco"
+          styleClass="w-full"
+        />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.coveragePlans.limitValueLabel' | transloco }}</label>
+        <input pInputText type="number" formControlName="limitTypeValue" class="w-full" />
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.coverageGuarantees.numApplyUseLabel' | transloco }}</label>
+        <input pInputText type="number" formControlName="numApplyUse" [placeholder]="'products.coverageGuarantees.numApplyUseHint' | transloco" class="w-full" />
+      </div>
+      <div class="flex items-center gap-2 pt-6">
+        <input type="checkbox" id="indCoverageAccumulate" formControlName="indCoverageAccumulate" />
+        <label for="indCoverageAccumulate" class="text-sm text-slate-700">{{ 'products.coverageGuarantees.accumulateLabel' | transloco }}</label>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.validFromLabel' | transloco }}</label>
+        <input pInputText type="date" formControlName="tstInitial" class="w-full" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.validToLabel' | transloco }}</label>
+        <input pInputText type="date" formControlName="tstEnd" class="w-full" />
+      </div>
+    </div>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
+    </div>
+  </form>
+</p-dialog>

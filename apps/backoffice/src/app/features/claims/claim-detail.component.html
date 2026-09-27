@@ -57,6 +57,7 @@
                   <th>{{ 'claims.detail.coveredColumn' | transloco }}</th>
                   <th>{{ 'claims.detail.approvedColumn' | transloco }}</th>
                   <th>{{ 'claims.detail.indemnifiedColumn' | transloco }}</th>
+                  <th class="w-28">{{ 'claims.detail.guaranteesButton' | transloco }}</th>
                 </tr>
               </ng-template>
               <ng-template #body let-provision>
@@ -92,6 +93,9 @@
                   <td>{{ provision.CoveredAmount | number: '1.2-2' }}</td>
                   <td>{{ provision.ApprovedAmount | number: '1.2-2' }}</td>
                   <td>{{ provision.IndemnifiedAmount | number: '1.2-2' }}</td>
+                  <td>
+                    <button pButton type="button" size="small" icon="pi pi-shield" [text]="true" [label]="'claims.detail.guaranteesButton' | transloco" (click)="openGuaranteeDialog(provision)"></button>
+                  </td>
                 </tr>
               </ng-template>
             </p-table>
@@ -349,4 +353,88 @@
       <button pButton type="submit" [label]="'common.save' | transloco" [loading]="paymentSubmitting()"></button>
     </div>
   </form>
+</p-dialog>
+
+<p-dialog
+  [header]="'claims.detail.guaranteeDialogTitle' | transloco"
+  [visible]="guaranteeDialogVisible()"
+  [modal]="true"
+  [style]="{ width: '42rem' }"
+  (visibleChange)="!$event && closeGuaranteeDialog()"
+>
+  @if (guaranteeDialogProvision(); as provision) {
+    <div class="flex flex-col gap-4 pt-2">
+      <p class="text-sm text-slate-500">{{ provision.TRiskCoverage.SCoveragePlan.SCoverage.DesCoverage }}</p>
+
+      @if (guaranteeProvisions().length > 0) {
+        <p-table [value]="guaranteeProvisions()" styleClass="p-datatable-sm">
+          <ng-template #header>
+            <tr>
+              <th>{{ 'claims.detail.guaranteeColumn' | transloco }}</th>
+              <th>{{ 'claims.detail.approvedColumn' | transloco }}</th>
+              <th>{{ 'claims.detail.indemnifiedColumn' | transloco }}</th>
+              <th>{{ 'claims.detail.usesColumn' | transloco }}</th>
+            </tr>
+          </ng-template>
+          <ng-template #body let-gp>
+            <tr>
+              <td>{{ guaranteeProvisionLabel(gp) }}</td>
+              <td>{{ gp.ApprovedAmount | number: '1.2-2' }}</td>
+              <td>{{ gp.IndemnifiedAmount | number: '1.2-2' }}</td>
+              <td>{{ gp.NumApplyUse ?? '-' }}</td>
+            </tr>
+          </ng-template>
+        </p-table>
+      } @else if (!guaranteeLoading()) {
+        <p class="text-sm text-slate-500">{{ 'claims.detail.noGuaranteeProvisionsDetail' | transloco }}</p>
+      }
+
+      <form [formGroup]="guaranteeForm" (ngSubmit)="submitGuaranteeProvision()" class="flex flex-col gap-3 rounded border border-slate-200 p-3">
+        <p class="text-sm font-medium text-slate-700">{{ 'claims.detail.newGuaranteeProvisionLabel' | transloco }}</p>
+        @if (eligibleCoverageGuarantees().length === 0) {
+          <p class="text-xs text-slate-500">{{ 'claims.detail.noEligibleGuaranteesDetail' | transloco }}</p>
+        }
+        <div class="flex flex-col gap-2">
+          <label class="text-sm font-medium text-slate-700">{{ 'claims.detail.guaranteeLabel' | transloco }}</label>
+          <p-select appendTo="body" formControlName="ideCoverageGuarantee" [options]="eligibleCoverageGuarantees()" optionValue="IdeCoverageGuarantee" styleClass="w-full">
+            <ng-template let-item #selectedItem>{{ guaranteeLabel(item) }}</ng-template>
+            <ng-template let-item #item>{{ guaranteeLabel(item) }}</ng-template>
+          </p-select>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="flex flex-col gap-1">
+            <label class="text-xs text-slate-500">{{ 'claims.detail.invoicedColumn' | transloco }}</label>
+            <p-inputNumber formControlName="invoicedAmount" mode="decimal" [minFractionDigits]="2" [style]="{ width: '100%' }" inputStyleClass="w-full" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs text-slate-500">{{ 'claims.detail.coveredColumn' | transloco }}</label>
+            <p-inputNumber formControlName="coveredAmount" mode="decimal" [minFractionDigits]="2" [style]="{ width: '100%' }" inputStyleClass="w-full" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs text-slate-500">{{ 'claims.detail.approvedColumn' | transloco }}</label>
+            <p-inputNumber formControlName="approvedAmount" mode="decimal" [minFractionDigits]="2" [style]="{ width: '100%' }" inputStyleClass="w-full" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs text-slate-500">{{ 'claims.detail.indemnifiedColumn' | transloco }}</label>
+            <p-inputNumber formControlName="indemnifiedAmount" mode="decimal" [minFractionDigits]="2" [style]="{ width: '100%' }" inputStyleClass="w-full" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs text-slate-500">{{ 'claims.detail.noCoveredColumn' | transloco }}</label>
+            <p-inputNumber formControlName="noCoveredAmount" mode="decimal" [minFractionDigits]="2" [style]="{ width: '100%' }" inputStyleClass="w-full" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs text-slate-500">{{ 'claims.detail.manualDeductibleLabel' | transloco }}</label>
+            <p-inputNumber formControlName="manualDeductibleAmount" mode="decimal" [minFractionDigits]="2" [style]="{ width: '100%' }" inputStyleClass="w-full" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs text-slate-500">{{ 'claims.detail.numApplyUseLabel' | transloco }}</label>
+            <p-inputNumber formControlName="numApplyUse" [style]="{ width: '100%' }" inputStyleClass="w-full" />
+          </div>
+        </div>
+        <div class="mt-1 flex justify-end gap-2">
+          <button pButton type="submit" [label]="'claims.detail.registerGuaranteeButton' | transloco" [loading]="guaranteeSubmitting()" [disabled]="eligibleCoverageGuarantees().length === 0"></button>
+        </div>
+      </form>
+    </div>
+  }
 </p-dialog>

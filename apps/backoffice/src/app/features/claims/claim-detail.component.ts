@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
+import { forkJoin } from 'rxjs';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
@@ -28,9 +29,12 @@ import {
   ClaimRequirement,
   ClaimRisk,
   ClaimsApiService,
+  CreateGuaranteeProvisionRequest,
+  GuaranteeProvision,
 } from './claims.service';
 
 const PAYMENT_TYPES_PATH = '/reference-data/payment-types';
+const COVERAGE_GUARANTEES_PATH = '/product-rating/coverage-guarantees';
 
 /** Fila auxiliar de la tabla de selección de coberturas del diálogo
  * "Nueva aprobación" -- puramente de UI, no se persiste tal cual (ver
@@ -88,12 +92,15 @@ const INVOICED_AMOUNT_EDITABLE_STATES = new Set(['DECLARADO', 'EN_REVISION_REQUI
  * Etapa 1 es `TstRequest === TstReception` = "pendiente" (`isReceived`
  * compara ambas fechas).
  *
- * Deliberadamente NO incluye acá el registro de uso de garantías
- * (`TGuaranteeProvision`, `GuaranteeProvisionsService` en el backend)
- * -- no hay todavía ningún endpoint de listado para `SCoverageGuarantee`
- * en el codebase (se buscó explícitamente), así que no hay forma de
- * armar un selector "elegir garantía" en pantalla. Queda pendiente para
- * una pasada futura; el backend ya funciona, falta solo esta UI.
+ * Agregado 2026-09-27 (cierre del pendiente chico de Siniestros
+ * Etapa 2): registro de uso de garantías (`TGuaranteeProvision`) por
+ * cobertura, vía el diálogo "Garantías" -- las opciones elegibles salen
+ * de `SCoverageGuarantee` filtradas por el `IdeCoveragePlan` exacto de
+ * la cobertura (`TRiskCoverage.SCoveragePlan.IdeCoveragePlan`), catálogo
+ * recién armado en `product-rating-service` (`CoverageGuaranteesService`).
+ * El backend de registro (`GuaranteeProvisionsService`,
+ * `POST coverage-provisions/:id/guarantee-provisions`) ya existía desde
+ * Etapa 2; esta es la primera UI que lo consume.
  */
 @Component({
   selector: 'app-claim-detail',
@@ -159,6 +166,15 @@ export class ClaimDetailComponent implements OnInit {
   readonly paymentSubmitting = signal(false);
   paymentForm = this.newPaymentForm();
 
+  // --- Diálogo "Garantías" (registrar uso de `SCoverageGuarantee`) ---
+  readonly guaranteeDialogVisible = signal(false);
+  readonly guaranteeDialogProvision = signal<ClaimCoverageProvision | null>(null);
+  readonly guaranteeProvisions = signal<GuaranteeProvision[]>([]);
+  readonly guaranteeLoading = signal(false);
+  readonly eligibleCoverageGuarantees = signal<CatalogRow[]>([]);
+  readonly guaranteeSubmitting = signal(false);
+  guaranteeForm = this.newGuaranteeForm();
+
   ngOnInit(): void {
     this.route.paramMap.subscribe((params) => {
       const id = params.get('id');
@@ -180,6 +196,50 @@ export class ClaimDetailComponent implements OnInit {
       numExternalPayment: [''],
       desObservation: [''],
     });
+  }
+
+  /** `coveredAmountDefault` -- arranca en el `CoveredAmount` de la
+   * cobertura (pedido explícito del usuario, 2026-09-27): la garantía
+   * normalmente cubre el mismo monto que ya se aprobó cubrir para la
+   * cobertura completa, así que se autocompleta y el ajustador lo ajusta
+   * a mano solo si esta garantía en particular cubre menos.
+   *
+   * "Indemnizado" sigue en vivo a "Aprobado" (mismo criterio que ya usa
+   * el resto del flujo de aprobación: lo aprobado es, por defecto, lo
+   * que se termina indemnizando) y "No cubierto" se recalcula como
+   * Reclamado - Indemnizado. Los tres quedan editables después de
+   * autocompletarse -- si el ajustador toca alguno a mano y después
+   * cambia Aprobado/Reclamado, el autocompletado lo vuelve a pisar
+   * (mismo criterio simple que el resto de este formulario, sin flag de
+   * "edité a mano"). `Validators.min(0)` en "No cubierto" de paso
+   * marca el formulario inválido si queda negativo (indemnizado por
+   * encima de lo reclamado), señal de que algo no cuadra antes de guardar. */
+  private newGuaranteeForm(coveredAmountDefault = 0) {
+    const form = this.fb.nonNullable.group({
+      ideCoverageGuarantee: ['', Validators.required],
+      invoicedAmount: [0, [Validators.required, Validators.min(0)]],
+      coveredAmount: [coveredAmountDefault, [Validators.required, Validators.min(0)]],
+      approvedAmount: [0, [Validators.required, Validators.min(0)]],
+      indemnifiedAmount: [0, [Validators.required, Validators.min(0)]],
+      noCoveredAmount: [0, [Validators.required, Validators.min(0)]],
+      manualDeductibleAmount: this.fb.control<number | null>(null),
+      numApplyUse: this.fb.control<number | null>(null),
+    });
+
+    const recomputeNoCovered = () => {
+      const invoiced = form.controls.invoicedAmount.value;
+      const indemnified = form.controls.indemnifiedAmount.value;
+      form.controls.noCoveredAmount.setValue(invoiced - indemnified, { emitEvent: false });
+    };
+
+    form.controls.approvedAmount.valueChanges.subscribe((value) => {
+      form.controls.indemnifiedAmount.setValue(value, { emitEvent: false });
+      recomputeNoCovered();
+    });
+    form.controls.invoicedAmount.valueChanges.subscribe(recomputeNoCovered);
+    form.controls.indemnifiedAmount.valueChanges.subscribe(recomputeNoCovered);
+
+    return form;
   }
 
   private load(id: string): void {
@@ -332,24 +392,63 @@ export class ClaimDetailComponent implements OnInit {
     return ids;
   }
 
+  /** El "Aprobado" con el que arranca cada fila seleccionable -- pedido
+   * explícito del usuario (2026-09-27): si la cobertura ya tiene uso(s)
+   * de garantía registrados (`TGuaranteeProvision`, diálogo "Garantías"),
+   * arranca en la suma de sus `ApprovedAmount` en vez del `CoveredAmount`
+   * de la cobertura completa (lo que sí sigue siendo el default cuando
+   * no hay ninguna garantía cargada). Deliberadamente NO se genera la
+   * aprobación sola al registrar una garantía -- ver el doc-comment de
+   * la clase: faltan datos que ese diálogo no pide (a quién se le paga,
+   * con qué tipo de pago) y se perdería el control humano por rol/rango
+   * (`ApprovalsService.resolveRequiredLevel`). Este método sigue siendo
+   * el único punto de entrada para crear una `TApproval`. */
   openApprovalDialog(file: ClaimFile): void {
     this.approvalDialogFile.set(file);
     this.approvalForm = this.newApprovalForm();
     this.resetPayeeSelection();
     const alreadyApproved = this.approvedProvisionIds(file);
-    const rows: CoverageSelectionRow[] = [];
+    const candidates: { provision: ClaimCoverageProvision; riskLabel: string }[] = [];
     for (const risk of file.TClaimRisk) {
       for (const provision of risk.TCoverageProvision) {
         if (alreadyApproved.has(provision.IdeCoverageProvision)) continue;
-        rows.push({
-          provision,
-          riskLabel: this.riskLabel(risk),
-          selected: false,
-          approvedAmount: Number(provision.CoveredAmount),
-        });
+        candidates.push({ provision, riskLabel: this.riskLabel(risk) });
       }
     }
-    this.coverageSelections.set(rows);
+    if (candidates.length === 0) {
+      this.coverageSelections.set([]);
+    } else {
+      forkJoin(
+        candidates.map((c) => this.claimsApi.listGuaranteeProvisions(c.provision.IdeCoverageProvision)),
+      ).subscribe({
+        next: (guaranteeListsByProvision) => {
+          this.coverageSelections.set(
+            candidates.map((c, i) => {
+              const guaranteeSum = guaranteeListsByProvision[i].reduce((sum, gp) => sum + Number(gp.ApprovedAmount), 0);
+              return {
+                provision: c.provision,
+                riskLabel: c.riskLabel,
+                selected: false,
+                approvedAmount: guaranteeSum > 0 ? guaranteeSum : Number(c.provision.CoveredAmount),
+              };
+            }),
+          );
+        },
+        error: (err: HttpErrorResponse) => {
+          // Si falla la consulta de garantías no bloqueamos el diálogo --
+          // se arma igual con el default anterior (CoveredAmount).
+          this.coverageSelections.set(
+            candidates.map((c) => ({
+              provision: c.provision,
+              riskLabel: c.riskLabel,
+              selected: false,
+              approvedAmount: Number(c.provision.CoveredAmount),
+            })),
+          );
+          this.showError(err);
+        },
+      });
+    }
     if (this.paymentTypes().length === 0) {
       this.catalogService.list(PAYMENT_TYPES_PATH).subscribe({ next: (rows2) => this.paymentTypes.set(rows2) });
     }
@@ -549,6 +648,82 @@ export class ClaimDetailComponent implements OnInit {
           this.showError(err);
         },
       });
+  }
+
+  // --- Diálogo "Garantías" ---
+
+  openGuaranteeDialog(provision: ClaimCoverageProvision): void {
+    this.guaranteeDialogProvision.set(provision);
+    this.guaranteeForm = this.newGuaranteeForm(Number(provision.CoveredAmount));
+    this.guaranteeProvisions.set([]);
+    this.guaranteeLoading.set(true);
+    this.claimsApi.listGuaranteeProvisions(provision.IdeCoverageProvision).subscribe({
+      next: (rows) => {
+        this.guaranteeProvisions.set(rows);
+        this.guaranteeLoading.set(false);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.guaranteeLoading.set(false);
+        this.showError(err);
+      },
+    });
+    const ideCoveragePlan = provision.TRiskCoverage.SCoveragePlan.IdeCoveragePlan;
+    this.catalogService.list(COVERAGE_GUARANTEES_PATH, { ideCoveragePlan }).subscribe({
+      next: (rows) => this.eligibleCoverageGuarantees.set(rows),
+    });
+    this.guaranteeDialogVisible.set(true);
+  }
+
+  closeGuaranteeDialog(): void {
+    this.guaranteeDialogVisible.set(false);
+  }
+
+  guaranteeLabel(row: CatalogRow): string {
+    const guarantee = row['SGuarantee'] as Record<string, unknown> | undefined;
+    const desShort = row['DesShort'] ? String(row['DesShort']) : '';
+    if (desShort) return desShort;
+    return guarantee ? String(guarantee['DesGuarantee'] ?? '') : this.transloco.translate('common.dash');
+  }
+
+  guaranteeProvisionLabel(row: GuaranteeProvision): string {
+    return row.SCoverageGuarantee.DesShort ?? row.SCoverageGuarantee.SGuarantee.DesGuarantee;
+  }
+
+  submitGuaranteeProvision(): void {
+    if (this.guaranteeForm.invalid) {
+      this.guaranteeForm.markAllAsTouched();
+      return;
+    }
+    const provision = this.guaranteeDialogProvision();
+    if (!provision) return;
+    const raw = this.guaranteeForm.getRawValue();
+    const dto: CreateGuaranteeProvisionRequest = {
+      ideCoverageGuarantee: raw.ideCoverageGuarantee,
+      invoicedAmount: raw.invoicedAmount,
+      coveredAmount: raw.coveredAmount,
+      approvedAmount: raw.approvedAmount,
+      indemnifiedAmount: raw.indemnifiedAmount,
+      noCoveredAmount: raw.noCoveredAmount,
+      manualDeductibleAmount: raw.manualDeductibleAmount ?? undefined,
+      numApplyUse: raw.numApplyUse ?? undefined,
+    };
+    this.guaranteeSubmitting.set(true);
+    this.claimsApi.createGuaranteeProvision(provision.IdeCoverageProvision, dto).subscribe({
+      next: (created) => {
+        this.guaranteeSubmitting.set(false);
+        this.guaranteeProvisions.update((rows) => [...rows, created]);
+        this.guaranteeForm = this.newGuaranteeForm(Number(provision.CoveredAmount));
+        this.messages.add({
+          severity: 'success',
+          summary: this.transloco.translate('common.done'),
+          detail: this.transloco.translate('claims.detail.guaranteeProvisionCreatedDetail'),
+        });
+      },
+      error: (err: HttpErrorResponse) => {
+        this.guaranteeSubmitting.set(false);
+        this.showError(err);
+      },
+    });
   }
 
   volver(): void {

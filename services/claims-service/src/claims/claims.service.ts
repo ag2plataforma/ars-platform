@@ -77,6 +77,20 @@ export class ClaimsService {
     const claimType = await this.prisma.sClaimType.findFirst({ where: { CodClaimType: dto.codClaimType } });
     if (!claimType) throw new NotFoundException(`No existe tipo de siniestro con código "${dto.codClaimType}"`);
 
+    // `SClaimType.NumDeadLineReport` -- plazo máximo (en días) entre que
+    // ocurre el siniestro y se lo notifica/declara. Decisión del usuario
+    // (2026-09-27, al encontrar que el campo se guardaba desde el
+    // catálogo pero nunca se validaba en ningún lado): Ocurrencia →
+    // Notificación, y bloquea el alta si se excede (mismo criterio que
+    // ya bloquean otras reglas de negocio de la plataforma, ej. el
+    // máximo de usos de una garantía en `GuaranteeProvisionsService`).
+    const daysToReport = this.daysBetween(new Date(dto.tstOcurrence), new Date(dto.tstNotification));
+    if (daysToReport > claimType.NumDeadLineReport) {
+      throw new BadRequestException(
+        `El tipo de siniestro "${dto.codClaimType}" exige notificarlo dentro de los ${claimType.NumDeadLineReport} día(s) de ocurrido, y pasaron ${daysToReport}`,
+      );
+    }
+
     const contractFile = await this.prisma.tContractFile.findUnique({
       where: { IdeContractFile: dto.ideContractFile },
       include: { TContract: true },
@@ -85,6 +99,31 @@ export class ClaimsService {
     if (contractFile.TContract.IdeProduct !== claimType.IdeProduct) {
       throw new BadRequestException(
         `El tipo de siniestro "${dto.codClaimType}" no aplica al producto de este contrato`,
+      );
+    }
+
+    // `SClaimType.NumClaimsPerYear` -- máximo de siniestros DE ESTE TIPO
+    // que puede tener el contrato (sin importar la vigencia/
+    // `TContractFile` concreta) en los últimos 12 meses corridos hacia
+    // atrás desde la fecha de ocurrencia del siniestro que se está
+    // declarando. Mismo hallazgo que `NumDeadLineReport` (2026-09-27):
+    // el campo se guardaba desde el catálogo pero nunca se validaba.
+    // Cuenta cualquier siniestro declarado en la ventana sin importar en
+    // qué estado terminó (decisión explícita del usuario -- el límite es
+    // sobre la frecuencia de declaración, no sobre el resultado).
+    const occurrenceDate = new Date(dto.tstOcurrence);
+    const windowStart = new Date(occurrenceDate);
+    windowStart.setFullYear(windowStart.getFullYear() - 1);
+    const priorClaimsCount = await this.prisma.tClaim.count({
+      where: {
+        IdeClaimType: claimType.IdeClaimType,
+        TstOcurrence: { gte: windowStart, lte: occurrenceDate },
+        TContractFile: { IdeContract: contractFile.IdeContract },
+      },
+    });
+    if (priorClaimsCount >= claimType.NumClaimsPerYear) {
+      throw new BadRequestException(
+        `El tipo de siniestro "${dto.codClaimType}" permite hasta ${claimType.NumClaimsPerYear} siniestro(s) por año en este contrato, y ya hay ${priorClaimsCount} en los últimos 12 meses`,
       );
     }
 
@@ -312,6 +351,13 @@ export class ClaimsService {
     `;
     const year = new Date().getFullYear();
     return `SIN-${year}-${result[0].nextval}`;
+  }
+
+  /** Días corridos entre dos fechas -- mismo criterio que `daysBetween`
+   * en `underwriting-service/contracts.service.ts` (`Math.floor`, no
+   * cuenta un día parcial como completo). */
+  private daysBetween(from: Date, to: Date): number {
+    return Math.floor((to.getTime() - from.getTime()) / 86_400_000);
   }
 
   private async generateNumClaimFile(tx: Prisma.TransactionClient): Promise<string> {

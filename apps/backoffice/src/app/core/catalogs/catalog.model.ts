@@ -312,6 +312,20 @@ export const PRODUCT_CATALOG_REGISTRY: CatalogConfig[] = [
     idField: 'IdePaymentType',
   },
   {
+    // Agregado 2026-09-27 (cierre del pendiente chico de Siniestros
+    // Etapa 2) -- `SGuarantee` ya existía en el esquema legado pero sin
+    // CRUD/listado expuesto todavía; `CoverageGuaranteesTabComponent`
+    // necesita elegir una garantía real al armar `SCoverageGuarantee`
+    // (ver `GuaranteesService` en reference-data-service).
+    key: 'guarantees',
+    label: 'catalogsRegistry.guarantees.label',
+    singular: 'catalogsRegistry.guarantees.singular',
+    path: '/reference-data/guarantees',
+    codField: 'CodGuarantee',
+    desField: 'DesGuarantee',
+    idField: 'IdeGuarantee',
+  },
+  {
     key: 'coverages',
     label: 'catalogsRegistry.coverages.label',
     singular: 'catalogsRegistry.coverages.singular',

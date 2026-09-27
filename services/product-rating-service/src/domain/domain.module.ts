@@ -15,6 +15,8 @@ import { CoveragePlansController } from './coverage-plans.controller';
 import { CoveragePlansService } from './coverage-plans.service';
 import { CalculationRulesController } from './calculation-rules.controller';
 import { CalculationRulesService } from './calculation-rules.service';
+import { CoverageGuaranteesController } from './coverage-guarantees.controller';
+import { CoverageGuaranteesService } from './coverage-guarantees.service';
 
 /**
  * Las 7 entidades "de dominio" (a diferencia de los 8 catálogos de
@@ -43,6 +45,7 @@ import { CalculationRulesService } from './calculation-rules.service';
     CoveragesController,
     CoveragePlansController,
     CalculationRulesController,
+    CoverageGuaranteesController,
   ],
   providers: [
     ProductsService,
@@ -52,6 +55,7 @@ import { CalculationRulesService } from './calculation-rules.service';
     CoveragesService,
     CoveragePlansService,
     CalculationRulesService,
+    CoverageGuaranteesService,
   ],
 })
 export class DomainModule {}

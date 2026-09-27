@@ -98,6 +98,7 @@
           <p-tab value="plan-product-risks">{{ 'products.planProductRisksTab' | transloco }}</p-tab>
           <p-tab value="coverage-plans">{{ 'products.coveragePlansTab' | transloco }}</p-tab>
           <p-tab value="calculation-rules">{{ 'products.calculationRulesTab' | transloco }}</p-tab>
+          <p-tab value="coverage-guarantees">{{ 'products.coverageGuaranteesTab' | transloco }}</p-tab>
         </p-tablist>
         <p-tabpanels>
           <p-tabpanel value="risk-products">
@@ -114,6 +115,9 @@
           </p-tabpanel>
           <p-tabpanel value="calculation-rules">
             <app-calculation-rules-tab [product]="product" />
+          </p-tabpanel>
+          <p-tabpanel value="coverage-guarantees">
+            <app-coverage-guarantees-tab [product]="product" />
           </p-tabpanel>
         </p-tabpanels>
       </p-tabs>

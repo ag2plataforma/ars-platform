@@ -21,6 +21,7 @@ import { PlanProductsTabComponent } from './plan-products-tab.component';
 import { PlanProductRisksTabComponent } from './plan-product-risks-tab.component';
 import { CoveragePlansTabComponent } from './coverage-plans-tab.component';
 import { CalculationRulesTabComponent } from './calculation-rules-tab.component';
+import { CoverageGuaranteesTabComponent } from './coverage-guarantees-tab.component';
 
 const PRODUCTS_PATH = '/product-rating/products';
 const INSURANCE_AREAS_PATH = '/product-rating/insurance-areas';
@@ -59,6 +60,7 @@ const CURRENCIES_PATH = '/product-rating/currencies';
     PlanProductRisksTabComponent,
     CoveragePlansTabComponent,
     CalculationRulesTabComponent,
+    CoverageGuaranteesTabComponent,
   ],
   providers: [MessageService, ConfirmationService],
   templateUrl: './products.component.html',
