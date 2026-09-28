@@ -245,14 +245,29 @@ export interface ContractDetail {
   TContractFile: ContractFile[];
 }
 
+/** Payload de `POST /contracts/:id/cancel` -- mismo shape que
+ *  `CancelContractDto` en el backend real (`ContractsService.cancel`,
+ *  underwriting-service), que hace el equivalente real de
+ *  `FContract('CANCELCONTRACT',...)` + `FMovementConcept(...)` del
+ *  sistema legacy: crea el `TContractOperation` de anulación y aplica
+ *  las devoluciones de prima/comisión/impuesto según el
+ *  `SProductEndorsement` elegido. */
+export interface CancelContractPayload {
+  ideProductEndorsement: string;
+  tstCancellation: string;
+  desCancellation: string;
+}
+
 /** Cliente HTTP contra `underwriting-service` (`/underwriting/contracts`,
  *  vía el gateway) -- mismo criterio que `QuotingService`: no reutiliza
  *  `CatalogService` porque estas rutas no siguen su shape Cod/Des
  *  simple. Pantalla de listado + detalle de contrato (ver
  *  docs/02-roadmap.md, pendiente cerrado a pedido explícito del
- *  usuario). Deliberadamente sin `create()`/mutaciones acá -- un
- *  contrato solo se genera desde el wizard de Cotización
- *  (`QuotingService.generateContract`), nunca directamente. */
+ *  usuario). Un contrato solo se genera desde el wizard de Cotización
+ *  (`QuotingService.generateContract`), nunca directamente -- pero sí
+ *  expone mutaciones puntuales sobre un contrato ya existente, como
+ *  `cancel()` (Etapa 1 de "Movimientos y suplementos del contrato",
+ *  ver docs/02-roadmap.md). */
 @Injectable({ providedIn: 'root' })
 export class ContractsService {
   private readonly base = `${environment.apiUrl}/underwriting/contracts`;
@@ -273,5 +288,15 @@ export class ContractsService {
   /** `GET /contracts/:id` -- detalle completo de un contrato puntual. */
   getContract(ideContract: string): Observable<ContractDetail> {
     return this.http.get<ContractDetail>(`${this.base}/${ideContract}`);
+  }
+
+  /** `POST /contracts/:id/cancel` -- anula el contrato (Etapa 1 de
+   *  "Movimientos y suplementos del contrato"). El backend real crea el
+   *  `TContractOperation` de anulación y aplica las devoluciones según
+   *  el `SProductEndorsement` elegido; acá solo se hace el POST y se
+   *  deja que el caller recargue el detalle (`getContract`) para ver el
+   *  nuevo estado/movimiento. */
+  cancel(ideContract: string, payload: CancelContractPayload): Observable<ContractDetail> {
+    return this.http.post<ContractDetail>(`${this.base}/${ideContract}/cancel`, payload);
   }
 }

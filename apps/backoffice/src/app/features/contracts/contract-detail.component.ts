@@ -2,8 +2,12 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
+import { InputTextModule } from 'primeng/inputtext';
+import { TextareaModule } from 'primeng/textarea';
+import { SelectModule } from 'primeng/select';
 import { TableModule, TableRowSelectEvent } from 'primeng/table';
 import { TabsModule } from 'primeng/tabs';
 import { TagModule } from 'primeng/tag';
@@ -11,6 +15,8 @@ import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { RiskAttributesService } from '../quotes/risk-attributes.service';
+import { CatalogService } from '../../core/catalogs/catalog.service';
+import { CatalogRow } from '../../core/catalogs/catalog.model';
 import {
   ContractDetail,
   ContractFile,
@@ -19,6 +25,8 @@ import {
   ContractRisk,
   ContractsService,
 } from './contracts.service';
+
+const PRODUCT_ENDORSEMENTS_PATH = '/product-rating/product-endorsements';
 
 /** Un requisito ya "aplanado" con el riesgo al que pertenece, para la
  *  pestaña "Requisitos" (Nivel 1, sin selección previa -- ver el
@@ -71,7 +79,20 @@ interface RequirementRow {
 @Component({
   selector: 'app-contract-detail',
   standalone: true,
-  imports: [CommonModule, ButtonModule, DialogModule, TableModule, TabsModule, TagModule, ToastModule, TranslocoPipe],
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    ButtonModule,
+    DialogModule,
+    InputTextModule,
+    TextareaModule,
+    SelectModule,
+    TableModule,
+    TabsModule,
+    TagModule,
+    ToastModule,
+    TranslocoPipe,
+  ],
   providers: [MessageService],
   templateUrl: './contract-detail.component.html',
 })
@@ -80,6 +101,8 @@ export class ContractDetailComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly contracts = inject(ContractsService);
   private readonly riskAttributes = inject(RiskAttributesService);
+  private readonly catalogService = inject(CatalogService);
+  private readonly fb = inject(FormBuilder);
   private readonly messages = inject(MessageService);
   private readonly transloco = inject(TranslocoService);
 
@@ -135,6 +158,26 @@ export class ContractDetailComponent implements OnInit {
   readonly attributesDialogLoading = signal(false);
   readonly attributesDialogFields = signal<Array<{ label: string; value: string }>>([]);
 
+  /** Diálogo "Anular contrato" (Etapa 1 de "Movimientos y suplementos del
+   *  contrato", ver docs/02-roadmap.md) -- llama a
+   *  `ContractsService.cancel()`, que en el backend real ya hace toda la
+   *  cascada de anulación (`ContractsService.cancel()` en
+   *  underwriting-service). Solo se puede anular un contrato "ACTIVO";
+   *  el propio backend valida el resto (estado, endoso, etc.). */
+  readonly cancelDialogVisible = signal(false);
+  readonly cancelSubmitting = signal(false);
+  readonly productEndorsements = signal<CatalogRow[]>([]);
+  readonly canCancel = computed(() => this.contract()?.SState.CodState === 'ACTIVO');
+  cancelForm = this.buildCancelForm();
+
+  private buildCancelForm() {
+    return this.fb.nonNullable.group({
+      ideProductEndorsement: ['', Validators.required],
+      tstCancellation: ['', Validators.required],
+      desCancellation: ['', Validators.required],
+    });
+  }
+
   ngOnInit(): void {
     this.route.paramMap.subscribe((params) => {
       const id = params.get('id');
@@ -153,13 +196,17 @@ export class ContractDetailComponent implements OnInit {
       },
       error: (err: HttpErrorResponse) => {
         this.loading.set(false);
-        const detail =
-          (err.error && typeof err.error === 'object' && 'message' in err.error
-            ? String((err.error as { message: unknown }).message)
-            : null) ?? this.transloco.translate<string>('common.unexpectedError');
-        this.messages.add({ severity: 'error', summary: this.transloco.translate('common.error'), detail });
+        this.showError(err);
       },
     });
+  }
+
+  private showError(err: HttpErrorResponse): void {
+    const detail =
+      (err.error && typeof err.error === 'object' && 'message' in err.error
+        ? String((err.error as { message: unknown }).message)
+        : null) ?? this.transloco.translate<string>('common.unexpectedError');
+    this.messages.add({ severity: 'error', summary: this.transloco.translate('common.error'), detail });
   }
 
   onFileSelect(event: TableRowSelectEvent): void {
@@ -213,6 +260,55 @@ export class ContractDetailComponent implements OnInit {
 
   closeAttributesDialog(): void {
     this.attributesDialogVisible.set(false);
+  }
+
+  openCancelDialog(): void {
+    const c = this.contract();
+    if (!c) return;
+    this.cancelForm = this.buildCancelForm();
+    this.productEndorsements.set([]);
+    this.catalogService.list(PRODUCT_ENDORSEMENTS_PATH, { codProduct: c.SProduct.CodProduct }).subscribe({
+      next: (rows) => this.productEndorsements.set(rows.filter((row) => row.SState?.CodState === 'ACTIVO')),
+      error: (err: HttpErrorResponse) => this.showError(err),
+    });
+    this.cancelDialogVisible.set(true);
+  }
+
+  closeCancelDialog(): void {
+    this.cancelDialogVisible.set(false);
+  }
+
+  submitCancel(): void {
+    const c = this.contract();
+    if (!c) return;
+    if (this.cancelForm.invalid) {
+      this.cancelForm.markAllAsTouched();
+      return;
+    }
+    const raw = this.cancelForm.getRawValue();
+    this.cancelSubmitting.set(true);
+    this.contracts
+      .cancel(c.IdeContract, {
+        ideProductEndorsement: raw.ideProductEndorsement,
+        tstCancellation: raw.tstCancellation,
+        desCancellation: raw.desCancellation,
+      })
+      .subscribe({
+        next: (result) => {
+          this.cancelSubmitting.set(false);
+          this.contract.set(result);
+          this.closeCancelDialog();
+          this.messages.add({
+            severity: 'success',
+            summary: this.transloco.translate('common.done'),
+            detail: this.transloco.translate('contractDetail.cancelDialog.cancelledDetail'),
+          });
+        },
+        error: (err: HttpErrorResponse) => {
+          this.cancelSubmitting.set(false);
+          this.showError(err);
+        },
+      });
   }
 
   stateSeverity(codState: string): 'info' | 'warn' | 'success' | 'secondary' {

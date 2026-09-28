@@ -28,6 +28,12 @@ import { PaymentTypesController } from './payment-types.controller';
 import { PaymentTypesService } from './payment-types.service';
 import { GuaranteesController } from './guarantees.controller';
 import { GuaranteesService } from './guarantees.service';
+import { EndorsementsController } from './endorsements.controller';
+import { EndorsementsService } from './endorsements.service';
+import { EndorsementReasonsController } from './endorsement-reasons.controller';
+import { EndorsementReasonsService } from './endorsement-reasons.service';
+import { OperationsController } from './operations.controller';
+import { OperationsService } from './operations.service';
 
 /**
  * Catálogos comunes que menciona el alcance original del README de este
@@ -65,6 +71,9 @@ import { GuaranteesService } from './guarantees.service';
     ConceptsController,
     PaymentTypesController,
     GuaranteesController,
+    EndorsementsController,
+    EndorsementReasonsController,
+    OperationsController,
   ],
   providers: [
     LanguagesService,
@@ -81,6 +90,9 @@ import { GuaranteesService } from './guarantees.service';
     ConceptsService,
     PaymentTypesService,
     GuaranteesService,
+    EndorsementsService,
+    EndorsementReasonsService,
+    OperationsService,
   ],
 })
 export class CommonCatalogsModule {}

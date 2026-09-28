@@ -438,6 +438,38 @@ export const PRODUCT_CATALOG_REGISTRY: CatalogConfig[] = [
       },
     ],
   },
+  {
+    // Agregado 2026-09-28 (backlog priorizado, ítem 1, Etapa 1 -- cierre
+    // de Anulación): `SOperation`/`SEndorsement`/`SEndorsementReason` ya
+    // existían en el esquema pero sin CRUD expuesto -- hacen falta para
+    // configurar un `SProductEndorsement` real (pestaña "Endosos" en
+    // Configuración de productos).
+    key: 'operations',
+    label: 'catalogsRegistry.operations.label',
+    singular: 'catalogsRegistry.operations.singular',
+    path: '/reference-data/operations',
+    codField: 'CodOperation',
+    desField: 'DesOperation',
+    idField: 'IdeOperation',
+  },
+  {
+    key: 'endorsements',
+    label: 'catalogsRegistry.endorsements.label',
+    singular: 'catalogsRegistry.endorsements.singular',
+    path: '/reference-data/endorsements',
+    codField: 'CodEndorsement',
+    desField: 'DesEndorsement',
+    idField: 'IdeEndorsement',
+  },
+  {
+    key: 'endorsement-reasons',
+    label: 'catalogsRegistry.endorsement-reasons.label',
+    singular: 'catalogsRegistry.endorsement-reasons.singular',
+    path: '/reference-data/endorsement-reasons',
+    codField: 'CodEndorsementReason',
+    desField: 'DesEndorsementReason',
+    idField: 'IdeEndorsementReason',
+  },
 ];
 
 

@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
+import { CheckboxModule } from 'primeng/checkbox';
 import { TableModule } from 'primeng/table';
 import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
@@ -22,6 +23,7 @@ import { PlanProductRisksTabComponent } from './plan-product-risks-tab.component
 import { CoveragePlansTabComponent } from './coverage-plans-tab.component';
 import { CalculationRulesTabComponent } from './calculation-rules-tab.component';
 import { CoverageGuaranteesTabComponent } from './coverage-guarantees-tab.component';
+import { ProductEndorsementsTabComponent } from './product-endorsements-tab.component';
 
 const PRODUCTS_PATH = '/product-rating/products';
 const INSURANCE_AREAS_PATH = '/product-rating/insurance-areas';
@@ -45,6 +47,7 @@ const CURRENCIES_PATH = '/product-rating/currencies';
     CommonModule,
     ReactiveFormsModule,
     ButtonModule,
+    CheckboxModule,
     TableModule,
     DialogModule,
     InputTextModule,
@@ -61,6 +64,7 @@ const CURRENCIES_PATH = '/product-rating/currencies';
     CoveragePlansTabComponent,
     CalculationRulesTabComponent,
     CoverageGuaranteesTabComponent,
+    ProductEndorsementsTabComponent,
   ],
   providers: [MessageService, ConfirmationService],
   templateUrl: './products.component.html',

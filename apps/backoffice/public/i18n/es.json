@@ -27,7 +27,13 @@
   },
   "dashboard": {
     "greeting": "Hola, {{code}}",
-    "intro": "Este es el nuevo backoffice de ARS. Todavía es un esqueleto: acá van a ir apareciendo los módulos de negocio (catálogos, productos, cotización, contratación, comisiones, siniestros) a medida que los migremos."
+    "intro": "Resumen rápido de la actividad reciente. Tocá cualquier tarjeta para ir al listado completo.",
+    "kpis": {
+      "quotesThisMonth": "Cotizaciones del mes",
+      "activeContracts": "Contratos activos",
+      "pendingClaims": "Siniestros pendientes",
+      "claimsThisMonth": "Siniestros del mes"
+    }
   },
   "catalogsRegistry": {
     "languages": {
@@ -157,6 +163,18 @@
     "guarantees": {
       "label": "Garantías",
       "singular": "garantía"
+    },
+    "operations": {
+      "label": "Operaciones",
+      "singular": "operación"
+    },
+    "endorsements": {
+      "label": "Tipos de endoso",
+      "singular": "tipo de endoso"
+    },
+    "endorsement-reasons": {
+      "label": "Motivos de endoso",
+      "singular": "motivo de endoso"
     }
   },
   "catalogFields": {
@@ -438,6 +456,7 @@
       "updatedDetail": "Se actualizó la regla de cálculo."
     },
     "coverageGuaranteesTab": "Garantías",
+    "productEndorsementsTab": "Endosos",
     "coverageGuarantees": {
       "coveragePlanLabel": "Cobertura del plan",
       "coveragePlanPlaceholder": "Elegí una cobertura del plan",
@@ -458,6 +477,30 @@
       "loadErrorDetail": "No se pudieron cargar las garantías de la cobertura.",
       "createdDetail": "Se agregó la garantía a la cobertura.",
       "updatedDetail": "Se actualizó la garantía de la cobertura."
+    },
+    "productEndorsements": {
+      "subtitle": "Endosos configurados para este producto.",
+      "newButton": "Nuevo endoso",
+      "loadErrorDetail": "No se pudieron cargar los endosos del producto.",
+      "endorsementColumn": "Tipo de endoso",
+      "endorsementReasonColumn": "Motivo",
+      "emptyState": "Todavía no hay endosos configurados acá.",
+      "createDialogTitle": "Nuevo endoso del producto",
+      "editDialogTitle": "Editar endoso del producto",
+      "endorsementLabel": "Tipo de endoso",
+      "endorsementPlaceholder": "Elegí un tipo de endoso",
+      "endorsementReasonLabel": "Motivo del endoso",
+      "endorsementReasonPlaceholder": "Elegí un motivo",
+      "operationLabel": "Operación",
+      "operationPlaceholder": "Elegí una operación",
+      "processLabel": "Proceso",
+      "processPlaceholder": "Elegí un proceso",
+      "refundSectionTitle": "Devoluciones",
+      "refundPremiumLabel": "Devuelve prima",
+      "refundCommissionLabel": "Devuelve comisión",
+      "refundTaxLabel": "Devuelve impuesto",
+      "createdDetail": "Se agregó el endoso al producto.",
+      "updatedDetail": "Se actualizó el endoso del producto."
     }
   },
   "quotes": {
@@ -639,7 +682,18 @@
     "channelEmpty": "Sin canales de distribución asociados.",
     "requirementColumn": "Requisito",
     "mandatoryColumn": "Obligatorio",
-    "requirementsEmpty": "Sin requisitos asociados."
+    "requirementsEmpty": "Sin requisitos asociados.",
+    "cancelDialog": {
+      "button": "Anular contrato",
+      "title": "Anular contrato",
+      "subtitle": "Esta acción anula el contrato y aplica las devoluciones configuradas en el endoso elegido.",
+      "endorsementLabel": "Tipo de endoso",
+      "endorsementPlaceholder": "Elegí un endoso",
+      "dateLabel": "Fecha de anulación",
+      "reasonLabel": "Motivo de la anulación",
+      "confirmButton": "Anular contrato",
+      "cancelledDetail": "Se anuló el contrato."
+    }
   },
   "rateTables": {
     "title": "Tablas de tarifa",

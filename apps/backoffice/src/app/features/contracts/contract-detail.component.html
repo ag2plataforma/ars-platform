@@ -38,6 +38,18 @@
         <span class="text-slate-500">{{ 'contractDetail.subscriptionLabel' | transloco }}</span>
         <span class="text-slate-900">{{ c.TstSubscription | date: 'dd/MM/yyyy' }}</span>
       </div>
+      <div class="ml-auto">
+        <button
+          pButton
+          type="button"
+          icon="pi pi-ban"
+          severity="danger"
+          [text]="true"
+          [disabled]="!canCancel()"
+          [label]="'contractDetail.cancelDialog.button' | transloco"
+          (click)="openCancelDialog()"
+        ></button>
+      </div>
     </div>
 
     <p-tabs [value]="activeTab()" (valueChange)="activeTab.set($event ?? 'personas')">
@@ -409,4 +421,41 @@
       }
     </div>
   }
+</p-dialog>
+
+<!-- ============================== Popup: Anular contrato ============================== -->
+<p-dialog
+  [header]="'contractDetail.cancelDialog.title' | transloco"
+  [visible]="cancelDialogVisible()"
+  (visibleChange)="!$event && closeCancelDialog()"
+  [modal]="true"
+  [style]="{ width: '28rem' }"
+>
+  <form [formGroup]="cancelForm" (ngSubmit)="submitCancel()" class="flex flex-col gap-4 pt-2">
+    <p class="text-sm text-slate-500">{{ 'contractDetail.cancelDialog.subtitle' | transloco }}</p>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.cancelDialog.endorsementLabel' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="ideProductEndorsement"
+        [options]="productEndorsements()"
+        optionLabel="DesProductEndorsement"
+        optionValue="IdeProductEndorsement"
+        [placeholder]="'contractDetail.cancelDialog.endorsementPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.cancelDialog.dateLabel' | transloco }}</label>
+      <input pInputText type="date" formControlName="tstCancellation" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.cancelDialog.reasonLabel' | transloco }}</label>
+      <textarea pTextarea formControlName="desCancellation" rows="3" class="w-full"></textarea>
+    </div>
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeCancelDialog()"></button>
+      <button pButton type="submit" severity="danger" [label]="'contractDetail.cancelDialog.confirmButton' | transloco" [loading]="cancelSubmitting()"></button>
+    </div>
+  </form>
 </p-dialog>

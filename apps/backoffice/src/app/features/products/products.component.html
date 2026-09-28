@@ -99,6 +99,7 @@
           <p-tab value="coverage-plans">{{ 'products.coveragePlansTab' | transloco }}</p-tab>
           <p-tab value="calculation-rules">{{ 'products.calculationRulesTab' | transloco }}</p-tab>
           <p-tab value="coverage-guarantees">{{ 'products.coverageGuaranteesTab' | transloco }}</p-tab>
+          <p-tab value="product-endorsements">{{ 'products.productEndorsementsTab' | transloco }}</p-tab>
         </p-tablist>
         <p-tabpanels>
           <p-tabpanel value="risk-products">
@@ -118,6 +119,9 @@
           </p-tabpanel>
           <p-tabpanel value="coverage-guarantees">
             <app-coverage-guarantees-tab [product]="product" />
+          </p-tabpanel>
+          <p-tabpanel value="product-endorsements">
+            <app-product-endorsements-tab [product]="product" />
           </p-tabpanel>
         </p-tabpanels>
       </p-tabs>
@@ -182,11 +186,11 @@
       <input pInputText type="number" formControlName="validityDays" class="w-full" />
     </div>
     <div class="flex items-center gap-2">
-      <input type="checkbox" id="indGenerateAllFraction" formControlName="indGenerateAllFraction" />
+      <p-checkbox formControlName="indGenerateAllFraction" [binary]="true" inputId="indGenerateAllFraction" />
       <label for="indGenerateAllFraction" class="text-sm text-slate-700">{{ 'products.generateAllFractionLabel' | transloco }}</label>
     </div>
     <div class="flex items-center gap-2">
-      <input type="checkbox" id="indProportionalPrime" formControlName="indProportionalPrime" />
+      <p-checkbox formControlName="indProportionalPrime" [binary]="true" inputId="indProportionalPrime" />
       <label for="indProportionalPrime" class="text-sm text-slate-700">{{ 'products.proportionalPrimeLabel' | transloco }}</label>
     </div>
     <div class="flex gap-4">

@@ -219,7 +219,7 @@ export class ContractsService {
         );
 
         const codOperation = await this.resolveOperationCodeByEndorsement(dto.ideProductEndorsement, tx);
-        await this.createContractOperation(ideContract, contract.IdeProduct, codOperation, actor, tx);
+        await this.createContractOperation(ideContract, contract.IdeProduct, codOperation, actor, tx, 'Anular');
 
         const ideActivo = await this.stateMachine.getStateByCode('Activo');
         const files = await tx.tContractFile.findMany({
@@ -1579,6 +1579,16 @@ export class ContractsService {
    * inicial (`CONTGENE`, vía `createInitialContractOperation`), por la
    * operación de anulación (código resuelto por endoso) y por la
    * generación de recibos (`RECEGENE`, ver `generateReceipts`).
+   *
+   * Agregado 2026-09-28 (a pedido explícito del usuario, tras notar que
+   * la pestaña "Movimientos" mostraba TODAS las operaciones eternamente
+   * en "Borrador"): la fila nace en el estado inicial genérico
+   * (Borrador, igual que antes) pero se transiciona de inmediato, en la
+   * MISMA transacción, al estado final que corresponda según
+   * `finalOperative` -- `'Activar'` (default, Borrador -> Activo) para
+   * `CONTGENE`/`RECEGENE`, `'Anular'` (Borrador -> Anulado) para la
+   * operación de anulación. Requiere las `SStateRule` correspondientes
+   * (ver `packages/database/scripts/seed-contract-operation-states.js`).
    */
   private async createContractOperation(
     ideContract: string,
@@ -1586,6 +1596,7 @@ export class ContractsService {
     codOperation: string,
     actor: string,
     tx: Prisma.TransactionClient = this.prisma,
+    finalOperative: 'Activar' | 'Anular' = 'Activar',
   ) {
     const operationProduct = await tx.sOperationProduct.findFirst({
       where: { IdeProduct: ideProduct, SOperation: { CodOperation: codOperation } },
@@ -1601,7 +1612,7 @@ export class ContractsService {
     const numOperation = (lastOperation?.NumOperation ?? 0) + 1;
     const ideStateInitial = await this.stateMachine.getInitialState('TContractOperation');
     const now = new Date();
-    return tx.tContractOperation.create({
+    const created = await tx.tContractOperation.create({
       data: {
         IdeContract: ideContract,
         IdeOperationProduct: operationProduct.IdeOperationProduct,
@@ -1613,6 +1624,11 @@ export class ContractsService {
         UsrModification: actor,
         TstModification: now,
       },
+    });
+    const ideStateFinal = await this.stateMachine.getNextState('TContractOperation', ideStateInitial, finalOperative);
+    return tx.tContractOperation.update({
+      where: { IdeContractOperation: created.IdeContractOperation },
+      data: { IdeState: ideStateFinal, UsrModification: actor, TstModification: now },
     });
   }
 
@@ -1926,10 +1942,20 @@ export class ContractsService {
    * tras una anulación), no una simplificación de esta implementación, y
    * se replica tal cual.
    *
-   * Nota de performance: el recorrido día a día es fiel al cursor del
-   * original (una fila de `TMovementConcept` por día potencialmente
-   * evaluada) -- para vigencias largas esto es O(días), aceptable para
-   * esta fase pero candidato a optimizar si hiciera falta más adelante.
+   * Nota de performance (corregido 2026-09-28): el recorrido día a día
+   * es fiel al cursor del original (una fila de `TMovementConcept` por
+   * día potencialmente evaluada), pero HASTA ACÁ cada día hacía sus
+   * propias consultas a la base dentro del `while` -- para una vigencia
+   * anual (~365 días) eso son cientos de round-trips secuenciales, que
+   * contra una base remota (reportado por el usuario el 28/09/2026: la
+   * request completa tardó ~5 minutos, superó el timeout por default de
+   * `fetch` en el gateway y el navegador recibió "fetch failed" aunque
+   * la transacción terminó confirmando bien). Se preserva EXACTAMENTE el
+   * mismo resultado numérico (`ConceptNetValue` final = valor inicial +
+   * suma de los mismos deltas por día, misma fórmula) pero el mapeo
+   * día -> movimiento viejo se resuelve en memoria contra los movimientos
+   * ya traídos de antemano (una sola consulta), y el `UPDATE` se hace
+   * UNA vez por concepto al final, no una vez por día.
    */
   private async setCancelPrime(
     ideContractFile: string,
@@ -1965,27 +1991,43 @@ export class ContractsService {
       });
       let lastProcessed: string | null = null;
 
+      // Todos los movimientos viejos de esta cobertura, con sus
+      // conceptos, en UNA sola consulta -- antes se repetía (un
+      // `findFirst` de movimiento + un `findMany` de conceptos) por
+      // CADA día de vigencia del movimiento nuevo, ver nota de
+      // performance arriba.
+      const oldMovements = await tx.tCoverageMovement.findMany({
+        where: { IdeRiskCoverage: ideRiskCoverage },
+        include: { TMovementConcept: { include: { SConcept: { include: { SConceptType: { select: { CodConceptType: true } } } } } } },
+      });
+
       for (const newMovement of newMovements) {
         const daysPrimeCalcNew = daysBetween(newMovement.TstInitial, newMovement.TstEnd);
+        const candidateOldMovements = oldMovements
+          .filter((m) => m.NumCoverageMovement < newMovement.NumCoverageMovement)
+          .sort((a, b) => b.NumCoverageMovement - a.NumCoverageMovement);
+
+        const newConcepts = await tx.tMovementConcept.findMany({
+          where: { IdeCoverageMovement: newMovement.IdeCoverageMovement },
+        });
+        const newConceptByIdeConcept = new Map(newConcepts.map((c) => [c.IdeConcept, c]));
+
+        // IdeMovementConcept (del movimiento nuevo) -> delta acumulado a
+        // lo largo de todos los días que le tocaron -- mismo cálculo por
+        // día que antes, solo que sumado en memoria antes de escribirlo
+        // (una vez), en vez de un UPDATE por día.
+        const accumulatedDelta = new Map<string, number>();
+
         let cursor = newMovement.TstInitial;
         while (cursor.getTime() <= newMovement.TstEnd.getTime()) {
-          const oldMovement = await tx.tCoverageMovement.findFirst({
-            where: {
-              IdeRiskCoverage: ideRiskCoverage,
-              NumCoverageMovement: { lt: newMovement.NumCoverageMovement },
-              TstInitial: { lte: cursor },
-              TstEnd: { gte: cursor },
-            },
-            orderBy: { NumCoverageMovement: 'desc' },
-          });
+          const cursorTime = cursor.getTime();
+          const oldMovement = candidateOldMovements.find(
+            (m) => m.TstInitial.getTime() <= cursorTime && m.TstEnd.getTime() >= cursorTime,
+          );
 
           if (oldMovement) {
             const daysPrimeCalcOld = daysBetween(oldMovement.TstInitial, oldMovement.TstEnd);
-            const oldConcepts = await tx.tMovementConcept.findMany({
-              where: { IdeCoverageMovement: oldMovement.IdeCoverageMovement },
-              include: { SConcept: { include: { SConceptType: { select: { CodConceptType: true } } } } },
-            });
-            for (const oldConcept of oldConcepts) {
+            for (const oldConcept of oldMovement.TMovementConcept) {
               const codConceptType = oldConcept.SConcept.SConceptType.CodConceptType;
               const applies =
                 (codConceptType === 'CALCPRIMA' && refundPremium === 'SI') ||
@@ -1993,25 +2035,31 @@ export class ContractsService {
                 (codConceptType === 'CALCIMPUESTO' && refundTax === 'SI');
               if (!applies) continue;
 
-              const newConcept = await tx.tMovementConcept.findFirst({
-                where: { IdeCoverageMovement: newMovement.IdeCoverageMovement, IdeConcept: oldConcept.IdeConcept },
-              });
+              const newConcept = newConceptByIdeConcept.get(oldConcept.IdeConcept);
               if (!newConcept) continue;
 
               const delta =
                 Number(newConcept.ConceptValue) / daysPrimeCalcNew -
                 Number(oldConcept.ConceptNetValue) / daysPrimeCalcOld;
-              await tx.tMovementConcept.update({
-                where: { IdeMovementConcept: newConcept.IdeMovementConcept },
-                data: {
-                  ConceptNetValue: Number(newConcept.ConceptNetValue) + delta,
-                  UsrModification: actor,
-                  TstModification: now,
-                },
-              });
+              accumulatedDelta.set(
+                newConcept.IdeMovementConcept,
+                (accumulatedDelta.get(newConcept.IdeMovementConcept) ?? 0) + delta,
+              );
             }
           }
           cursor = addDays(cursor, 1);
+        }
+
+        for (const [ideMovementConcept, totalDelta] of accumulatedDelta) {
+          const newConcept = newConcepts.find((c) => c.IdeMovementConcept === ideMovementConcept)!;
+          await tx.tMovementConcept.update({
+            where: { IdeMovementConcept: ideMovementConcept },
+            data: {
+              ConceptNetValue: Number(newConcept.ConceptNetValue) + totalDelta,
+              UsrModification: actor,
+              TstModification: now,
+            },
+          });
         }
 
         if (primaTotalConcept) {

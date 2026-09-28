@@ -1,0 +1,185 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex flex-col gap-4">
+  <div class="flex items-center justify-between">
+    <p class="text-sm text-slate-500">{{ 'products.productEndorsements.subtitle' | transloco }}</p>
+    <button pButton type="button" icon="pi pi-plus" [label]="'products.productEndorsements.newButton' | transloco" (click)="openCreate()"></button>
+  </div>
+
+  <p-table
+    [value]="rows()"
+    [loading]="loading()"
+    dataKey="IdeProductEndorsement"
+    [paginator]="true"
+    [rows]="10"
+    [rowsPerPageOptions]="[10, 25, 50]"
+    [showCurrentPageReport]="true"
+    currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+    styleClass="p-datatable-sm"
+  >
+    <ng-template #header>
+      <tr>
+        <th pSortableColumn="CodProductEndorsement">
+          <span class="ars-th-flex">
+            {{ 'catalogs.codeColumn' | transloco }}
+            <p-sortIcon field="CodProductEndorsement" />
+            <p-columnFilter type="text" field="CodProductEndorsement" display="menu" />
+          </span>
+        </th>
+        <th>{{ 'catalogs.descriptionColumn' | transloco }}</th>
+        <th>{{ 'products.productEndorsements.endorsementColumn' | transloco }}</th>
+        <th>{{ 'products.productEndorsements.endorsementReasonColumn' | transloco }}</th>
+        <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+        <th class="w-32">{{ 'catalogs.actionsColumn' | transloco }}</th>
+      </tr>
+    </ng-template>
+    <ng-template #body let-row>
+      <tr>
+        <td>{{ row.CodProductEndorsement }}</td>
+        <td>{{ row.DesProductEndorsement }}</td>
+        <td>{{ endorsementName(row) }}</td>
+        <td>{{ endorsementReasonName(row) }}</td>
+        <td>
+          <p-tag [value]="(isActive(row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isActive(row) ? 'success' : 'danger'" />
+        </td>
+        <td>
+          <div class="flex gap-1">
+            <button pButton type="button" icon="pi pi-pencil" [text]="true" severity="secondary" (click)="openEdit(row)"></button>
+            <button
+              pButton
+              type="button"
+              [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'"
+              [text]="true"
+              [severity]="isActive(row) ? 'danger' : 'success'"
+              (click)="toggleState(row)"
+            ></button>
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="6" class="text-center text-slate-500">{{ 'products.productEndorsements.emptyState' | transloco }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-dialog
+  [header]="(dialogMode() === 'create' ? 'products.productEndorsements.createDialogTitle' : 'products.productEndorsements.editDialogTitle') | transloco"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  [style]="{ width: '32rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'catalogs.codeColumn' | transloco }}</label>
+      <input pInputText formControlName="cod" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'catalogs.descriptionColumn' | transloco }}</label>
+      <input pInputText formControlName="des" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'products.productEndorsements.endorsementLabel' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codEndorsement"
+        [options]="endorsements()"
+        optionLabel="DesEndorsement"
+        optionValue="CodEndorsement"
+        [placeholder]="'products.productEndorsements.endorsementPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'products.productEndorsements.endorsementReasonLabel' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codEndorsementReason"
+        [options]="endorsementReasons()"
+        optionLabel="DesEndorsementReason"
+        optionValue="CodEndorsementReason"
+        [placeholder]="'products.productEndorsements.endorsementReasonPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'products.productEndorsements.operationLabel' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codOperation"
+        [options]="operations()"
+        optionLabel="DesOperation"
+        optionValue="CodOperation"
+        [placeholder]="'products.productEndorsements.operationPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'products.productEndorsements.processLabel' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codProcess"
+        [options]="processes()"
+        optionLabel="DesProcess"
+        optionValue="CodProcess"
+        [placeholder]="'products.productEndorsements.processPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+
+    <p class="text-sm font-medium text-slate-700">{{ 'products.productEndorsements.refundSectionTitle' | transloco }}</p>
+    <div class="grid grid-cols-3 gap-4">
+      <div class="flex flex-col gap-2">
+        <label class="text-xs text-slate-500">{{ 'products.productEndorsements.refundPremiumLabel' | transloco }}</label>
+        <p-select
+          appendTo="body"
+          formControlName="refundPremium"
+          [options]="refundOptions"
+          optionLabel="labelKey"
+          optionValue="value"
+          styleClass="w-full"
+        >
+          <ng-template let-option #item>{{ option.labelKey | transloco }}</ng-template>
+          <ng-template let-selected #selectedItem>{{ selected.labelKey | transloco }}</ng-template>
+        </p-select>
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-xs text-slate-500">{{ 'products.productEndorsements.refundCommissionLabel' | transloco }}</label>
+        <p-select
+          appendTo="body"
+          formControlName="refundCommission"
+          [options]="refundOptions"
+          optionLabel="labelKey"
+          optionValue="value"
+          styleClass="w-full"
+        >
+          <ng-template let-option #item>{{ option.labelKey | transloco }}</ng-template>
+          <ng-template let-selected #selectedItem>{{ selected.labelKey | transloco }}</ng-template>
+        </p-select>
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-xs text-slate-500">{{ 'products.productEndorsements.refundTaxLabel' | transloco }}</label>
+        <p-select
+          appendTo="body"
+          formControlName="refundTax"
+          [options]="refundOptions"
+          optionLabel="labelKey"
+          optionValue="value"
+          styleClass="w-full"
+        >
+          <ng-template let-option #item>{{ option.labelKey | transloco }}</ng-template>
+          <ng-template let-selected #selectedItem>{{ selected.labelKey | transloco }}</ng-template>
+        </p-select>
+      </div>
+    </div>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
+    </div>
+  </form>
+</p-dialog>
