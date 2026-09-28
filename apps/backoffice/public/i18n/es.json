@@ -693,6 +693,18 @@
       "reasonLabel": "Motivo de la anulación",
       "confirmButton": "Anular contrato",
       "cancelledDetail": "Se anuló el contrato."
+    },
+    "actionsColumn": "Acciones",
+    "changeAmountDialog": {
+      "button": "Suplemento",
+      "title": "Nuevo suplemento: cambio de monto asegurado",
+      "subtitle": "Cambia el monto asegurado de esta cobertura y recalcula la prima proporcionalmente al nuevo monto.",
+      "currentAmountLabel": "Monto actual:",
+      "newAmountLabel": "Nuevo monto asegurado",
+      "dateLabel": "Fecha del suplemento",
+      "reasonLabel": "Motivo del suplemento",
+      "confirmButton": "Aplicar suplemento",
+      "appliedDetail": "Se aplicó el suplemento."
     }
   },
   "rateTables": {

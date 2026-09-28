@@ -5,6 +5,7 @@ import { QuotesService } from '../quoting/quotes.service';
 import { RequirementsService } from '../requirements/requirements.service';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { CancelContractDto } from './dto/cancel-contract.dto';
+import { ChangeInsuredAmountDto } from './dto/change-insured-amount.dto';
 import { ListContractsDto } from './dto/list-contracts.dto';
 
 /**
@@ -15,6 +16,15 @@ import { ListContractsDto } from './dto/list-contracts.dto';
  * 5 segundos por defecto de Prisma no alcanzan ni de cerca.
  */
 const CANCEL_TRANSACTION_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutos
+
+/**
+ * Timeout de la transacción que envuelve `changeInsuredAmount()`. Mismo
+ * orden de magnitud que `cancel()` (no `create()`): `setSupplementPrime`
+ * también recorre día a día la ventana del movimiento nuevo, mismo patrón
+ * de prorrateo ya optimizado (una sola consulta de movimientos viejos,
+ * no una por día) que `setCancelPrime`.
+ */
+const SUPPLEMENT_TRANSACTION_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutos
 
 /**
  * Timeout de la transacción que envuelve `create()`. Más corto que el de
@@ -242,6 +252,95 @@ export class ContractsService {
         await this.applyStateCascade(ideContract, 'Anular', actor, tx);
       },
       { timeout: CANCEL_TRANSACTION_TIMEOUT_MS, maxWait: 10_000 },
+    );
+
+    return this.findOne(ideContract);
+  }
+
+  /**
+   * Cascada del suplemento "Cambio de monto asegurado" -- primer tipo de
+   * endoso/suplemento sobre un contrato ya activo (ver docs/02-roadmap.md,
+   * ítem 1, "Etapa 2"), distinto de `cancel()`: acá NO se cierra nada, se
+   * agrega un movimiento nuevo (`NumCoverageMovement + 1`) a UNA sola
+   * `TRiskCoverage` puntual, con el monto nuevo, dejando el resto del
+   * árbol del contrato (`TContract`/`TContractFile`/`TFileRisk`/las
+   * DEMÁS coberturas) intacto -- por eso no se reutiliza
+   * `applyStateCascade` (que transicionaría TODO el árbol y fallaría
+   * contra un `TContract` que ya está `Activo` pidiéndole de nuevo
+   * `'Activar'`).
+   *
+   * Decisión de negocio explícita del usuario (2026-09-28): la prima se
+   * recalcula asumiendo que escala PROPORCIONALMENTE al monto asegurado
+   * (si se duplica la suma asegurada, se duplica la prima del período
+   * restante) -- el motor de reglas (`SCalculationRule.FormulaJSON`) no
+   * usa `Amount` como variable hoy (confirmado: ninguna fórmula real lo
+   * referencia), así que en vez de tocar el motor de reglas para todos
+   * los productos, este cálculo escala el valor bruto YA calculado del
+   * movimiento anterior por `newAmount / oldAmount` y reutiliza EXACTO el
+   * mismo prorrateo día a día por el que ya pasó `setCancelPrime`
+   * (`newConcept.ConceptValue / díasNuevo - oldConcept.ConceptNetValue / díasViejo`),
+   * solo que sin las banderas de `ConditionData.refundPremium/refundCommission/refundTax`
+   * (un suplemento siempre recalcula los 3 tipos, no es condicional como
+   * una devolución de anulación).
+   *
+   * ORDEN: valida el contrato/cobertura (`Activo`, fecha del suplemento
+   * dentro de la vigencia del movimiento actual) -> resuelve la operación
+   * por el endoso (mismo mecanismo que `cancel()`,
+   * `SOperationProduct.IdeProductEndorsement`, sembrada aparte con su
+   * propio código de operación, no `ANULGENE`/`RECEGENE`) ->
+   * `TContractOperation` nueva (`finalOperative` default `'Activar'`,
+   * a diferencia de la anulación) -> movimiento nuevo en Borrador
+   * (`createSupplementMovement`, marca el viejo `'Modificar'`, igual
+   * criterio que `createCancellationMovement`) -> conceptos del
+   * movimiento nuevo escalados por el monto (`setSupplementConcepts`) ->
+   * prorrateo día a día (`setSupplementPrime`, también actualiza
+   * `TRiskCoverage.Amount`/`Prime`) -> recibo (`generateReceipts`,
+   * reutilizado tal cual -- ya resuelve genéricamente a tipo `'SUP'`
+   * para cualquier operación con `NumOperation > 2`) -> recién ACÁ, con
+   * el movimiento nuevo ya apuntado a su `TContractOperation` real,
+   * `activateSupplementMovement` lo pasa (a él y a sus conceptos) de
+   * Borrador a Activo -- tiene que ser el ÚLTIMO paso, porque
+   * `generateReceipts` solo repunta movimientos que sigan en Borrador.
+   */
+  async changeInsuredAmount(ideContract: string, dto: ChangeInsuredAmountDto, actor: string) {
+    const existing = await this.prisma.tContract.findUnique({ where: { IdeContract: ideContract } });
+    if (!existing) {
+      throw new NotFoundException(`No existe contrato con id "${ideContract}"`);
+    }
+
+    const tstSupplement = new Date(dto.tstSupplement);
+
+    await this.prisma.$transaction(
+      async (tx) => {
+        const { contract, lastMovement } = await this.validateSupplementDate(
+          ideContract,
+          dto.ideRiskCoverage,
+          tstSupplement,
+          tx,
+        );
+
+        if (Number(lastMovement.Amount) === dto.newAmount) {
+          throw new ConflictException('El nuevo monto asegurado debe ser distinto del monto actual');
+        }
+
+        const codOperation = await this.resolveOperationCodeByEndorsement(dto.ideProductEndorsement, tx);
+        await this.createContractOperation(ideContract, contract.IdeProduct, codOperation, actor, tx);
+
+        const newMovement = await this.createSupplementMovement(
+          dto.ideRiskCoverage,
+          lastMovement,
+          tstSupplement,
+          dto.newAmount,
+          actor,
+          tx,
+        );
+        await this.setSupplementConcepts(dto.ideRiskCoverage, lastMovement, newMovement, dto.newAmount, actor, tx);
+        await this.setSupplementPrime(dto.ideRiskCoverage, newMovement.IdeCoverageMovement, dto.newAmount, actor, tx);
+
+        await this.generateReceipts(ideContract, dto.ideProductEndorsement, actor, tx);
+        await this.activateSupplementMovement(newMovement.IdeCoverageMovement, actor, tx);
+      },
+      { timeout: SUPPLEMENT_TRANSACTION_TIMEOUT_MS, maxWait: 10_000 },
     );
 
     return this.findOne(ideContract);
@@ -2108,6 +2207,340 @@ export class ContractsService {
           },
         });
       }
+    }
+  }
+
+  // ==========================================================================
+  // Cascada del suplemento "Cambio de monto asegurado" -- ver el método
+  // público `changeInsuredAmount` (más arriba) para el doc-comment de
+  // orden completo. Comparte `resolveOperationCodeByEndorsement`/
+  // `createContractOperation`/`generateReceipts` con la cascada de
+  // anulación (ver más abajo).
+  // ==========================================================================
+
+  /**
+   * Valida que el contrato esté `Activo`, que la `TRiskCoverage` indicada
+   * exista y esté `Activo`, y que la fecha del suplemento caiga DENTRO de
+   * la ventana del movimiento ACTUAL de esa cobertura (`NumCoverageMovement`
+   * más alto en estado `Activo`) -- mismo criterio que `createCancellationMovement`
+   * usa para encontrar "el último movimiento": sin ese último movimiento
+   * no hay contra qué escalar/prorratear la prima nueva.
+   */
+  private async validateSupplementDate(
+    ideContract: string,
+    ideRiskCoverage: string,
+    tstSupplement: Date,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const ideActivo = await this.stateMachine.getStateByCode('Activo');
+    const contract = await tx.tContract.findFirst({
+      where: {
+        IdeContract: ideContract,
+        IdeState: ideActivo,
+        TstInitial: { lte: tstSupplement },
+        TstEnd: { gte: tstSupplement },
+      },
+    });
+    if (!contract) {
+      throw new ConflictException(
+        'No se pudo procesar el suplemento: el contrato no está en estado "Activo" o la fecha del suplemento no está dentro de su vigencia',
+      );
+    }
+
+    const riskCoverage = await tx.tRiskCoverage.findFirst({
+      where: {
+        IdeRiskCoverage: ideRiskCoverage,
+        IdeState: ideActivo,
+        TFileRisk: { TContractFile: { IdeContract: ideContract } },
+      },
+    });
+    if (!riskCoverage) {
+      throw new NotFoundException(`No existe una cobertura activa "${ideRiskCoverage}" en el contrato "${ideContract}"`);
+    }
+
+    const lastMovement = await tx.tCoverageMovement.findFirst({
+      where: { IdeRiskCoverage: ideRiskCoverage, IdeState: ideActivo },
+      orderBy: { NumCoverageMovement: 'desc' },
+    });
+    if (!lastMovement) {
+      throw new ConflictException(`La cobertura "${ideRiskCoverage}" no tiene ningún movimiento activo`);
+    }
+    if (
+      tstSupplement.getTime() < lastMovement.TstInitial.getTime() ||
+      tstSupplement.getTime() > lastMovement.TstEnd.getTime()
+    ) {
+      throw new ConflictException(
+        'La fecha del suplemento debe estar dentro de la vigencia del movimiento actual de la cobertura',
+      );
+    }
+
+    return { contract, lastMovement };
+  }
+
+  /**
+   * Equivalente, para un suplemento, a `createCancellationMovement`: crea
+   * el movimiento nuevo (`NumCoverageMovement` = máximo + 1,
+   * `[tstSupplement, TstEnd del movimiento actual]` -- a diferencia de la
+   * anulación, acá `TstEnd` es el del MOVIMIENTO actual, no el del
+   * contrato completo, porque el suplemento no cierra nada, solo
+   * reemplaza el tramo restante), con el monto nuevo y el MISMO `Rate`
+   * que el movimiento anterior (decisión de negocio "prima proporcional
+   * al monto": se asume que la tasa por unidad no cambia, solo la base),
+   * y marca el movimiento anterior `'Modificar'` -- transición ya
+   * existente y usada por `createCancellationMovement`, no hace falta
+   * sembrar ninguna `SStateRule` nueva para esto.
+   */
+  private async createSupplementMovement(
+    ideRiskCoverage: string,
+    lastMovement: { IdeCoverageMovement: string; NumCoverageMovement: number; TstEnd: Date; Rate: Prisma.Decimal; IdeState: string },
+    tstSupplement: Date,
+    newAmount: number,
+    actor: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const ideMovementInitial = await this.stateMachine.getInitialState('TCoverageMovement');
+    const now = new Date();
+
+    const newMovement = await tx.tCoverageMovement.create({
+      data: {
+        IdeRiskCoverage: ideRiskCoverage,
+        NumCoverageMovement: lastMovement.NumCoverageMovement + 1,
+        TstInitial: tstSupplement,
+        TstEnd: lastMovement.TstEnd,
+        Amount: newAmount,
+        Rate: lastMovement.Rate,
+        Prime: 0,
+        IdeState: ideMovementInitial,
+        UsrCreation: actor,
+        TstCreation: now,
+        UsrModification: actor,
+        TstModification: now,
+      },
+    });
+
+    const nextState = await this.stateMachine.getNextState('TCoverageMovement', lastMovement.IdeState, 'Modificar');
+    await tx.tCoverageMovement.update({
+      where: { IdeCoverageMovement: lastMovement.IdeCoverageMovement },
+      data: { IdeState: nextState, UsrModification: actor, TstModification: now },
+    });
+
+    return newMovement;
+  }
+
+  /**
+   * Equivalente, para un suplemento, a `setCancelConcept`: por cada
+   * concepto del movimiento ANTERIOR, crea el concepto correspondiente en
+   * el movimiento NUEVO. Los tipados `CALCPRIMA`/`CALCCOMISION`/
+   * `CALCIMPUESTO` (los que el motor ya reconoce como "derivados de la
+   * prima") se escalan por `newAmount / oldAmount` (decisión de negocio
+   * "prima proporcional al monto", ver doc-comment de `changeInsuredAmount`);
+   * cualquier otro tipo de concepto se copia tal cual, sin escalar -- no
+   * se asume que TODO en la póliza depende del monto asegurado, solo lo
+   * que el motor ya clasifica como cálculo de prima/comisión/impuesto.
+   * `ConceptNetValue` nace en 0, provisorio -- `setSupplementPrime` lo
+   * recalcula con el prorrateo día a día, mismo orden que
+   * `setCancelConcept`/`setCancelPrime`.
+   */
+  private async setSupplementConcepts(
+    ideRiskCoverage: string,
+    lastMovement: { IdeCoverageMovement: string; Amount: Prisma.Decimal },
+    newMovement: { IdeCoverageMovement: string },
+    newAmount: number,
+    actor: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ): Promise<void> {
+    const oldAmount = Number(lastMovement.Amount);
+    const ratio = oldAmount !== 0 ? newAmount / oldAmount : 1;
+
+    const oldConcepts = await tx.tMovementConcept.findMany({
+      where: { IdeCoverageMovement: lastMovement.IdeCoverageMovement },
+      include: { SConcept: { include: { SConceptType: { select: { CodConceptType: true } } } } },
+    });
+
+    const ideMovementConceptInitial = await this.stateMachine.getInitialState('TMovementConcept');
+    const now = new Date();
+
+    for (const oldConcept of oldConcepts) {
+      const codConceptType = oldConcept.SConcept.SConceptType.CodConceptType;
+      const scalesWithAmount =
+        codConceptType === 'CALCPRIMA' || codConceptType === 'CALCCOMISION' || codConceptType === 'CALCIMPUESTO';
+      const conceptValue = scalesWithAmount ? Number(oldConcept.ConceptValue) * ratio : Number(oldConcept.ConceptValue);
+
+      await tx.tMovementConcept.create({
+        data: {
+          IdeCoverageMovement: newMovement.IdeCoverageMovement,
+          IdeConcept: oldConcept.IdeConcept,
+          ConceptValue: conceptValue,
+          ConceptNetValue: 0,
+          IdeState: ideMovementConceptInitial,
+          UsrCreation: actor,
+          TstCreation: now,
+          UsrModification: actor,
+          TstModification: now,
+        },
+      });
+    }
+  }
+
+  /**
+   * Equivalente, para un suplemento, a `setCancelPrime` -- MISMA fórmula
+   * de prorrateo día a día (`newConcept.ConceptValue/díasNuevo -
+   * oldConcept.ConceptNetValue/díasViejo`, ver el doc-comment de
+   * `setCancelPrime` para el detalle completo), con dos diferencias
+   * deliberadas:
+   *  1. Sin banderas `ConditionData.refundPremium/refundCommission/refundTax`
+   *     -- un suplemento SIEMPRE recalcula los 3 tipos de concepto, no es
+   *     condicional como una devolución de anulación.
+   *  2. Al final, además de `TCoverageMovement.Prime`/`TRiskCoverage.Prime`
+   *     (igual que `setCancelPrime`), también actualiza `TRiskCoverage.Amount`
+   *     con el monto nuevo -- acá la cobertura NO se cierra (sigue
+   *     `Activo`), así que su fila debe reflejar el monto vigente.
+   *
+   * Como esta cascada opera sobre UNA sola cobertura (no todas las del
+   * `TContractFile`, a diferencia de `setCancelPrime`), no hace falta el
+   * `for` externo por `TRiskCoverage` -- se recibe directo el
+   * `ideRiskCoverage`/`ideCoverageMovement` del movimiento nuevo.
+   */
+  private async setSupplementPrime(
+    ideRiskCoverage: string,
+    ideCoverageMovement: string,
+    newAmount: number,
+    actor: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ): Promise<void> {
+    const [primaNetaConcept, primaTotalConcept] = await Promise.all([
+      tx.sConcept.findFirst({ where: { CodConcept: 'PrimaNeta' } }),
+      tx.sConcept.findFirst({ where: { CodConcept: 'PrimaTotal' } }),
+    ]);
+
+    const now = new Date();
+    const newMovement = await tx.tCoverageMovement.findUniqueOrThrow({ where: { IdeCoverageMovement: ideCoverageMovement } });
+
+    const oldMovements = await tx.tCoverageMovement.findMany({
+      where: { IdeRiskCoverage: ideRiskCoverage },
+      include: { TMovementConcept: { include: { SConcept: { include: { SConceptType: { select: { CodConceptType: true } } } } } } },
+    });
+    const candidateOldMovements = oldMovements
+      .filter((m) => m.NumCoverageMovement < newMovement.NumCoverageMovement)
+      .sort((a, b) => b.NumCoverageMovement - a.NumCoverageMovement);
+
+    const daysPrimeCalcNew = daysBetween(newMovement.TstInitial, newMovement.TstEnd);
+    const newConcepts = await tx.tMovementConcept.findMany({ where: { IdeCoverageMovement: ideCoverageMovement } });
+    const newConceptByIdeConcept = new Map(newConcepts.map((c) => [c.IdeConcept, c]));
+
+    const accumulatedDelta = new Map<string, number>();
+    let cursor = newMovement.TstInitial;
+    while (cursor.getTime() <= newMovement.TstEnd.getTime()) {
+      const cursorTime = cursor.getTime();
+      const oldMovement = candidateOldMovements.find(
+        (m) => m.TstInitial.getTime() <= cursorTime && m.TstEnd.getTime() >= cursorTime,
+      );
+      if (oldMovement) {
+        const daysPrimeCalcOld = daysBetween(oldMovement.TstInitial, oldMovement.TstEnd);
+        for (const oldConcept of oldMovement.TMovementConcept) {
+          const codConceptType = oldConcept.SConcept.SConceptType.CodConceptType;
+          const applies =
+            codConceptType === 'CALCPRIMA' || codConceptType === 'CALCCOMISION' || codConceptType === 'CALCIMPUESTO';
+          if (!applies) continue;
+
+          const newConcept = newConceptByIdeConcept.get(oldConcept.IdeConcept);
+          if (!newConcept) continue;
+
+          const delta =
+            Number(newConcept.ConceptValue) / daysPrimeCalcNew - Number(oldConcept.ConceptNetValue) / daysPrimeCalcOld;
+          accumulatedDelta.set(
+            newConcept.IdeMovementConcept,
+            (accumulatedDelta.get(newConcept.IdeMovementConcept) ?? 0) + delta,
+          );
+        }
+      }
+      cursor = addDays(cursor, 1);
+    }
+
+    for (const [ideMovementConcept, totalDelta] of accumulatedDelta) {
+      const newConcept = newConcepts.find((c) => c.IdeMovementConcept === ideMovementConcept)!;
+      await tx.tMovementConcept.update({
+        where: { IdeMovementConcept: ideMovementConcept },
+        data: {
+          ConceptNetValue: Number(newConcept.ConceptNetValue) + totalDelta,
+          UsrModification: actor,
+          TstModification: now,
+        },
+      });
+    }
+
+    let primeValue = 0;
+    if (primaTotalConcept) {
+      const [primaNetaRow, taxRows] = await Promise.all([
+        primaNetaConcept
+          ? tx.tMovementConcept.findFirst({
+              where: { IdeCoverageMovement: ideCoverageMovement, IdeConcept: primaNetaConcept.IdeConcept },
+            })
+          : Promise.resolve(null),
+        tx.tMovementConcept.findMany({
+          where: { IdeCoverageMovement: ideCoverageMovement, SConcept: { SConceptType: { CodConceptType: 'CALCIMPUESTO' } } },
+        }),
+      ]);
+      primeValue = round2(
+        (primaNetaRow ? Number(primaNetaRow.ConceptNetValue) : 0) +
+          taxRows.reduce((sum, row) => sum + Number(row.ConceptNetValue), 0),
+      );
+      await tx.tMovementConcept.updateMany({
+        where: { IdeCoverageMovement: ideCoverageMovement, IdeConcept: primaTotalConcept.IdeConcept },
+        data: { ConceptNetValue: primeValue, UsrModification: actor, TstModification: now },
+      });
+      await tx.tCoverageMovement.update({
+        where: { IdeCoverageMovement: ideCoverageMovement },
+        data: { Prime: primeValue, UsrModification: actor, TstModification: now },
+      });
+    }
+
+    const primaTotalRow = primaTotalConcept
+      ? await tx.tMovementConcept.findFirst({
+          where: { IdeCoverageMovement: ideCoverageMovement, IdeConcept: primaTotalConcept.IdeConcept },
+        })
+      : null;
+    await tx.tRiskCoverage.update({
+      where: { IdeRiskCoverage: ideRiskCoverage },
+      data: {
+        Amount: newAmount,
+        Prime: primaTotalRow ? round2(Number(primaTotalRow.ConceptValue)) : primeValue,
+        UsrModification: actor,
+        TstModification: now,
+      },
+    });
+  }
+
+  /**
+   * Último paso de `changeInsuredAmount`: transiciona el movimiento nuevo
+   * (y sus conceptos) de Borrador a Activo -- tiene que correr DESPUÉS de
+   * `generateReceipts`, porque ese método solo repunta a la operación
+   * RECEGENE los movimientos que sigan en Borrador (`IdeState: ideBorrador`
+   * en su `where`); si este paso corriera antes, el movimiento ya no
+   * calificaría y quedaría sin `IdeContractOperation` para siempre. Mismo
+   * operativo `'Activar'` que ya usa `applyStateCascade` al crear un
+   * contrato -- no hace falta sembrar ninguna `SStateRule` nueva.
+   */
+  private async activateSupplementMovement(
+    ideCoverageMovement: string,
+    actor: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ): Promise<void> {
+    const now = new Date();
+    const movement = await tx.tCoverageMovement.findUniqueOrThrow({ where: { IdeCoverageMovement: ideCoverageMovement } });
+    const nextMovementState = await this.stateMachine.getNextState('TCoverageMovement', movement.IdeState, 'Activar');
+    await tx.tCoverageMovement.update({
+      where: { IdeCoverageMovement: ideCoverageMovement },
+      data: { IdeState: nextMovementState, UsrModification: actor, TstModification: now },
+    });
+
+    const concepts = await tx.tMovementConcept.findMany({ where: { IdeCoverageMovement: ideCoverageMovement } });
+    for (const concept of concepts) {
+      const nextConceptState = await this.stateMachine.getNextState('TMovementConcept', concept.IdeState, 'Activar');
+      await tx.tMovementConcept.update({
+        where: { IdeMovementConcept: concept.IdeMovementConcept },
+        data: { IdeState: nextConceptState, UsrModification: actor, TstModification: now },
+      });
     }
   }
 

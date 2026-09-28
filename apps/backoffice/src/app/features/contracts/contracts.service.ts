@@ -258,6 +258,20 @@ export interface CancelContractPayload {
   desCancellation: string;
 }
 
+/** Payload de `POST /contracts/:id/change-amount` -- mismo shape que
+ *  `ChangeInsuredAmountDto` en el backend real (`ContractsService.changeInsuredAmount`,
+ *  underwriting-service). Suplemento "Cambio de monto asegurado" (Etapa 2
+ *  de "Movimientos y suplementos del contrato", ver docs/02-roadmap.md):
+ *  cambia el `Amount` de UNA `TRiskCoverage` puntual (no de todo el
+ *  contrato) y recalcula su prima proporcionalmente al nuevo monto. */
+export interface ChangeInsuredAmountPayload {
+  ideRiskCoverage: string;
+  newAmount: number;
+  ideProductEndorsement: string;
+  tstSupplement: string;
+  desSupplement: string;
+}
+
 /** Cliente HTTP contra `underwriting-service` (`/underwriting/contracts`,
  *  vía el gateway) -- mismo criterio que `QuotingService`: no reutiliza
  *  `CatalogService` porque estas rutas no siguen su shape Cod/Des
@@ -298,5 +312,15 @@ export class ContractsService {
    *  nuevo estado/movimiento. */
   cancel(ideContract: string, payload: CancelContractPayload): Observable<ContractDetail> {
     return this.http.post<ContractDetail>(`${this.base}/${ideContract}/cancel`, payload);
+  }
+
+  /** `POST /contracts/:id/change-amount` -- suplemento "Cambio de monto
+   *  asegurado" (Etapa 2). El backend real crea el movimiento nuevo de
+   *  la cobertura, recalcula la prima proporcional al monto y genera el
+   *  recibo correspondiente; acá solo se hace el POST y se deja que el
+   *  caller recargue el detalle (`getContract`) para ver el nuevo monto/
+   *  movimiento. */
+  changeInsuredAmount(ideContract: string, payload: ChangeInsuredAmountPayload): Observable<ContractDetail> {
+    return this.http.post<ContractDetail>(`${this.base}/${ideContract}/change-amount`, payload);
   }
 }

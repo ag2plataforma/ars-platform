@@ -4,6 +4,7 @@ import { ContractsService } from './contracts.service';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { TransitionContractStateDto } from './dto/transition-contract-state.dto';
 import { CancelContractDto } from './dto/cancel-contract.dto';
+import { ChangeInsuredAmountDto } from './dto/change-insured-amount.dto';
 import { ListContractsDto } from './dto/list-contracts.dto';
 
 /**
@@ -60,5 +61,20 @@ export class ContractsController {
   @Post('contracts/:id/cancel')
   cancel(@Param('id') id: string, @Body() dto: CancelContractDto, @CurrentUser() actor: JwtPayload) {
     return this.service.cancel(id, dto, actor.code);
+  }
+
+  /**
+   * Suplemento "Cambio de monto asegurado" -- ver el doc-comment de
+   * `ContractsService.changeInsuredAmount` para el detalle completo de la
+   * cascada. Igual que `cancel`, endpoint dedicado (no el genérico
+   * `/state`) porque requiere parámetros propios del endoso.
+   */
+  @Post('contracts/:id/change-amount')
+  changeInsuredAmount(
+    @Param('id') id: string,
+    @Body() dto: ChangeInsuredAmountDto,
+    @CurrentUser() actor: JwtPayload,
+  ) {
+    return this.service.changeInsuredAmount(id, dto, actor.code);
   }
 }

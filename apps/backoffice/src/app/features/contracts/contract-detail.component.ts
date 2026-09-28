@@ -18,6 +18,7 @@ import { RiskAttributesService } from '../quotes/risk-attributes.service';
 import { CatalogService } from '../../core/catalogs/catalog.service';
 import { CatalogRow } from '../../core/catalogs/catalog.model';
 import {
+  ContractCoverage,
   ContractDetail,
   ContractFile,
   ContractOperation,
@@ -178,6 +179,31 @@ export class ContractDetailComponent implements OnInit {
     });
   }
 
+  /** Diálogo "Nuevo suplemento" (Etapa 2 de "Movimientos y suplementos
+   *  del contrato", ver docs/02-roadmap.md) -- llama a
+   *  `ContractsService.changeInsuredAmount()`, que en el backend real
+   *  hace la cascada de "Cambio de monto asegurado" sobre UNA
+   *  `TRiskCoverage` puntual (no todo el contrato): movimiento nuevo +
+   *  prima recalculada proporcional al monto. Se abre desde un botón por
+   *  fila en la pestaña "Coberturas" (`openChangeAmountDialog`), así que
+   *  la cobertura ya viene resuelta -- no hace falta seleccionarla en el
+   *  formulario. Reutiliza la misma lista de `productEndorsements` que
+   *  el diálogo de anulación (ambos filtran por `SState.CodState ===
+   *  'ACTIVO'`; el usuario elige el endoso correcto en el desplegable). */
+  readonly changeAmountDialogVisible = signal(false);
+  readonly changeAmountSubmitting = signal(false);
+  readonly changeAmountCoverage = signal<ContractCoverage | null>(null);
+  changeAmountForm = this.buildChangeAmountForm();
+
+  private buildChangeAmountForm() {
+    return this.fb.nonNullable.group({
+      ideProductEndorsement: ['', Validators.required],
+      newAmount: [0, [Validators.required, Validators.min(0.01)]],
+      tstSupplement: ['', Validators.required],
+      desSupplement: ['', Validators.required],
+    });
+  }
+
   ngOnInit(): void {
     this.route.paramMap.subscribe((params) => {
       const id = params.get('id');
@@ -306,6 +332,74 @@ export class ContractDetailComponent implements OnInit {
         },
         error: (err: HttpErrorResponse) => {
           this.cancelSubmitting.set(false);
+          this.showError(err);
+        },
+      });
+  }
+
+  openChangeAmountDialog(coverage: ContractCoverage): void {
+    const c = this.contract();
+    if (!c) return;
+    this.changeAmountCoverage.set(coverage);
+    this.changeAmountForm = this.buildChangeAmountForm();
+    this.changeAmountForm.patchValue({ newAmount: Number(coverage.Amount) });
+    this.productEndorsements.set([]);
+    this.catalogService.list(PRODUCT_ENDORSEMENTS_PATH, { codProduct: c.SProduct.CodProduct }).subscribe({
+      next: (rows) => this.productEndorsements.set(rows.filter((row) => row.SState?.CodState === 'ACTIVO')),
+      error: (err: HttpErrorResponse) => this.showError(err),
+    });
+    this.changeAmountDialogVisible.set(true);
+  }
+
+  closeChangeAmountDialog(): void {
+    this.changeAmountDialogVisible.set(false);
+    this.changeAmountCoverage.set(null);
+  }
+
+  submitChangeAmount(): void {
+    const c = this.contract();
+    const coverage = this.changeAmountCoverage();
+    if (!c || !coverage) return;
+    if (this.changeAmountForm.invalid) {
+      this.changeAmountForm.markAllAsTouched();
+      return;
+    }
+    const raw = this.changeAmountForm.getRawValue();
+    this.changeAmountSubmitting.set(true);
+    this.contracts
+      .changeInsuredAmount(c.IdeContract, {
+        ideRiskCoverage: coverage.IdeRiskCoverage,
+        newAmount: raw.newAmount,
+        ideProductEndorsement: raw.ideProductEndorsement,
+        tstSupplement: raw.tstSupplement,
+        desSupplement: raw.desSupplement,
+      })
+      .subscribe({
+        next: (result) => {
+          this.changeAmountSubmitting.set(false);
+          this.contract.set(result);
+          // La cobertura viene de un objeto congelado en el momento en que
+          // se abrió el diálogo -- tras recargar el contrato, refrescar
+          // `selectedRisk` para que la tabla de Coberturas (que lee
+          // `selectedRiskCoverages()`, derivado de `selectedRisk()`) muestre
+          // el monto/prima nuevos sin que el usuario tenga que re-seleccionar
+          // el riesgo a mano.
+          const risk = this.selectedRisk();
+          if (risk) {
+            const refreshedFile = result.TContractFile.find((f) => f.IdeContractFile === this.selectedFile()?.IdeContractFile);
+            const refreshedRisk = refreshedFile?.TFileRisk.find((r) => r.IdeFileRisk === risk.IdeFileRisk) ?? null;
+            this.selectedFile.set(refreshedFile ?? null);
+            this.selectedRisk.set(refreshedRisk);
+          }
+          this.closeChangeAmountDialog();
+          this.messages.add({
+            severity: 'success',
+            summary: this.transloco.translate('common.done'),
+            detail: this.transloco.translate('contractDetail.changeAmountDialog.appliedDetail'),
+          });
+        },
+        error: (err: HttpErrorResponse) => {
+          this.changeAmountSubmitting.set(false);
           this.showError(err);
         },
       });
