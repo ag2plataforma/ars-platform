@@ -307,6 +307,40 @@ export interface RemoveCoveragePayload {
   desSupplement: string;
 }
 
+/** Payload de `POST /contracts/:id/add-risk` -- mismo shape que
+ *  `AddRiskDto` en el backend real (`ContractsService.addRisk`,
+ *  underwriting-service). Suplemento "Alta de riesgo" (Etapa 4 de
+ *  "Movimientos y suplementos del contrato", ver docs/02-roadmap.md):
+ *  agrega un `TFileRisk` nuevo (vacío, sin coberturas) a un certificado
+ *  que ya existe en el contrato -- las coberturas se agregan después,
+ *  una por una, con `addCoverage` (Etapa 3). */
+export interface AddRiskPayload {
+  ideContractFile: string;
+  idePlanProductRisk: string;
+  desFileRisk?: string;
+  ideProductEndorsement: string;
+  tstSupplement: string;
+  desSupplement: string;
+  /** Valores de atributos personalizados del riesgo elegido, mismo shape
+   *  que `CreateQuoteRiskDto.riskAttributeValue` en el backend real
+   *  (`{ "<IdeAttributeProperty>": "<valor o IdeFieldValue>" }`) --
+   *  `undefined` cuando el riesgo no tiene atributos configurados (ver
+   *  `ContractDetailComponent.loadAddRiskAttributeFields`). */
+  riskAttributeValue?: unknown;
+}
+
+/** Payload de `POST /contracts/:id/remove-risk` -- mismo shape que
+ *  `RemoveRiskDto` en el backend real (`ContractsService.removeRisk`,
+ *  underwriting-service). Suplemento "Baja de riesgo" (Etapa 4): cancela
+ *  TODAS las coberturas activas del riesgo (devolución proporcional al
+ *  tiempo, mismo mecanismo que `removeCoverage`) y cierra el riesgo. */
+export interface RemoveRiskPayload {
+  ideFileRisk: string;
+  ideProductEndorsement: string;
+  tstSupplement: string;
+  desSupplement: string;
+}
+
 /** Cliente HTTP contra `underwriting-service` (`/underwriting/contracts`,
  *  vía el gateway) -- mismo criterio que `QuotingService`: no reutiliza
  *  `CatalogService` porque estas rutas no siguen su shape Cod/Des
@@ -375,5 +409,21 @@ export class ContractsService {
    *  recargue el detalle. */
   removeCoverage(ideContract: string, payload: RemoveCoveragePayload): Observable<ContractDetail> {
     return this.http.post<ContractDetail>(`${this.base}/${ideContract}/remove-coverage`, payload);
+  }
+
+  /** `POST /contracts/:id/add-risk` -- suplemento "Alta de riesgo"
+   *  (Etapa 4). El backend real crea el `TFileRisk` nuevo, ya activo;
+   *  acá solo se hace el POST y se deja que el caller recargue el
+   *  detalle (`getContract`) para ver el riesgo nuevo. */
+  addRisk(ideContract: string, payload: AddRiskPayload): Observable<ContractDetail> {
+    return this.http.post<ContractDetail>(`${this.base}/${ideContract}/add-risk`, payload);
+  }
+
+  /** `POST /contracts/:id/remove-risk` -- suplemento "Baja de riesgo"
+   *  (Etapa 4). El backend real cancela todas las coberturas activas del
+   *  riesgo y lo cierra; acá solo se hace el POST y se deja que el
+   *  caller recargue el detalle. */
+  removeRisk(ideContract: string, payload: RemoveRiskPayload): Observable<ContractDetail> {
+    return this.http.post<ContractDetail>(`${this.base}/${ideContract}/remove-risk`, payload);
   }
 }

@@ -7,6 +7,8 @@ import { CancelContractDto } from './dto/cancel-contract.dto';
 import { ChangeInsuredAmountDto } from './dto/change-insured-amount.dto';
 import { AddCoverageDto } from './dto/add-coverage.dto';
 import { RemoveCoverageDto } from './dto/remove-coverage.dto';
+import { AddRiskDto } from './dto/add-risk.dto';
+import { RemoveRiskDto } from './dto/remove-risk.dto';
 import { ListContractsDto } from './dto/list-contracts.dto';
 
 /**
@@ -96,5 +98,23 @@ export class ContractsController {
   @Post('contracts/:id/remove-coverage')
   removeCoverage(@Param('id') id: string, @Body() dto: RemoveCoverageDto, @CurrentUser() actor: JwtPayload) {
     return this.service.removeCoverage(id, dto, actor.code);
+  }
+
+  /**
+   * Suplemento "Alta de riesgo" -- ver el doc-comment de
+   * `ContractsService.addRisk` para el detalle completo.
+   */
+  @Post('contracts/:id/add-risk')
+  addRisk(@Param('id') id: string, @Body() dto: AddRiskDto, @CurrentUser() actor: JwtPayload) {
+    return this.service.addRisk(id, dto, actor.code);
+  }
+
+  /**
+   * Suplemento "Baja de riesgo" -- ver el doc-comment de
+   * `ContractsService.removeRisk` para el detalle completo.
+   */
+  @Post('contracts/:id/remove-risk')
+  removeRisk(@Param('id') id: string, @Body() dto: RemoveRiskDto, @CurrentUser() actor: JwtPayload) {
+    return this.service.removeRisk(id, dto, actor.code);
   }
 }

@@ -8,6 +8,8 @@ import { CancelContractDto } from './dto/cancel-contract.dto';
 import { ChangeInsuredAmountDto } from './dto/change-insured-amount.dto';
 import { AddCoverageDto } from './dto/add-coverage.dto';
 import { RemoveCoverageDto } from './dto/remove-coverage.dto';
+import { AddRiskDto } from './dto/add-risk.dto';
+import { RemoveRiskDto } from './dto/remove-risk.dto';
 import { ListContractsDto } from './dto/list-contracts.dto';
 
 /**
@@ -483,6 +485,152 @@ export class ContractsService {
         await this.generateReceipts(ideContract, dto.ideProductEndorsement, actor, tx);
         await this.activateSupplementMovement(newMovement.IdeCoverageMovement, actor, tx);
         await this.closeRiskCoverage(dto.ideRiskCoverage, actor, tx);
+      },
+      { timeout: SUPPLEMENT_TRANSACTION_TIMEOUT_MS, maxWait: 10_000 },
+    );
+
+    return this.findOne(ideContract);
+  }
+
+  /**
+   * Suplemento "Alta de riesgo" (Etapa 4 de "Movimientos y suplementos
+   * del contrato", ver docs/02-roadmap.md): agrega un `TFileRisk` nuevo
+   * a un certificado (`TContractFile`) que ya existe en el contrato --
+   * a diferencia de `addCoverage`, acá NO se eligen coberturas en el
+   * mismo paso (decisión de negocio explícita del usuario, 2026-09-28:
+   * "mismo mecanismo" que alta de cobertura): el riesgo nace vacío y
+   * activo, y el usuario le agrega coberturas después con el mismo botón
+   * "Agregar cobertura" de la pestaña Coberturas (Etapa 3).
+   *
+   * Por eso este suplemento es mucho más simple que `addCoverage`: sin
+   * `TRiskCoverage` todavía no hay `TCoverageMovement` ni prima que
+   * recalcular, así que no hace falta `createInitialMovements`/
+   * `setNetPrime`/`generateReceipts` acá -- esos corren recién cuando se
+   * agregue la primera cobertura. Solo dos pasos: la operación de
+   * contrato (para que quede trazado en "Movimientos", igual que
+   * cualquier otro suplemento) y el `TFileRisk` mismo, ya `Activo`.
+   *
+   * SÍ acepta `RiskAttributeValue` (los atributos personalizados del
+   * riesgo, ver `RiskAttributesService`) -- ajustado 2026-09-29 tras
+   * reporte del usuario ("no valida si para ese producto es necesario
+   * atributos personalizados, tal como aparecen en la cotización"): el
+   * frontend (`ContractDetailComponent`, diálogo "Agregar riesgo")
+   * replica el mismo mecanismo que Etapa 1 de cotización
+   * (`QuotesComponent.loadRiskFields`/`buildRiskFieldsState`) -- pide
+   * `RiskAttributesService.getSchema(ideRiskProduct)` y arma un form
+   * dinámico si el riesgo elegido tiene campos configurados. A
+   * diferencia de cotización, acá NO se replica el gate de
+   * `resolveActiveSteps`/`STEP_CODE_CUSTOM_ATTRIBUTES` (el contrato no
+   * expone `CodDistributionChannel` en su respuesta hoy, solo la
+   * descripción ya resuelta -- ver `ContractDistributionChannel` en
+   * `contracts.service.ts` del frontend): se usa el mismo
+   * comportamiento "seguro por defecto" que ya tiene cotización sin
+   * canal elegido (no oculta nada), simplemente mostrando el form
+   * cuando el schema trae campos. El valor no se valida acá contra la
+   * definición de atributos (`class-validator` con `IsOptional()`
+   * `IsObject()`, igual que `CreateQuoteRiskDto.riskAttributeValue`) --
+   * la validación de campos requeridos queda del lado del formulario
+   * dinámico del frontend, mismo criterio que cotización.
+   */
+  async addRisk(ideContract: string, dto: AddRiskDto, actor: string) {
+    const existing = await this.prisma.tContract.findUnique({ where: { IdeContract: ideContract } });
+    if (!existing) {
+      throw new NotFoundException(`No existe contrato con id "${ideContract}"`);
+    }
+
+    const tstSupplement = new Date(dto.tstSupplement);
+
+    await this.prisma.$transaction(
+      async (tx) => {
+        const { contractFile, planProductRisk } = await this.validateAddRisk(
+          ideContract,
+          existing.IdeProduct,
+          dto.ideContractFile,
+          dto.idePlanProductRisk,
+          tstSupplement,
+          tx,
+        );
+
+        const codOperation = await this.resolveOperationCodeByEndorsement(dto.ideProductEndorsement, tx);
+        await this.createContractOperation(ideContract, existing.IdeProduct, codOperation, actor, tx);
+
+        await this.createNewFileRisk(
+          contractFile,
+          planProductRisk,
+          dto.desFileRisk,
+          dto.riskAttributeValue,
+          tstSupplement,
+          actor,
+          tx,
+        );
+      },
+      { timeout: SUPPLEMENT_TRANSACTION_TIMEOUT_MS, maxWait: 10_000 },
+    );
+
+    return this.findOne(ideContract);
+  }
+
+  /**
+   * Suplemento "Baja de riesgo" (Etapa 4): cancela TODAS las coberturas
+   * activas del `TFileRisk` -- literalmente `removeCoverage` (monto a 0,
+   * devolución proporcional al tiempo) repetido por cada
+   * `TRiskCoverage` activa, reutilizando sus mismos helpers
+   * (`validateSupplementDate`/`createSupplementMovement`/
+   * `setSupplementConcepts`/`setSupplementPrime`/`activateSupplementMovement`/
+   * `closeRiskCoverage`) sin ningún cambio -- y cierra el riesgo mismo
+   * al final (`closeFileRisk`, mismo operativo `'Modificar'` que ya usa
+   * `cancelFileRisk` en la anulación total del contrato, así que no hace
+   * falta sembrar ninguna `SStateRule` nueva).
+   *
+   * Los recibos se generan UNA sola vez para todas las coberturas de
+   * este riesgo (no uno por cobertura), mismo criterio que
+   * `generateReceipts` ya usa para agrupar todos los movimientos en
+   * Borrador de la operación. Si el riesgo no tiene ninguna cobertura
+   * activa (ya vacío, o recién creado con `addRisk`), se saltea
+   * directamente al cierre del `TFileRisk` sin generar nada.
+   */
+  async removeRisk(ideContract: string, dto: RemoveRiskDto, actor: string) {
+    const existing = await this.prisma.tContract.findUnique({ where: { IdeContract: ideContract } });
+    if (!existing) {
+      throw new NotFoundException(`No existe contrato con id "${ideContract}"`);
+    }
+
+    const tstSupplement = new Date(dto.tstSupplement);
+
+    await this.prisma.$transaction(
+      async (tx) => {
+        await this.validateRemoveRisk(ideContract, dto.ideFileRisk, tstSupplement, tx);
+
+        const codOperation = await this.resolveOperationCodeByEndorsement(dto.ideProductEndorsement, tx);
+        await this.createContractOperation(ideContract, existing.IdeProduct, codOperation, actor, tx);
+
+        const ideActivo = await this.stateMachine.getStateByCode('Activo');
+        const riskCoverages = await tx.tRiskCoverage.findMany({
+          where: { IdeFileRisk: dto.ideFileRisk, IdeState: ideActivo },
+          select: { IdeRiskCoverage: true },
+        });
+
+        const newMovementIds: string[] = [];
+        for (const { IdeRiskCoverage: ideRiskCoverage } of riskCoverages) {
+          const { lastMovement } = await this.validateSupplementDate(ideContract, ideRiskCoverage, tstSupplement, tx);
+          if (Number(lastMovement.Amount) === 0) continue; // ya en 0 -- probablemente ya fue dada de baja antes.
+          const newMovement = await this.createSupplementMovement(ideRiskCoverage, lastMovement, tstSupplement, 0, actor, tx);
+          await this.setSupplementConcepts(ideRiskCoverage, lastMovement, newMovement, 0, actor, tx);
+          await this.setSupplementPrime(ideRiskCoverage, newMovement.IdeCoverageMovement, 0, actor, tx);
+          newMovementIds.push(newMovement.IdeCoverageMovement);
+        }
+
+        if (newMovementIds.length > 0) {
+          await this.generateReceipts(ideContract, dto.ideProductEndorsement, actor, tx);
+          for (const ideCoverageMovement of newMovementIds) {
+            await this.activateSupplementMovement(ideCoverageMovement, actor, tx);
+          }
+        }
+        for (const { IdeRiskCoverage: ideRiskCoverage } of riskCoverages) {
+          await this.closeRiskCoverage(ideRiskCoverage, actor, tx);
+        }
+
+        await this.closeFileRisk(dto.ideFileRisk, tstSupplement, dto.desSupplement, actor, tx);
       },
       { timeout: SUPPLEMENT_TRANSACTION_TIMEOUT_MS, maxWait: 10_000 },
     );
@@ -2844,6 +2992,181 @@ export class ContractsService {
     await tx.tRiskCoverage.update({
       where: { IdeRiskCoverage: ideRiskCoverage },
       data: { IdeState: nextState, UsrModification: actor, TstModification: new Date() },
+    });
+  }
+
+  // ==========================================================================
+  // Cascada de los suplementos "Alta de riesgo" / "Baja de riesgo" (Etapa
+  // 4) -- ver los métodos públicos `addRisk`/`removeRisk` (más arriba)
+  // para el doc-comment de orden completo. `removeRisk` reutiliza
+  // directamente los helpers de "Cambio de monto asegurado"/"Baja de
+  // cobertura" (arriba); acá solo van los helpers propios de "Alta de
+  // riesgo" más `closeFileRisk`, compartido por ambos suplementos.
+  // ==========================================================================
+
+  /**
+   * Valida que el contrato esté `Activo` (con la fecha del suplemento
+   * dentro de su vigencia), que el `TContractFile` indicado exista, esté
+   * `Activo` y pertenezca a este contrato, y que la `SPlanProductRisk`
+   * exista, esté `Activo` y pertenezca al MISMO producto del contrato
+   * (`SPlanProduct.IdeProduct`) -- mismo criterio de validación que
+   * `validateAddCoverage`, un nivel más arriba en la jerarquía.
+   */
+  private async validateAddRisk(
+    ideContract: string,
+    ideProduct: string,
+    ideContractFile: string,
+    idePlanProductRisk: string,
+    tstSupplement: Date,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const ideActivo = await this.stateMachine.getStateByCode('Activo');
+    const contract = await tx.tContract.findFirst({
+      where: {
+        IdeContract: ideContract,
+        IdeState: ideActivo,
+        TstInitial: { lte: tstSupplement },
+        TstEnd: { gte: tstSupplement },
+      },
+    });
+    if (!contract) {
+      throw new ConflictException(
+        'No se pudo procesar el suplemento: el contrato no está en estado "Activo" o la fecha del suplemento no está dentro de su vigencia',
+      );
+    }
+
+    const contractFile = await tx.tContractFile.findFirst({
+      where: { IdeContractFile: ideContractFile, IdeState: ideActivo, IdeContract: ideContract },
+    });
+    if (!contractFile) {
+      throw new NotFoundException(`No existe un certificado activo "${ideContractFile}" en el contrato "${ideContract}"`);
+    }
+
+    const planProductRisk = await tx.sPlanProductRisk.findFirst({
+      where: { IdePlanProductRisk: idePlanProductRisk, IdeState: ideActivo, SPlanProduct: { IdeProduct: ideProduct } },
+    });
+    if (!planProductRisk) {
+      throw new NotFoundException(`El plan de riesgo "${idePlanProductRisk}" no está disponible para este producto`);
+    }
+
+    return { contractFile, planProductRisk };
+  }
+
+  /**
+   * Crea el `TFileRisk` nuevo, con vigencia `[tstSupplement, TstEnd del
+   * TContractFile]` (no arranca desde el inicio del contrato -- recién
+   * se está agregando hoy, mismo criterio que `createNewRiskCoverage`) y
+   * lo activa de inmediato -- a diferencia de una cobertura, un riesgo
+   * vacío no tiene ningún movimiento/recibo que esperar, así que no hace
+   * falta separar "crear en Borrador" de "activar" en dos pasos con
+   * `generateReceipts` en el medio.
+   */
+  private async createNewFileRisk(
+    contractFile: { IdeContractFile: string; TstEnd: Date },
+    planProductRisk: { IdePlanProductRisk: string; IdeRiskProduct: string },
+    desFileRisk: string | undefined,
+    riskAttributeValue: unknown,
+    tstSupplement: Date,
+    actor: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const ideFileRiskInitial = await this.stateMachine.getInitialState('TFileRisk');
+    const maxNumFileRisk = await tx.tFileRisk.aggregate({
+      where: { IdeContractFile: contractFile.IdeContractFile },
+      _max: { NumFileRisk: true },
+    });
+    const numFileRisk = (maxNumFileRisk._max.NumFileRisk ?? 0) + 1;
+    const now = new Date();
+
+    const fileRisk = await tx.tFileRisk.create({
+      data: {
+        IdeContractFile: contractFile.IdeContractFile,
+        NumFileRisk: numFileRisk,
+        DesFileRisk: desFileRisk ?? null,
+        IdeRiskProduct: planProductRisk.IdeRiskProduct,
+        IdePlanProductRisk: planProductRisk.IdePlanProductRisk,
+        RiskAttributeValue: (riskAttributeValue as object | undefined) ?? undefined,
+        TstInclusion: now,
+        TstInitial: tstSupplement,
+        TstEnd: contractFile.TstEnd,
+        IdeState: ideFileRiskInitial,
+        UsrCreation: actor,
+        TstCreation: now,
+        UsrModification: actor,
+        TstModification: now,
+      },
+    });
+
+    const nextState = await this.stateMachine.getNextState('TFileRisk', fileRisk.IdeState, 'Activar');
+    return tx.tFileRisk.update({
+      where: { IdeFileRisk: fileRisk.IdeFileRisk },
+      data: { IdeState: nextState, UsrModification: actor, TstModification: now },
+    });
+  }
+
+  /**
+   * Valida que el contrato esté `Activo` (con la fecha del suplemento
+   * dentro de su vigencia) y que el `TFileRisk` indicado exista, esté
+   * `Activo` y pertenezca a este contrato -- mismo criterio que
+   * `validateAddCoverage`/`validateSupplementDate`, a nivel de riesgo.
+   */
+  private async validateRemoveRisk(
+    ideContract: string,
+    ideFileRisk: string,
+    tstSupplement: Date,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const ideActivo = await this.stateMachine.getStateByCode('Activo');
+    const contract = await tx.tContract.findFirst({
+      where: {
+        IdeContract: ideContract,
+        IdeState: ideActivo,
+        TstInitial: { lte: tstSupplement },
+        TstEnd: { gte: tstSupplement },
+      },
+    });
+    if (!contract) {
+      throw new ConflictException(
+        'No se pudo procesar el suplemento: el contrato no está en estado "Activo" o la fecha del suplemento no está dentro de su vigencia',
+      );
+    }
+
+    const fileRisk = await tx.tFileRisk.findFirst({
+      where: { IdeFileRisk: ideFileRisk, IdeState: ideActivo, TContractFile: { IdeContract: ideContract } },
+    });
+    if (!fileRisk) {
+      throw new NotFoundException(`No existe un riesgo activo "${ideFileRisk}" en el contrato "${ideContract}"`);
+    }
+    return fileRisk;
+  }
+
+  /**
+   * Último paso de `removeRisk`: transiciona el `TFileRisk` de `Activo`
+   * a `'Modificar'` y registra la cancelación (`TstCancellation`/
+   * `DesCancellation`) -- mismo operativo/estado y mismos campos que usa
+   * `cancelFileRisk` en la anulación total del contrato, así que no hace
+   * falta sembrar ninguna `SStateRule` nueva. Corre DESPUÉS de cerrar
+   * todas sus `TRiskCoverage` (`closeRiskCoverage`, en el `for` de
+   * `removeRisk`).
+   */
+  private async closeFileRisk(
+    ideFileRisk: string,
+    tstSupplement: Date,
+    desSupplement: string,
+    actor: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ): Promise<void> {
+    const current = await tx.tFileRisk.findUniqueOrThrow({ where: { IdeFileRisk: ideFileRisk } });
+    const nextState = await this.stateMachine.getNextState('TFileRisk', current.IdeState, 'Modificar');
+    await tx.tFileRisk.update({
+      where: { IdeFileRisk: ideFileRisk },
+      data: {
+        TstCancellation: tstSupplement,
+        DesCancellation: desSupplement,
+        IdeState: nextState,
+        UsrModification: actor,
+        TstModification: new Date(),
+      },
     });
   }
 

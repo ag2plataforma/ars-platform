@@ -142,6 +142,17 @@
           @if (!selectedFile()) {
             <p class="text-sm text-slate-500">{{ 'contractDetail.selectFileHint' | transloco }}</p>
           } @else {
+            <div class="mb-3 flex justify-end">
+              <button
+                pButton
+                type="button"
+                icon="pi pi-plus"
+                size="small"
+                [disabled]="c.SState.CodState !== 'ACTIVO' || selectedFile()!.SState.CodState !== 'ACTIVO'"
+                [label]="'contractDetail.addRiskDialog.button' | transloco"
+                (click)="openAddRiskDialog()"
+              ></button>
+            </div>
             <p-table
               [value]="selectedFileRisks()"
               dataKey="IdeFileRisk"
@@ -181,6 +192,17 @@
                       [text]="true"
                       size="small"
                       (click)="openAttributesDialog(risk); $event.stopPropagation()"
+                    ></button>
+                    <button
+                      pButton
+                      type="button"
+                      [text]="true"
+                      size="small"
+                      severity="danger"
+                      icon="pi pi-times"
+                      [disabled]="c.SState.CodState !== 'ACTIVO' || risk.SState.CodState !== 'ACTIVO'"
+                      [label]="'contractDetail.removeRiskDialog.button' | transloco"
+                      (click)="openRemoveRiskDialog(risk); $event.stopPropagation()"
                     ></button>
                   </td>
                 </tr>
@@ -647,6 +669,157 @@
     <div class="mt-2 flex justify-end gap-2">
       <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeRemoveCoverageDialog()"></button>
       <button pButton type="submit" severity="danger" [label]="'contractDetail.removeCoverageDialog.confirmButton' | transloco" [loading]="removeCoverageSubmitting()"></button>
+    </div>
+  </form>
+</p-dialog>
+
+<!-- ============================== Popup: Agregar riesgo ============================== -->
+<p-dialog
+  [header]="'contractDetail.addRiskDialog.title' | transloco"
+  [visible]="addRiskDialogVisible()"
+  (visibleChange)="!$event && closeAddRiskDialog()"
+  [modal]="true"
+  [style]="{ width: '28rem' }"
+>
+  <form [formGroup]="addRiskForm" (ngSubmit)="submitAddRisk()" class="flex flex-col gap-4 pt-2">
+    <p class="text-sm text-slate-500">{{ 'contractDetail.addRiskDialog.subtitle' | transloco }}</p>
+    @if (availablePlanProductRiskOptions().length === 0) {
+      <p class="text-sm text-slate-500">{{ 'contractDetail.addRiskDialog.noOptions' | transloco }}</p>
+    }
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.addRiskDialog.planRiskLabel' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="idePlanProductRisk"
+        [options]="availablePlanProductRiskOptions()"
+        optionValue="IdePlanProductRisk"
+        [placeholder]="'contractDetail.addRiskDialog.planRiskPlaceholder' | transloco"
+        styleClass="w-full"
+      >
+        <ng-template let-item #selectedItem>{{ planProductRiskLabel(item) }}</ng-template>
+        <ng-template let-item #item>{{ planProductRiskLabel(item) }}</ng-template>
+      </p-select>
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.addRiskDialog.riskLabelLabel' | transloco }}</label>
+      <input pInputText type="text" formControlName="desFileRisk" [placeholder]="'contractDetail.addRiskDialog.riskLabelPlaceholder' | transloco" class="w-full" />
+    </div>
+    @if (addRiskAttributesLoading()) {
+      <p class="text-xs text-slate-400">{{ 'quotes.loadingRiskData' | transloco }}</p>
+    } @else if (addRiskAttributeFields().length > 0) {
+      <div [formGroup]="addRiskAttributesForm" class="flex flex-col gap-3 border-t border-slate-200 pt-3">
+        <p class="text-xs font-medium text-slate-500">{{ 'contractDetail.attributesDialogTitle' | transloco }}</p>
+        @for (field of addRiskAttributeFields(); track field.ideAttributeProperty) {
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-slate-600">{{ field.label }}</label>
+            @switch (field.type) {
+              @case ('select') {
+                <p-select
+                  appendTo="body"
+                  [formControlName]="field.ideAttributeProperty"
+                  [options]="field.options ?? []"
+                  optionLabel="key"
+                  optionValue="value"
+                  [placeholder]="'quotes.selectOptionPlaceholder' | transloco"
+                  styleClass="w-full"
+                />
+              }
+              @case ('radio') {
+                <div class="flex flex-wrap gap-3 pt-1">
+                  @for (opt of field.options ?? []; track opt.key) {
+                    <label class="flex items-center gap-1 text-xs text-slate-600">
+                      <p-radiobutton [formControlName]="field.ideAttributeProperty" [value]="opt.value" />
+                      {{ opt.key }}
+                    </label>
+                  }
+                </div>
+              }
+              @case ('checkbox') {
+                <p-checkbox [binary]="true" [formControlName]="field.ideAttributeProperty" />
+              }
+              @case ('number') {
+                <input pInputText type="number" [formControlName]="field.ideAttributeProperty" />
+              }
+              @case ('date') {
+                <input pInputText type="date" [formControlName]="field.ideAttributeProperty" />
+              }
+              @default {
+                <input pInputText type="text" [formControlName]="field.ideAttributeProperty" />
+              }
+            }
+            @if (addRiskFieldInvalid(field)) {
+              <span class="text-xs text-red-600">{{ addRiskFirstErrorMessage(field) }}</span>
+            }
+          </div>
+        }
+      </div>
+    }
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.cancelDialog.endorsementLabel' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="ideProductEndorsement"
+        [options]="productEndorsements()"
+        optionLabel="DesProductEndorsement"
+        optionValue="IdeProductEndorsement"
+        [placeholder]="'contractDetail.cancelDialog.endorsementPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.addRiskDialog.dateLabel' | transloco }}</label>
+      <input pInputText type="date" formControlName="tstSupplement" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.addRiskDialog.reasonLabel' | transloco }}</label>
+      <textarea pTextarea formControlName="desSupplement" rows="3" class="w-full"></textarea>
+    </div>
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeAddRiskDialog()"></button>
+      <button pButton type="submit" [label]="'contractDetail.addRiskDialog.confirmButton' | transloco" [loading]="addRiskSubmitting()"></button>
+    </div>
+  </form>
+</p-dialog>
+
+<!-- ============================== Popup: Dar de baja riesgo ============================== -->
+<p-dialog
+  [header]="'contractDetail.removeRiskDialog.title' | transloco"
+  [visible]="removeRiskDialogVisible()"
+  (visibleChange)="!$event && closeRemoveRiskDialog()"
+  [modal]="true"
+  [style]="{ width: '28rem' }"
+>
+  <form [formGroup]="removeRiskForm" (ngSubmit)="submitRemoveRisk()" class="flex flex-col gap-4 pt-2">
+    <p class="text-sm text-slate-500">{{ 'contractDetail.removeRiskDialog.subtitle' | transloco }}</p>
+    @if (removeRiskRisk(); as risk) {
+      <p class="text-sm text-slate-700">
+        <span class="font-medium">{{ 'contractDetail.riskColumn' | transloco }}:</span>
+        {{ risk.DesFileRisk ?? risk.SRiskProduct.DesShort ?? ('quotes.coverageFallback' | transloco) }}
+      </p>
+    }
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.cancelDialog.endorsementLabel' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="ideProductEndorsement"
+        [options]="productEndorsements()"
+        optionLabel="DesProductEndorsement"
+        optionValue="IdeProductEndorsement"
+        [placeholder]="'contractDetail.cancelDialog.endorsementPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.removeRiskDialog.dateLabel' | transloco }}</label>
+      <input pInputText type="date" formControlName="tstSupplement" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.removeRiskDialog.reasonLabel' | transloco }}</label>
+      <textarea pTextarea formControlName="desSupplement" rows="3" class="w-full"></textarea>
+    </div>
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeRemoveRiskDialog()"></button>
+      <button pButton type="submit" severity="danger" [label]="'contractDetail.removeRiskDialog.confirmButton' | transloco" [loading]="removeRiskSubmitting()"></button>
     </div>
   </form>
 </p-dialog>

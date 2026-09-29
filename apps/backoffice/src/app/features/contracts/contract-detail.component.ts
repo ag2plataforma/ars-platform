@@ -2,10 +2,12 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
+import { CheckboxModule } from 'primeng/checkbox';
 import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
+import { RadioButtonModule } from 'primeng/radiobutton';
 import { TextareaModule } from 'primeng/textarea';
 import { SelectModule } from 'primeng/select';
 import { TableModule, TableRowSelectEvent } from 'primeng/table';
@@ -14,7 +16,7 @@ import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { RiskAttributesService } from '../quotes/risk-attributes.service';
+import { RiskAttributeField, RiskAttributesService } from '../quotes/risk-attributes.service';
 import { CatalogService } from '../../core/catalogs/catalog.service';
 import { CatalogRow } from '../../core/catalogs/catalog.model';
 import {
@@ -29,6 +31,7 @@ import {
 
 const PRODUCT_ENDORSEMENTS_PATH = '/product-rating/product-endorsements';
 const COVERAGE_PLANS_PATH = '/product-rating/coverage-plans';
+const PLAN_PRODUCT_RISKS_PATH = '/product-rating/plan-product-risks';
 
 /** Fila de `GET /product-rating/coverage-plans?idePlanProductRisk=...`
  *  (ver `CoveragePlansService.findAll`/`INCLUDE` en el backend real,
@@ -41,6 +44,55 @@ interface CoveragePlanOption {
   UpperAmount: string;
   SCoverage: { DesCoverage: string };
   SState: { CodState: string };
+}
+
+/** Fila de `GET /product-rating/plan-product-risks` (ver
+ *  `PlanProductRisksService.findAll` en el backend real,
+ *  `product-rating-service`) -- solo los campos que necesita el
+ *  selector del diálogo "Agregar riesgo" (Etapa 4). Filtrado client-side
+ *  por producto (el backend no expone ese filtro en el `GET` de lista),
+ *  mismo criterio que ya usa `CoveragePlansTabComponent`/
+ *  `CalculationRulesTabComponent` en Configuración de productos.
+ *  `IdeRiskProduct` es un campo escalar directo de `SPlanProductRisk`
+ *  (confirmado contra `PlanProductRisksService` real, no hace falta
+ *  ningún include extra) -- se usa para pedir el schema de atributos
+ *  personalizados del riesgo elegido, ver `loadAddRiskAttributeFields`. */
+interface PlanProductRiskOption {
+  IdePlanProductRisk: string;
+  IdeRiskProduct: string;
+  SPlanProduct: { DesShort: string | null; DesPlanProduct: string; SProduct: { CodProduct: string } };
+  SRiskProduct: { DesShort: string | null; DesLarge: string | null };
+  SState: { CodState: string };
+}
+
+/** Mapea un validador de `AttributeContent` a un `ValidatorFn` de
+ *  Angular -- copia adaptada de `buildValidators` en
+ *  `quotes.component.ts` (mismo comportamiento exacto: un
+ *  `validationName` no reconocido se ignora, no bloquea el formulario).
+ *  Duplicada acá en vez de compartida para no tocar `quotes.component.ts`
+ *  (archivo ya commiteado, sin cambios pendientes) por un helper de 20
+ *  líneas -- si en el futuro aparece un tercer lugar que la necesite,
+ *  ahí sí vale la pena moverla a `risk-attributes.service.ts`. */
+function buildAttributeValidators(validators: RiskAttributeField['validators']): ValidatorFn[] {
+  const result: ValidatorFn[] = [];
+  for (const v of validators ?? []) {
+    const props = v.aditionalProps ?? {};
+    switch (v.validationName) {
+      case 'required':
+        result.push(Validators.required);
+        break;
+      case 'min':
+        if (typeof props['min'] === 'number') result.push(Validators.min(props['min']));
+        break;
+      case 'max':
+        if (typeof props['max'] === 'number') result.push(Validators.max(props['max']));
+        break;
+      case 'maxLength':
+        if (typeof props['maxLength'] === 'number') result.push(Validators.maxLength(props['maxLength']));
+        break;
+    }
+  }
+  return result;
 }
 
 /** Un requisito ya "aplanado" con el riesgo al que pertenece, para la
@@ -98,8 +150,10 @@ interface RequirementRow {
     CommonModule,
     ReactiveFormsModule,
     ButtonModule,
+    CheckboxModule,
     DialogModule,
     InputTextModule,
+    RadioButtonModule,
     TextareaModule,
     SelectModule,
     TableModule,
@@ -266,6 +320,75 @@ export class ContractDetailComponent implements OnInit {
   removeCoverageForm = this.buildRemoveCoverageForm();
 
   private buildRemoveCoverageForm() {
+    return this.fb.nonNullable.group({
+      ideProductEndorsement: ['', Validators.required],
+      tstSupplement: ['', Validators.required],
+      desSupplement: ['', Validators.required],
+    });
+  }
+
+  /** Diálogo "Agregar riesgo" (Etapa 4 de "Movimientos y suplementos del
+   *  contrato", ver docs/02-roadmap.md) -- llama a
+   *  `ContractsService.addRisk()`, que en el backend real crea un
+   *  `TFileRisk` nuevo sobre el certificado seleccionado (`selectedFile`).
+   *  Deliberadamente SIN selector de coberturas acá (decisión de negocio
+   *  explícita del usuario, 2026-09-28: "mismo mecanismo" que alta de
+   *  cobertura) -- el riesgo nace vacío y el usuario le agrega
+   *  coberturas después con el botón "Agregar cobertura" (Etapa 3), una
+   *  vez que lo selecciona en la pestaña Coberturas. El desplegable de
+   *  Plan x Riesgo sale de `GET /product-rating/plan-product-risks`,
+   *  filtrado client-side por el producto del contrato -- mismo criterio
+   *  que ya usan las pestañas de Configuración de productos. */
+  readonly addRiskDialogVisible = signal(false);
+  readonly addRiskSubmitting = signal(false);
+  readonly planProductRiskOptions = signal<PlanProductRiskOption[]>([]);
+  readonly availablePlanProductRiskOptions = computed(() =>
+    this.planProductRiskOptions().filter((row) => row.SState.CodState === 'ACTIVO'),
+  );
+  addRiskForm = this.buildAddRiskForm();
+
+  private buildAddRiskForm() {
+    return this.fb.nonNullable.group({
+      idePlanProductRisk: ['', Validators.required],
+      desFileRisk: [''],
+      ideProductEndorsement: ['', Validators.required],
+      tstSupplement: ['', Validators.required],
+      desSupplement: ['', Validators.required],
+    });
+  }
+
+  /** Atributos personalizados del riesgo elegido en "Agregar riesgo" --
+   *  mismo mecanismo que `QuotesComponent.riskFieldsMap`/
+   *  `buildRiskFieldsState` en la Etapa 1 de cotización, simplificado a
+   *  una sola instancia (acá se agrega un riesgo a la vez, no una lista).
+   *  Se recalcula en `loadAddRiskAttributeFields` cada vez que cambia
+   *  `idePlanProductRisk` (ver la suscripción en `openAddRiskDialog`).
+   *  Corrige el bug reportado por el usuario (2026-09-29): "no valida si
+   *  para ese producto es necesario atributos personalizados (tal como
+   *  aparecen en la cotización)" -- antes el riesgo se creaba siempre
+   *  vacío, sin importar si el tipo de riesgo tenía atributos
+   *  configurados. Simplificación deliberada frente a cotización: NO
+   *  replica el gate `resolveActiveSteps`/`STEP_CODE_CUSTOM_ATTRIBUTES`
+   *  (el contrato no expone `CodDistributionChannel`, solo su
+   *  descripción ya resuelta) -- se muestra el form siempre que el
+   *  schema tenga campos, mismo comportamiento "seguro por defecto" que
+   *  ya usa cotización cuando todavía no hay canal elegido. */
+  readonly addRiskAttributeFields = signal<RiskAttributeField[]>([]);
+  readonly addRiskAttributesLoading = signal(false);
+  addRiskAttributesForm = this.fb.group({});
+
+  /** Diálogo "Dar de baja riesgo" (Etapa 4) -- llama a
+   *  `ContractsService.removeRisk()`, que en el backend real cancela
+   *  TODAS las coberturas activas del riesgo (devolución proporcional al
+   *  tiempo, mismo mecanismo que "Baja de cobertura") y lo cierra. No
+   *  pide monto ni cobertura -- solo endoso, fecha y motivo, mismo
+   *  criterio que "Anular contrato"/"Baja de cobertura". */
+  readonly removeRiskDialogVisible = signal(false);
+  readonly removeRiskSubmitting = signal(false);
+  readonly removeRiskRisk = signal<ContractRisk | null>(null);
+  removeRiskForm = this.buildRemoveRiskForm();
+
+  private buildRemoveRiskForm() {
     return this.fb.nonNullable.group({
       ideProductEndorsement: ['', Validators.required],
       tstSupplement: ['', Validators.required],
@@ -598,6 +721,205 @@ export class ContractDetailComponent implements OnInit {
     const refreshedRisk = refreshedFile?.TFileRisk.find((r) => r.IdeFileRisk === risk.IdeFileRisk) ?? null;
     this.selectedFile.set(refreshedFile ?? null);
     this.selectedRisk.set(refreshedRisk);
+  }
+
+  openAddRiskDialog(): void {
+    const c = this.contract();
+    const file = this.selectedFile();
+    if (!c || !file) return;
+    this.addRiskForm = this.buildAddRiskForm();
+    this.resetAddRiskAttributeFields();
+    this.addRiskForm.controls.idePlanProductRisk.valueChanges.subscribe((idePlanProductRisk) => {
+      if (idePlanProductRisk) {
+        this.loadAddRiskAttributeFields(idePlanProductRisk);
+      } else {
+        this.resetAddRiskAttributeFields();
+      }
+    });
+    this.planProductRiskOptions.set([]);
+    this.catalogService.list(PLAN_PRODUCT_RISKS_PATH).subscribe({
+      next: (rows) => {
+        const codProduct = c.SProduct.CodProduct;
+        this.planProductRiskOptions.set(
+          (rows as unknown as PlanProductRiskOption[]).filter((row) => row.SPlanProduct.SProduct.CodProduct === codProduct),
+        );
+      },
+      error: (err: HttpErrorResponse) => this.showError(err),
+    });
+    this.productEndorsements.set([]);
+    this.catalogService.list(PRODUCT_ENDORSEMENTS_PATH, { codProduct: c.SProduct.CodProduct }).subscribe({
+      next: (rows) => this.productEndorsements.set(rows.filter((row) => row.SState?.CodState === 'ACTIVO')),
+      error: (err: HttpErrorResponse) => this.showError(err),
+    });
+    this.addRiskDialogVisible.set(true);
+  }
+
+  private resetAddRiskAttributeFields(): void {
+    this.addRiskAttributesForm = this.fb.group({});
+    this.addRiskAttributeFields.set([]);
+    this.addRiskAttributesLoading.set(false);
+  }
+
+  /** Trae el schema de atributos personalizados del riesgo elegido
+   *  (`RiskAttributesService.getSchema`) y arma el form dinámico -- un
+   *  control por `IdeAttributeProperty`, con los validadores que declare
+   *  cada campo. Mismo mecanismo que
+   *  `QuotesComponent.loadRiskFields`/`buildRiskFieldsState`; ver el
+   *  doc-comment de `addRiskAttributeFields` para la simplificación
+   *  deliberada frente a cotización (sin gate de `resolveActiveSteps`). */
+  private loadAddRiskAttributeFields(idePlanProductRisk: string): void {
+    const option = this.planProductRiskOptions().find((row) => row.IdePlanProductRisk === idePlanProductRisk);
+    this.resetAddRiskAttributeFields();
+    if (!option) return;
+    this.addRiskAttributesLoading.set(true);
+    this.riskAttributes.getSchema(option.IdeRiskProduct).subscribe({
+      next: (schema) => {
+        for (const field of schema.fields) {
+          const initialValue = field.type === 'checkbox' ? false : null;
+          this.addRiskAttributesForm.addControl(
+            field.ideAttributeProperty,
+            this.fb.control(initialValue, buildAttributeValidators(field.validators)),
+          );
+        }
+        this.addRiskAttributeFields.set(schema.fields);
+        this.addRiskAttributesLoading.set(false);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.addRiskAttributesLoading.set(false);
+        this.showError(err);
+      },
+    });
+  }
+
+  addRiskFieldInvalid(field: RiskAttributeField): boolean {
+    const control = this.addRiskAttributesForm.get(field.ideAttributeProperty);
+    return !!control && control.invalid && control.touched;
+  }
+
+  addRiskFirstErrorMessage(field: RiskAttributeField): string {
+    const control = this.addRiskAttributesForm.get(field.ideAttributeProperty);
+    if (!control?.errors) return '';
+    const key = Object.keys(control.errors)[0];
+    return field.validationMessages[key] ?? this.transloco.translate<string>('quotes.invalidValueFallback');
+  }
+
+  closeAddRiskDialog(): void {
+    this.addRiskDialogVisible.set(false);
+  }
+
+  planProductRiskLabel(row: PlanProductRiskOption): string {
+    const plan = row.SPlanProduct.DesShort ?? row.SPlanProduct.DesPlanProduct;
+    const risk = row.SRiskProduct.DesShort ?? row.SRiskProduct.DesLarge ?? '';
+    return `${plan} / ${risk}`;
+  }
+
+  submitAddRisk(): void {
+    const c = this.contract();
+    const file = this.selectedFile();
+    if (!c || !file) return;
+    if (this.addRiskForm.invalid || this.addRiskAttributesForm.invalid || this.addRiskAttributesLoading()) {
+      this.addRiskForm.markAllAsTouched();
+      this.addRiskAttributesForm.markAllAsTouched();
+      return;
+    }
+    const raw = this.addRiskForm.getRawValue();
+    const hasAttributeFields = this.addRiskAttributeFields().length > 0;
+    this.addRiskSubmitting.set(true);
+    this.contracts
+      .addRisk(c.IdeContract, {
+        ideContractFile: file.IdeContractFile,
+        idePlanProductRisk: raw.idePlanProductRisk,
+        desFileRisk: raw.desFileRisk || undefined,
+        ideProductEndorsement: raw.ideProductEndorsement,
+        tstSupplement: raw.tstSupplement,
+        desSupplement: raw.desSupplement,
+        riskAttributeValue: hasAttributeFields ? this.addRiskAttributesForm.getRawValue() : undefined,
+      })
+      .subscribe({
+        next: (result) => {
+          this.afterRiskSupplement(result);
+          this.addRiskSubmitting.set(false);
+          this.closeAddRiskDialog();
+          this.messages.add({
+            severity: 'success',
+            summary: this.transloco.translate('common.done'),
+            detail: this.transloco.translate('contractDetail.addRiskDialog.appliedDetail'),
+          });
+        },
+        error: (err: HttpErrorResponse) => {
+          this.addRiskSubmitting.set(false);
+          this.showError(err);
+        },
+      });
+  }
+
+  openRemoveRiskDialog(risk: ContractRisk): void {
+    const c = this.contract();
+    if (!c) return;
+    this.removeRiskRisk.set(risk);
+    this.removeRiskForm = this.buildRemoveRiskForm();
+    this.productEndorsements.set([]);
+    this.catalogService.list(PRODUCT_ENDORSEMENTS_PATH, { codProduct: c.SProduct.CodProduct }).subscribe({
+      next: (rows) => this.productEndorsements.set(rows.filter((row) => row.SState?.CodState === 'ACTIVO')),
+      error: (err: HttpErrorResponse) => this.showError(err),
+    });
+    this.removeRiskDialogVisible.set(true);
+  }
+
+  closeRemoveRiskDialog(): void {
+    this.removeRiskDialogVisible.set(false);
+    this.removeRiskRisk.set(null);
+  }
+
+  submitRemoveRisk(): void {
+    const c = this.contract();
+    const risk = this.removeRiskRisk();
+    if (!c || !risk) return;
+    if (this.removeRiskForm.invalid) {
+      this.removeRiskForm.markAllAsTouched();
+      return;
+    }
+    const raw = this.removeRiskForm.getRawValue();
+    this.removeRiskSubmitting.set(true);
+    this.contracts
+      .removeRisk(c.IdeContract, {
+        ideFileRisk: risk.IdeFileRisk,
+        ideProductEndorsement: raw.ideProductEndorsement,
+        tstSupplement: raw.tstSupplement,
+        desSupplement: raw.desSupplement,
+      })
+      .subscribe({
+        next: (result) => {
+          this.afterRiskSupplement(result);
+          this.removeRiskSubmitting.set(false);
+          this.closeRemoveRiskDialog();
+          this.messages.add({
+            severity: 'success',
+            summary: this.transloco.translate('common.done'),
+            detail: this.transloco.translate('contractDetail.removeRiskDialog.appliedDetail'),
+          });
+        },
+        error: (err: HttpErrorResponse) => {
+          this.removeRiskSubmitting.set(false);
+          this.showError(err);
+        },
+      });
+  }
+
+  /** Refresca `selectedFile`/`selectedRisk` tras un suplemento de riesgo
+   *  (alta o baja) para que las tablas de Riesgos/Coberturas muestren el
+   *  estado nuevo sin que el usuario tenga que re-navegar -- mismo
+   *  criterio que `afterCoverageSupplement` (Etapa 3), un nivel más
+   *  arriba en la jerarquía. */
+  private afterRiskSupplement(result: ContractDetail): void {
+    this.contract.set(result);
+    const refreshedFile = result.TContractFile.find((f) => f.IdeContractFile === this.selectedFile()?.IdeContractFile);
+    this.selectedFile.set(refreshedFile ?? null);
+    const risk = this.selectedRisk();
+    if (risk) {
+      const refreshedRisk = refreshedFile?.TFileRisk.find((r) => r.IdeFileRisk === risk.IdeFileRisk) ?? null;
+      this.selectedRisk.set(refreshedRisk);
+    }
   }
 
   stateSeverity(codState: string): 'info' | 'warn' | 'success' | 'secondary' {

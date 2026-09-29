@@ -728,6 +728,29 @@
       "reasonLabel": "Motivo del suplemento",
       "confirmButton": "Dar de baja",
       "appliedDetail": "Se dio de baja la cobertura."
+    },
+    "addRiskDialog": {
+      "button": "Agregar riesgo",
+      "title": "Nuevo suplemento: alta de riesgo",
+      "subtitle": "Agrega un riesgo nuevo a este certificado. Después de crearlo, agregale coberturas desde la pestaña Coberturas.",
+      "planRiskLabel": "Plan x Riesgo",
+      "planRiskPlaceholder": "Elegí un plan de riesgo",
+      "riskLabelLabel": "Descripción del riesgo (opcional)",
+      "riskLabelPlaceholder": "Ej: patente, dirección, etc.",
+      "dateLabel": "Fecha del suplemento",
+      "reasonLabel": "Motivo del suplemento",
+      "confirmButton": "Agregar riesgo",
+      "appliedDetail": "Se agregó el riesgo.",
+      "noOptions": "No hay planes de riesgo disponibles para este producto."
+    },
+    "removeRiskDialog": {
+      "button": "Baja",
+      "title": "Nuevo suplemento: baja de riesgo",
+      "subtitle": "Da de baja este riesgo: cancela todas sus coberturas activas (devolución proporcional al tiempo) y lo cierra.",
+      "dateLabel": "Fecha del suplemento",
+      "reasonLabel": "Motivo del suplemento",
+      "confirmButton": "Dar de baja",
+      "appliedDetail": "Se dio de baja el riesgo."
     }
   },
   "rateTables": {
