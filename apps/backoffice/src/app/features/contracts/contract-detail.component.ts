@@ -28,6 +28,20 @@ import {
 } from './contracts.service';
 
 const PRODUCT_ENDORSEMENTS_PATH = '/product-rating/product-endorsements';
+const COVERAGE_PLANS_PATH = '/product-rating/coverage-plans';
+
+/** Fila de `GET /product-rating/coverage-plans?idePlanProductRisk=...`
+ *  (ver `CoveragePlansService.findAll`/`INCLUDE` en el backend real,
+ *  `product-rating-service`) -- solo los campos que necesita el
+ *  selector del diálogo "Agregar cobertura" (Etapa 3). */
+interface CoveragePlanOption {
+  IdeCoveragePlan: string;
+  DesShort: string | null;
+  IndFixedAmount: boolean;
+  UpperAmount: string;
+  SCoverage: { DesCoverage: string };
+  SState: { CodState: string };
+}
 
 /** Un requisito ya "aplanado" con el riesgo al que pertenece, para la
  *  pestaña "Requisitos" (Nivel 1, sin selección previa -- ver el
@@ -199,6 +213,61 @@ export class ContractDetailComponent implements OnInit {
     return this.fb.nonNullable.group({
       ideProductEndorsement: ['', Validators.required],
       newAmount: [0, [Validators.required, Validators.min(0.01)]],
+      tstSupplement: ['', Validators.required],
+      desSupplement: ['', Validators.required],
+    });
+  }
+
+  /** Diálogo "Agregar cobertura" (Etapa 3 de "Movimientos y suplementos
+   *  del contrato", ver docs/02-roadmap.md) -- llama a
+   *  `ContractsService.addCoverage()`, que en el backend real crea una
+   *  `TRiskCoverage` nueva sobre el riesgo seleccionado (`selectedRisk`).
+   *  El desplegable de coberturas sale de
+   *  `GET /product-rating/coverage-plans?idePlanProductRisk=...` (mismo
+   *  endpoint que usa la pestaña "Coberturas" de Configuración de
+   *  productos), filtrado acá en el front para excluir las que el
+   *  riesgo ya tiene activas -- para cambiarles el monto existe
+   *  `changeInsuredAmount`, no tiene sentido duplicar. El monto es
+   *  opcional (decisión explícita del usuario, 2026-09-28): si se deja
+   *  vacío, el backend real usa el default de `SCoveragePlan`. */
+  readonly addCoverageDialogVisible = signal(false);
+  readonly addCoverageSubmitting = signal(false);
+  readonly coveragePlanOptions = signal<CoveragePlanOption[]>([]);
+  readonly availableCoveragePlanOptions = computed(() => {
+    const activeIds = new Set(
+      this.selectedRiskCoverages()
+        .filter((cov) => cov.SState.CodState === 'ACTIVO')
+        .map((cov) => cov.SCoveragePlan.IdeCoveragePlan),
+    );
+    return this.coveragePlanOptions().filter((plan) => plan.SState.CodState === 'ACTIVO' && !activeIds.has(plan.IdeCoveragePlan));
+  });
+  addCoverageForm = this.buildAddCoverageForm();
+
+  private buildAddCoverageForm() {
+    return this.fb.nonNullable.group({
+      ideCoveragePlan: ['', Validators.required],
+      newAmount: this.fb.control<number | null>(null),
+      ideProductEndorsement: ['', Validators.required],
+      tstSupplement: ['', Validators.required],
+      desSupplement: ['', Validators.required],
+    });
+  }
+
+  /** Diálogo "Dar de baja cobertura" (Etapa 3) -- llama a
+   *  `ContractsService.removeCoverage()`, que en el backend real es
+   *  literalmente el mecanismo de `changeInsuredAmount` con
+   *  `newAmount=0` más el cierre de la `TRiskCoverage` (ver el
+   *  doc-comment de `ContractsService.removeCoverage` en el backend
+   *  real). No pide monto -- solo endoso, fecha y motivo, mismo criterio
+   *  que "Anular contrato". */
+  readonly removeCoverageDialogVisible = signal(false);
+  readonly removeCoverageSubmitting = signal(false);
+  readonly removeCoverageCoverage = signal<ContractCoverage | null>(null);
+  removeCoverageForm = this.buildRemoveCoverageForm();
+
+  private buildRemoveCoverageForm() {
+    return this.fb.nonNullable.group({
+      ideProductEndorsement: ['', Validators.required],
       tstSupplement: ['', Validators.required],
       desSupplement: ['', Validators.required],
     });
@@ -403,6 +472,132 @@ export class ContractDetailComponent implements OnInit {
           this.showError(err);
         },
       });
+  }
+
+  openAddCoverageDialog(): void {
+    const c = this.contract();
+    const risk = this.selectedRisk();
+    if (!c || !risk) return;
+    this.addCoverageForm = this.buildAddCoverageForm();
+    this.coveragePlanOptions.set([]);
+    this.catalogService.list(COVERAGE_PLANS_PATH, { idePlanProductRisk: risk.IdePlanProductRisk }).subscribe({
+      next: (rows) => this.coveragePlanOptions.set(rows as unknown as CoveragePlanOption[]),
+      error: (err: HttpErrorResponse) => this.showError(err),
+    });
+    this.productEndorsements.set([]);
+    this.catalogService.list(PRODUCT_ENDORSEMENTS_PATH, { codProduct: c.SProduct.CodProduct }).subscribe({
+      next: (rows) => this.productEndorsements.set(rows.filter((row) => row.SState?.CodState === 'ACTIVO')),
+      error: (err: HttpErrorResponse) => this.showError(err),
+    });
+    this.addCoverageDialogVisible.set(true);
+  }
+
+  closeAddCoverageDialog(): void {
+    this.addCoverageDialogVisible.set(false);
+  }
+
+  submitAddCoverage(): void {
+    const c = this.contract();
+    const risk = this.selectedRisk();
+    if (!c || !risk) return;
+    if (this.addCoverageForm.invalid) {
+      this.addCoverageForm.markAllAsTouched();
+      return;
+    }
+    const raw = this.addCoverageForm.getRawValue();
+    this.addCoverageSubmitting.set(true);
+    this.contracts
+      .addCoverage(c.IdeContract, {
+        ideFileRisk: risk.IdeFileRisk,
+        ideCoveragePlan: raw.ideCoveragePlan,
+        newAmount: raw.newAmount ?? undefined,
+        ideProductEndorsement: raw.ideProductEndorsement,
+        tstSupplement: raw.tstSupplement,
+        desSupplement: raw.desSupplement,
+      })
+      .subscribe({
+        next: (result) => {
+          this.afterCoverageSupplement(result, risk);
+          this.addCoverageSubmitting.set(false);
+          this.closeAddCoverageDialog();
+          this.messages.add({
+            severity: 'success',
+            summary: this.transloco.translate('common.done'),
+            detail: this.transloco.translate('contractDetail.addCoverageDialog.appliedDetail'),
+          });
+        },
+        error: (err: HttpErrorResponse) => {
+          this.addCoverageSubmitting.set(false);
+          this.showError(err);
+        },
+      });
+  }
+
+  openRemoveCoverageDialog(coverage: ContractCoverage): void {
+    const c = this.contract();
+    if (!c) return;
+    this.removeCoverageCoverage.set(coverage);
+    this.removeCoverageForm = this.buildRemoveCoverageForm();
+    this.productEndorsements.set([]);
+    this.catalogService.list(PRODUCT_ENDORSEMENTS_PATH, { codProduct: c.SProduct.CodProduct }).subscribe({
+      next: (rows) => this.productEndorsements.set(rows.filter((row) => row.SState?.CodState === 'ACTIVO')),
+      error: (err: HttpErrorResponse) => this.showError(err),
+    });
+    this.removeCoverageDialogVisible.set(true);
+  }
+
+  closeRemoveCoverageDialog(): void {
+    this.removeCoverageDialogVisible.set(false);
+    this.removeCoverageCoverage.set(null);
+  }
+
+  submitRemoveCoverage(): void {
+    const c = this.contract();
+    const coverage = this.removeCoverageCoverage();
+    const risk = this.selectedRisk();
+    if (!c || !coverage || !risk) return;
+    if (this.removeCoverageForm.invalid) {
+      this.removeCoverageForm.markAllAsTouched();
+      return;
+    }
+    const raw = this.removeCoverageForm.getRawValue();
+    this.removeCoverageSubmitting.set(true);
+    this.contracts
+      .removeCoverage(c.IdeContract, {
+        ideRiskCoverage: coverage.IdeRiskCoverage,
+        ideProductEndorsement: raw.ideProductEndorsement,
+        tstSupplement: raw.tstSupplement,
+        desSupplement: raw.desSupplement,
+      })
+      .subscribe({
+        next: (result) => {
+          this.afterCoverageSupplement(result, risk);
+          this.removeCoverageSubmitting.set(false);
+          this.closeRemoveCoverageDialog();
+          this.messages.add({
+            severity: 'success',
+            summary: this.transloco.translate('common.done'),
+            detail: this.transloco.translate('contractDetail.removeCoverageDialog.appliedDetail'),
+          });
+        },
+        error: (err: HttpErrorResponse) => {
+          this.removeCoverageSubmitting.set(false);
+          this.showError(err);
+        },
+      });
+  }
+
+  /** Refresca `selectedFile`/`selectedRisk` tras un suplemento de
+   *  cobertura (alta o baja) para que la tabla de Coberturas muestre el
+   *  estado nuevo sin que el usuario tenga que re-seleccionar el riesgo
+   *  a mano -- mismo criterio que usaba `submitChangeAmount` (Etapa 2),
+   *  extraído acá a un helper porque ahora lo comparten 3 flujos. */
+  private afterCoverageSupplement(result: ContractDetail, risk: ContractRisk): void {
+    this.contract.set(result);
+    const refreshedFile = result.TContractFile.find((f) => f.IdeContractFile === this.selectedFile()?.IdeContractFile);
+    const refreshedRisk = refreshedFile?.TFileRisk.find((r) => r.IdeFileRisk === risk.IdeFileRisk) ?? null;
+    this.selectedFile.set(refreshedFile ?? null);
+    this.selectedRisk.set(refreshedRisk);
   }
 
   stateSeverity(codState: string): 'info' | 'warn' | 'success' | 'secondary' {

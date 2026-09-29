@@ -5,6 +5,8 @@ import { CreateContractDto } from './dto/create-contract.dto';
 import { TransitionContractStateDto } from './dto/transition-contract-state.dto';
 import { CancelContractDto } from './dto/cancel-contract.dto';
 import { ChangeInsuredAmountDto } from './dto/change-insured-amount.dto';
+import { AddCoverageDto } from './dto/add-coverage.dto';
+import { RemoveCoverageDto } from './dto/remove-coverage.dto';
 import { ListContractsDto } from './dto/list-contracts.dto';
 
 /**
@@ -76,5 +78,23 @@ export class ContractsController {
     @CurrentUser() actor: JwtPayload,
   ) {
     return this.service.changeInsuredAmount(id, dto, actor.code);
+  }
+
+  /**
+   * Suplemento "Alta de cobertura" -- ver el doc-comment de
+   * `ContractsService.addCoverage` para el detalle completo.
+   */
+  @Post('contracts/:id/add-coverage')
+  addCoverage(@Param('id') id: string, @Body() dto: AddCoverageDto, @CurrentUser() actor: JwtPayload) {
+    return this.service.addCoverage(id, dto, actor.code);
+  }
+
+  /**
+   * Suplemento "Baja de cobertura" -- ver el doc-comment de
+   * `ContractsService.removeCoverage` para el detalle completo.
+   */
+  @Post('contracts/:id/remove-coverage')
+  removeCoverage(@Param('id') id: string, @Body() dto: RemoveCoverageDto, @CurrentUser() actor: JwtPayload) {
+    return this.service.removeCoverage(id, dto, actor.code);
   }
 }

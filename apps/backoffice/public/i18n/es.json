@@ -705,6 +705,29 @@
       "reasonLabel": "Motivo del suplemento",
       "confirmButton": "Aplicar suplemento",
       "appliedDetail": "Se aplicó el suplemento."
+    },
+    "addCoverageDialog": {
+      "button": "Agregar cobertura",
+      "title": "Nuevo suplemento: alta de cobertura",
+      "subtitle": "Agrega una cobertura nueva al riesgo seleccionado. Si dejás el monto vacío, se usa el monto por defecto configurado en la cobertura.",
+      "coverageLabel": "Cobertura",
+      "coveragePlaceholder": "Elegí una cobertura",
+      "amountLabel": "Monto asegurado (opcional)",
+      "amountPlaceholder": "Monto por defecto de la cobertura",
+      "dateLabel": "Fecha del suplemento",
+      "reasonLabel": "Motivo del suplemento",
+      "confirmButton": "Agregar cobertura",
+      "appliedDetail": "Se agregó la cobertura.",
+      "noOptions": "No hay coberturas disponibles para agregar a este riesgo."
+    },
+    "removeCoverageDialog": {
+      "button": "Baja",
+      "title": "Nuevo suplemento: baja de cobertura",
+      "subtitle": "Da de baja esta cobertura y devuelve la prima restante proporcional al tiempo.",
+      "dateLabel": "Fecha del suplemento",
+      "reasonLabel": "Motivo del suplemento",
+      "confirmButton": "Dar de baja",
+      "appliedDetail": "Se dio de baja la cobertura."
     }
   },
   "rateTables": {

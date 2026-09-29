@@ -6,6 +6,8 @@ import { RequirementsService } from '../requirements/requirements.service';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { CancelContractDto } from './dto/cancel-contract.dto';
 import { ChangeInsuredAmountDto } from './dto/change-insured-amount.dto';
+import { AddCoverageDto } from './dto/add-coverage.dto';
+import { RemoveCoverageDto } from './dto/remove-coverage.dto';
 import { ListContractsDto } from './dto/list-contracts.dto';
 
 /**
@@ -339,6 +341,148 @@ export class ContractsService {
 
         await this.generateReceipts(ideContract, dto.ideProductEndorsement, actor, tx);
         await this.activateSupplementMovement(newMovement.IdeCoverageMovement, actor, tx);
+      },
+      { timeout: SUPPLEMENT_TRANSACTION_TIMEOUT_MS, maxWait: 10_000 },
+    );
+
+    return this.findOne(ideContract);
+  }
+
+  /**
+   * Suplemento "Alta de cobertura" (Etapa 3 de "Movimientos y
+   * suplementos del contrato", ver docs/02-roadmap.md): agrega una
+   * `SCoveragePlan` nueva a un `TFileRisk` que ya existe en el
+   * contrato -- a diferencia de `changeInsuredAmount`, acá la
+   * `TRiskCoverage` no existe todavía, hay que crearla desde cero.
+   *
+   * Decisión de negocio explícita del usuario (2026-09-28): el monto
+   * asegurado por defecto sale de `SCoveragePlan` (`IndFixedAmount ?
+   * UpperAmount : 0`, mismo criterio que `populateQuoteCoverages` al
+   * cotizar), pero el usuario puede indicar otro monto (`dto.newAmount`).
+   * La tasa (`Rate`) sale siempre de `SCoveragePlan.IndFixedRate ?
+   * UpperRate : 0` -- no se pidió poder editarla acá.
+   *
+   * ORDEN: valida contrato/riesgo/plan de cobertura
+   * (`validateAddCoverage`) -> resuelve la operación por el endoso
+   * (mismo mecanismo que `changeInsuredAmount`) -> crea la
+   * `TRiskCoverage` nueva en Borrador (`createNewRiskCoverage`) ->
+   * movimiento inicial + conceptos vía el MISMO motor de reglas que usa
+   * `create()` para una cobertura recién cotizada (`createInitialMovements`,
+   * reutilizado tal cual -- confirmado que a nivel de `TCoverageMovement`
+   * el motor de reglas nunca calcula `Amount`/`Rate` dinámicamente, solo
+   * los conceptos de prima/impuesto/comisión, así que Amount/Rate
+   * puestos a mano en `createNewRiskCoverage` son exactamente lo que
+   * este paso espera recibir ya resuelto) -> prorrateo al período de
+   * facturación vigente (`setNetPrime`, MISMO método genérico que usa
+   * `create()`, acá solo encuentra el ÚNICO movimiento en Borrador que
+   * se acaba de crear) -> recibo (`generateReceipts`, reutilizado tal
+   * cual) -> recién acá, con el movimiento ya apuntado a su operación
+   * real, `activateNewCoverage` pasa la cobertura y su movimiento/
+   * conceptos de Borrador a Activo (mismo motivo que en
+   * `changeInsuredAmount`: tiene que ser el ÚLTIMO paso).
+   *
+   * Deliberadamente NO replica `resolveContractRequirementsForCoverage`
+   * (los requisitos/checklist de documentación que sí arma
+   * `copyRisksAndCoverages` al contratar) -- queda fuera de este alcance,
+   * a revisar si hace falta en un paso posterior del roadmap.
+   */
+  async addCoverage(ideContract: string, dto: AddCoverageDto, actor: string) {
+    const existing = await this.prisma.tContract.findUnique({ where: { IdeContract: ideContract } });
+    if (!existing) {
+      throw new NotFoundException(`No existe contrato con id "${ideContract}"`);
+    }
+
+    const tstSupplement = new Date(dto.tstSupplement);
+
+    await this.prisma.$transaction(
+      async (tx) => {
+        const { fileRisk, coveragePlan } = await this.validateAddCoverage(
+          ideContract,
+          dto.ideFileRisk,
+          dto.ideCoveragePlan,
+          tstSupplement,
+          tx,
+        );
+
+        const codOperation = await this.resolveOperationCodeByEndorsement(dto.ideProductEndorsement, tx);
+        await this.createContractOperation(ideContract, existing.IdeProduct, codOperation, actor, tx);
+
+        const riskCoverage = await this.createNewRiskCoverage(fileRisk, coveragePlan, dto.newAmount, tstSupplement, actor, tx);
+
+        await this.createInitialMovements(
+          [
+            {
+              ideRiskCoverage: riskCoverage.IdeRiskCoverage,
+              ideFileRisk: fileRisk.IdeFileRisk,
+              ideCoveragePlan: coveragePlan.IdeCoveragePlan,
+              idePlanProductRisk: fileRisk.IdePlanProductRisk,
+              ideProduct: existing.IdeProduct,
+              prime: 0,
+            },
+          ],
+          actor,
+          tx,
+        );
+        await this.setNetPrime(fileRisk.IdeContractFile, actor, tx);
+        await this.generateReceipts(ideContract, dto.ideProductEndorsement, actor, tx);
+
+        const newMovement = await tx.tCoverageMovement.findFirstOrThrow({
+          where: { IdeRiskCoverage: riskCoverage.IdeRiskCoverage },
+        });
+        await this.activateNewCoverage(riskCoverage.IdeRiskCoverage, newMovement.IdeCoverageMovement, actor, tx);
+      },
+      { timeout: SUPPLEMENT_TRANSACTION_TIMEOUT_MS, maxWait: 10_000 },
+    );
+
+    return this.findOne(ideContract);
+  }
+
+  /**
+   * Suplemento "Baja de cobertura" (Etapa 3): cancela UNA `TRiskCoverage`
+   * puntual sin tocar el resto del riesgo/contrato. Decisión de negocio
+   * explícita del usuario (2026-09-28): la devolución de la prima
+   * restante es proporcional al tiempo, MISMO criterio que "Cambio de
+   * monto asegurado" -- de hecho, es literalmente ese mismo mecanismo
+   * con `newAmount=0`: reutiliza `validateSupplementDate`/
+   * `createSupplementMovement`/`setSupplementConcepts`/`setSupplementPrime`/
+   * `activateSupplementMovement` sin ningún cambio (confirmado que la
+   * fórmula de `setSupplementConcepts` -- `ratio = newAmount/oldAmount`
+   * -- da 0 correctamente cuando `newAmount=0`, escalando todos los
+   * conceptos de prima/comisión/impuesto a cero). La única diferencia
+   * real con "cambio de monto" es el paso final, `closeRiskCoverage`:
+   * a diferencia de un cambio de monto (que deja la cobertura `Activo`
+   * con su monto nuevo), acá la cobertura se da de baja de verdad, así
+   * que pasa a `'Modificar'` (mismo operativo/estado que usa
+   * `cancelRiskCoverage` en la anulación total del contrato) para que no
+   * quede mostrada como una cobertura activa con monto en 0 para
+   * siempre.
+   */
+  async removeCoverage(ideContract: string, dto: RemoveCoverageDto, actor: string) {
+    const existing = await this.prisma.tContract.findUnique({ where: { IdeContract: ideContract } });
+    if (!existing) {
+      throw new NotFoundException(`No existe contrato con id "${ideContract}"`);
+    }
+
+    const tstSupplement = new Date(dto.tstSupplement);
+
+    await this.prisma.$transaction(
+      async (tx) => {
+        const { lastMovement } = await this.validateSupplementDate(ideContract, dto.ideRiskCoverage, tstSupplement, tx);
+
+        if (Number(lastMovement.Amount) === 0) {
+          throw new ConflictException('Esta cobertura ya tiene el monto asegurado en 0 -- probablemente ya fue dada de baja');
+        }
+
+        const codOperation = await this.resolveOperationCodeByEndorsement(dto.ideProductEndorsement, tx);
+        await this.createContractOperation(ideContract, existing.IdeProduct, codOperation, actor, tx);
+
+        const newMovement = await this.createSupplementMovement(dto.ideRiskCoverage, lastMovement, tstSupplement, 0, actor, tx);
+        await this.setSupplementConcepts(dto.ideRiskCoverage, lastMovement, newMovement, 0, actor, tx);
+        await this.setSupplementPrime(dto.ideRiskCoverage, newMovement.IdeCoverageMovement, 0, actor, tx);
+
+        await this.generateReceipts(ideContract, dto.ideProductEndorsement, actor, tx);
+        await this.activateSupplementMovement(newMovement.IdeCoverageMovement, actor, tx);
+        await this.closeRiskCoverage(dto.ideRiskCoverage, actor, tx);
       },
       { timeout: SUPPLEMENT_TRANSACTION_TIMEOUT_MS, maxWait: 10_000 },
     );
@@ -2542,6 +2686,165 @@ export class ContractsService {
         data: { IdeState: nextConceptState, UsrModification: actor, TstModification: now },
       });
     }
+  }
+
+  // ==========================================================================
+  // Cascada de los suplementos "Alta de cobertura" / "Baja de cobertura"
+  // -- ver los métodos públicos `addCoverage`/`removeCoverage` (más
+  // arriba) para el doc-comment de orden completo. `removeCoverage`
+  // reutiliza directamente los helpers de "Cambio de monto asegurado"
+  // (arriba); acá solo van los helpers propios de "Alta de cobertura"
+  // más `closeRiskCoverage`, compartido por ambos suplementos.
+  // ==========================================================================
+
+  /**
+   * Valida que el contrato esté `Activo` (con la fecha del suplemento
+   * dentro de su vigencia), que el `TFileRisk` indicado exista, esté
+   * `Activo` y pertenezca a este contrato, que la `SCoveragePlan` exista,
+   * esté `Activo` y pertenezca al MISMO `IdePlanProductRisk` del riesgo
+   * (mismo join que usa `populateQuoteCoverages` al listar las coberturas
+   * disponibles de un plan), y que el riesgo NO tenga ya una
+   * `TRiskCoverage` activa con esa misma `SCoveragePlan` (no tiene
+   * sentido duplicar una cobertura ya vigente -- para cambiarle el monto
+   * existe `changeInsuredAmount`).
+   */
+  private async validateAddCoverage(
+    ideContract: string,
+    ideFileRisk: string,
+    ideCoveragePlan: string,
+    tstSupplement: Date,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const ideActivo = await this.stateMachine.getStateByCode('Activo');
+    const contract = await tx.tContract.findFirst({
+      where: {
+        IdeContract: ideContract,
+        IdeState: ideActivo,
+        TstInitial: { lte: tstSupplement },
+        TstEnd: { gte: tstSupplement },
+      },
+    });
+    if (!contract) {
+      throw new ConflictException(
+        'No se pudo procesar el suplemento: el contrato no está en estado "Activo" o la fecha del suplemento no está dentro de su vigencia',
+      );
+    }
+
+    const fileRisk = await tx.tFileRisk.findFirst({
+      where: { IdeFileRisk: ideFileRisk, IdeState: ideActivo, TContractFile: { IdeContract: ideContract } },
+    });
+    if (!fileRisk) {
+      throw new NotFoundException(`No existe un riesgo activo "${ideFileRisk}" en el contrato "${ideContract}"`);
+    }
+
+    const coveragePlan = await tx.sCoveragePlan.findFirst({
+      where: { IdeCoveragePlan: ideCoveragePlan, IdeState: ideActivo, IdePlanProductRisk: fileRisk.IdePlanProductRisk },
+    });
+    if (!coveragePlan) {
+      throw new NotFoundException(
+        `La cobertura "${ideCoveragePlan}" no está disponible para el plan del riesgo "${ideFileRisk}"`,
+      );
+    }
+
+    const existingCoverage = await tx.tRiskCoverage.findFirst({
+      where: { IdeFileRisk: ideFileRisk, IdeCoveragePlan: ideCoveragePlan, IdeState: ideActivo },
+    });
+    if (existingCoverage) {
+      throw new ConflictException(`El riesgo "${ideFileRisk}" ya tiene activa la cobertura "${ideCoveragePlan}"`);
+    }
+
+    return { fileRisk, coveragePlan };
+  }
+
+  /**
+   * Crea la `TRiskCoverage` nueva en Borrador, con vigencia
+   * `[tstSupplement, TstEnd del TFileRisk]` (no arranca desde el inicio
+   * del contrato -- recién se está agregando hoy) y monto/tasa
+   * resueltos ANTES de pasar por el motor de reglas (que a nivel de
+   * `TCoverageMovement` nunca calcula `Amount`/`Rate` dinámicamente,
+   * confirmado en `createInitialMovements`): `Amount` = `dto.newAmount`
+   * si el usuario indicó uno, si no el default de `SCoveragePlan`
+   * (`IndFixedAmount ? UpperAmount : 0`, mismo criterio que
+   * `populateQuoteCoverages` al cotizar); `Rate` = siempre
+   * `IndFixedRate ? UpperRate : 0` (no se pidió poder editarla).
+   */
+  private async createNewRiskCoverage(
+    fileRisk: { IdeFileRisk: string; TstEnd: Date },
+    coveragePlan: {
+      IdeCoveragePlan: string;
+      IndFixedAmount: boolean;
+      UpperAmount: Prisma.Decimal;
+      IndFixedRate: boolean;
+      UpperRate: Prisma.Decimal;
+    },
+    newAmount: number | undefined,
+    tstSupplement: Date,
+    actor: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const ideRiskCoverageInitial = await this.stateMachine.getInitialState('TRiskCoverage');
+    const amount = newAmount ?? (coveragePlan.IndFixedAmount ? Number(coveragePlan.UpperAmount) : 0);
+    const rate = coveragePlan.IndFixedRate ? Number(coveragePlan.UpperRate) : 0;
+    const now = new Date();
+    return tx.tRiskCoverage.create({
+      data: {
+        IdeFileRisk: fileRisk.IdeFileRisk,
+        IdeCoveragePlan: coveragePlan.IdeCoveragePlan,
+        TstInitial: tstSupplement,
+        TstEnd: fileRisk.TstEnd,
+        Amount: amount,
+        Rate: rate,
+        Prime: 0,
+        IdeState: ideRiskCoverageInitial,
+        UsrCreation: actor,
+        TstCreation: now,
+        UsrModification: actor,
+        TstModification: now,
+      },
+    });
+  }
+
+  /**
+   * Último paso de `addCoverage`: transiciona la `TRiskCoverage` nueva
+   * (Borrador -> Activo) y, reutilizando `activateSupplementMovement`,
+   * su único movimiento inicial y los conceptos de ese movimiento --
+   * tiene que correr DESPUÉS de `generateReceipts`, mismo motivo ya
+   * documentado en `changeInsuredAmount`/`activateSupplementMovement`.
+   */
+  private async activateNewCoverage(
+    ideRiskCoverage: string,
+    ideCoverageMovement: string,
+    actor: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ): Promise<void> {
+    const coverage = await tx.tRiskCoverage.findUniqueOrThrow({ where: { IdeRiskCoverage: ideRiskCoverage } });
+    const nextState = await this.stateMachine.getNextState('TRiskCoverage', coverage.IdeState, 'Activar');
+    await tx.tRiskCoverage.update({
+      where: { IdeRiskCoverage: ideRiskCoverage },
+      data: { IdeState: nextState, UsrModification: actor, TstModification: new Date() },
+    });
+    await this.activateSupplementMovement(ideCoverageMovement, actor, tx);
+  }
+
+  /**
+   * Último paso de `removeCoverage`: transiciona la `TRiskCoverage` de
+   * `Activo` a `'Modificar'` -- mismo operativo/estado que usa
+   * `cancelRiskCoverage` al anular todo el contrato, así que no hace
+   * falta sembrar ninguna `SStateRule` nueva. Sin este paso, la
+   * cobertura quedaría mostrada como "Activo" con monto/prima en 0 para
+   * siempre, en vez de reflejar que fue dada de baja.
+   */
+  private async closeRiskCoverage(
+    ideRiskCoverage: string,
+    actor: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ): Promise<void> {
+    const coverage = await tx.tRiskCoverage.findUniqueOrThrow({ where: { IdeRiskCoverage: ideRiskCoverage } });
+    const nextState = await this.stateMachine.getNextState('TRiskCoverage', coverage.IdeState, 'Modificar');
+    await tx.tRiskCoverage.update({
+      where: { IdeRiskCoverage: ideRiskCoverage },
+      data: { IdeState: nextState, UsrModification: actor, TstModification: new Date() },
+    });
   }
 
   /**

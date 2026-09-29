@@ -159,7 +159,7 @@ export interface ContractOperation {
  *  `TCoverageMovement`. */
 export interface ContractCoverage {
   IdeRiskCoverage: string;
-  SCoveragePlan: { DesShort: string | null; DesLarge: string | null };
+  SCoveragePlan: { IdeCoveragePlan: string; DesShort: string | null; DesLarge: string | null };
   SState: ContractStateRef;
   Amount: DecimalString;
   Rate: DecimalString;
@@ -193,6 +193,11 @@ export interface ContractRisk {
    *  propia descripción, hay que leer `SPlanProduct.DesShort`/
    *  `DesPlanProduct` (ver el comentario del backend real). */
   SPlanProductRisk: { SPlanProduct: { DesShort: string | null; DesPlanProduct: string } };
+  /** Columna escalar propia de `TFileRisk` (no una relación, así que ya
+   *  viene incluida aunque el backend real use `include` en vez de
+   *  `select`) -- la usa el diálogo "Agregar cobertura" (Etapa 3) para
+   *  pedir `GET /product-rating/coverage-plans?idePlanProductRisk=...`. */
+  IdePlanProductRisk: string;
   TstInclusion: string;
   TstInitial: string;
   TstEnd: string;
@@ -272,6 +277,36 @@ export interface ChangeInsuredAmountPayload {
   desSupplement: string;
 }
 
+/** Payload de `POST /contracts/:id/add-coverage` -- mismo shape que
+ *  `AddCoverageDto` en el backend real (`ContractsService.addCoverage`,
+ *  underwriting-service). Suplemento "Alta de cobertura" (Etapa 3 de
+ *  "Movimientos y suplementos del contrato", ver docs/02-roadmap.md):
+ *  agrega una `SCoveragePlan` nueva a un `TFileRisk` que ya existe en el
+ *  contrato. `newAmount` es opcional -- si no se indica, el backend
+ *  real usa el monto por defecto configurado en `SCoveragePlan`
+ *  (`IndFixedAmount ? UpperAmount : 0`). */
+export interface AddCoveragePayload {
+  ideFileRisk: string;
+  ideCoveragePlan: string;
+  newAmount?: number;
+  ideProductEndorsement: string;
+  tstSupplement: string;
+  desSupplement: string;
+}
+
+/** Payload de `POST /contracts/:id/remove-coverage` -- mismo shape que
+ *  `RemoveCoverageDto` en el backend real
+ *  (`ContractsService.removeCoverage`, underwriting-service). Suplemento
+ *  "Baja de cobertura" (Etapa 3): cancela UNA `TRiskCoverage` puntual
+ *  (monto a 0, devolución proporcional al tiempo -- mismo mecanismo que
+ *  `changeInsuredAmount`), sin tocar el resto del riesgo/contrato. */
+export interface RemoveCoveragePayload {
+  ideRiskCoverage: string;
+  ideProductEndorsement: string;
+  tstSupplement: string;
+  desSupplement: string;
+}
+
 /** Cliente HTTP contra `underwriting-service` (`/underwriting/contracts`,
  *  vía el gateway) -- mismo criterio que `QuotingService`: no reutiliza
  *  `CatalogService` porque estas rutas no siguen su shape Cod/Des
@@ -322,5 +357,23 @@ export class ContractsService {
    *  movimiento. */
   changeInsuredAmount(ideContract: string, payload: ChangeInsuredAmountPayload): Observable<ContractDetail> {
     return this.http.post<ContractDetail>(`${this.base}/${ideContract}/change-amount`, payload);
+  }
+
+  /** `POST /contracts/:id/add-coverage` -- suplemento "Alta de cobertura"
+   *  (Etapa 3). El backend real crea la `TRiskCoverage` nueva, su
+   *  movimiento inicial y el recibo correspondiente; acá solo se hace el
+   *  POST y se deja que el caller recargue el detalle (`getContract`)
+   *  para ver la cobertura nueva. */
+  addCoverage(ideContract: string, payload: AddCoveragePayload): Observable<ContractDetail> {
+    return this.http.post<ContractDetail>(`${this.base}/${ideContract}/add-coverage`, payload);
+  }
+
+  /** `POST /contracts/:id/remove-coverage` -- suplemento "Baja de
+   *  cobertura" (Etapa 3). El backend real cancela la `TRiskCoverage`
+   *  (monto a 0, devolución proporcional al tiempo) y genera el recibo
+   *  correspondiente; acá solo se hace el POST y se deja que el caller
+   *  recargue el detalle. */
+  removeCoverage(ideContract: string, payload: RemoveCoveragePayload): Observable<ContractDetail> {
+    return this.http.post<ContractDetail>(`${this.base}/${ideContract}/remove-coverage`, payload);
   }
 }
