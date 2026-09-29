@@ -396,6 +396,15 @@ export class ContractsService {
     return this.http.get<ContractDetail>(`${this.base}/${ideContract}`);
   }
 
+  /** `POST /contracts/:id/activate` -- activa el contrato (acción
+   *  explícita "Activar contrato"). Sin body: el backend real valida que
+   *  el contrato esté en "Borrador" y activa toda la cascada
+   *  (`TContract` -> ... -> `TMovementConcept`); acá solo se hace el POST
+   *  y se deja que el caller recargue el detalle. */
+  activate(ideContract: string): Observable<ContractDetail> {
+    return this.http.post<ContractDetail>(`${this.base}/${ideContract}/activate`, {});
+  }
+
   /** `POST /contracts/:id/cancel` -- anula el contrato (Etapa 1 de
    *  "Movimientos y suplementos del contrato"). El backend real crea el
    *  `TContractOperation` de anulación y aplica las devoluciones según

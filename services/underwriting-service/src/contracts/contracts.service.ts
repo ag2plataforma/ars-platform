@@ -65,9 +65,19 @@ const CREATE_TRANSACTION_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutos
  * copiados (`TContractRequirement`) -> movimiento inicial de cobertura y su
  * prima (`TCoverageMovement`/`TMovementConcept`, vía el mismo
  * `RulesEngineService` ya usado para cotizar) -> recibo de la operación
- * (`TReceipt`/`TReceiptDetail`) -> transición a "Activar" de TODO el árbol
- * del contrato -> transición a "Contratar" de la cotización de origen
- * (marca la cotización como convertida, reutilizando `QuotesService.transitionState`).
+ * (`TReceipt`/`TReceiptDetail`) -> transición a "Contratar" de la cotización
+ * de origen (marca la cotización como convertida, reutilizando
+ * `QuotesService.transitionState`).
+ *
+ * DESVIACIÓN DELIBERADA respecto al `FContract` original (pedido explícito
+ * del usuario, ver "Activar contrato" en docs/02-roadmap.md, diferido el
+ * 2026-09-28 y cerrado ahora): el original transicionaba TODO el árbol del
+ * contrato a "Activar" dentro de esta misma cascada, así que un contrato
+ * nunca quedaba visible en Borrador. Acá se saca ese paso de `create()` a
+ * propósito -- el contrato queda en Borrador al contratarse, y `activate()`
+ * (más abajo) es la acción explícita nueva que lo activa. Reutiliza el
+ * mismo `applyStateCascade` que antes llamaba `activateContractTree`
+ * (eliminado), así que la cascada en sí (los mismos 6 niveles) no cambió.
  *
  * DELIBERADAMENTE AFUERA de esta primera pasada (ver docs/02-roadmap.md):
  *  - `FReceipt('BILLFRACTION')` -- confirmado como stub no-operativo en el
@@ -162,7 +172,6 @@ export class ContractsService {
         await this.setNetPrime(contractFile.IdeContractFile, actor, tx);
         await this.generateReceipts(contract.IdeContract, null, actor, tx);
 
-        await this.activateContractTree(contract.IdeContract, actor, tx);
         await this.quotesService.transitionState(quote.IdeQuote, 'Contratar', actor, tx);
 
         return contract.IdeContract;
@@ -171,6 +180,83 @@ export class ContractsService {
     );
 
     return this.findOne(ideContract);
+  }
+
+  /**
+   * Acción explícita "Activar contrato" (pedido del usuario, ver
+   * "Activar contrato" en docs/02-roadmap.md): activa TODO el árbol del
+   * contrato (`TContract` -> `TContractFile` -> `TFileRisk` ->
+   * `TRiskCoverage` -> `TCoverageMovement` -> `TMovementConcept`, misma
+   * cascada de `applyStateCascade` que antes se disparaba automáticamente
+   * dentro de `create()`) Y, además, a `TContractPerson` (Titular/Tomador,
+   * ver `activateContractPersons`) -- una extensión deliberada sobre la
+   * cascada original: el `FContract` legado (y por eso `applyStateCascade`,
+   * que lo replica fielmente) NUNCA tocaba `TContractPerson` (seedeada
+   * "sin transición" en `seed-contract-testing-fixtures.js`, ver
+   * `NO_TRANSITION_ENTITIES`), así que Titular/Tomador se quedaba en
+   * "Borrador" para siempre aunque el contrato ya estuviera Activo -- gap
+   * que el usuario descubrió al probar "Activar contrato" en pantalla
+   * (2026-09-29). Requiere haber corrido una vez
+   * `packages/database/scripts/seed-activate-contract-person-transition.js`
+   * (agrega la transición `SEED_BORRADOR -> ACTIVO` vía `'Activar'` para
+   * `TContractPerson`, que el seed original nunca configuró; sin esa fila,
+   * `activateContractPersons` fallaría con 404 de transición no
+   * configurada). Solo se puede activar un contrato que esté todavía en su
+   * estado inicial ("Borrador") -- valida contra
+   * `StateMachineService.getInitialState('TContract')` en vez de un código
+   * fijo, mismo criterio que el resto del servicio. `TReceipt`/
+   * `TReceiptDetail` NO forman parte de esta cascada (ver
+   * `applyStateCascade`) -- quedan en su estado inicial, comportamiento
+   * preexistente, no algo que este método deba corregir.
+   */
+  async activate(ideContract: string, actor: string) {
+    const existing = await this.prisma.tContract.findUnique({ where: { IdeContract: ideContract } });
+    if (!existing) {
+      throw new NotFoundException(`No existe contrato con id "${ideContract}"`);
+    }
+
+    const ideBorrador = await this.stateMachine.getInitialState('TContract');
+    if (existing.IdeState !== ideBorrador) {
+      throw new ConflictException(`El contrato "${ideContract}" no está en estado "Borrador"`);
+    }
+
+    await this.prisma.$transaction(
+      async (tx) => {
+        await this.applyStateCascade(ideContract, 'Activar', actor, tx);
+        await this.activateContractPersons(ideContract, actor, tx);
+      },
+      { timeout: CREATE_TRANSACTION_TIMEOUT_MS, maxWait: 10_000 },
+    );
+
+    return this.findOne(ideContract);
+  }
+
+  /**
+   * Transiciona a `Activo` todas las `TContractPerson` (Titular/Tomador)
+   * de este contrato -- ver el doc-comment de `activate()` para el
+   * porqué. Filtra por el estado inicial REAL de la entidad
+   * (`StateMachineService.getInitialState`, no un código fijo) para no
+   * romper si alguna persona ya llegó a Activo por otra vía (reintento,
+   * dato migrado a mano, etc.) -- en ese caso simplemente no la toca, en
+   * vez de fallar buscando una transición Activo->Activo que no existe.
+   */
+  private async activateContractPersons(
+    ideContract: string,
+    actor: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ): Promise<void> {
+    const ideContractPersonBorrador = await this.stateMachine.getInitialState('TContractPerson');
+    const now = new Date();
+    const persons = await tx.tContractPerson.findMany({
+      where: { IdeContract: ideContract, IdeState: ideContractPersonBorrador },
+    });
+    for (const person of persons) {
+      const nextState = await this.stateMachine.getNextState('TContractPerson', person.IdeState, 'Activar');
+      await tx.tContractPerson.update({
+        where: { IdeContractPerson: person.IdeContractPerson },
+        data: { IdeState: nextState, UsrModification: actor, TstModification: now },
+      });
+    }
   }
 
   /**
@@ -905,14 +991,6 @@ export class ContractsService {
     }
     await this.applyStateCascade(ideContract, codOperative, actor);
     return this.findOne(ideContract);
-  }
-
-  private async activateContractTree(
-    ideContract: string,
-    actor: string,
-    tx: Prisma.TransactionClient = this.prisma,
-  ): Promise<void> {
-    await this.applyStateCascade(ideContract, 'Activar', actor, tx);
   }
 
   private async applyStateCascade(

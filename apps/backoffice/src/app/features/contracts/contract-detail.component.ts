@@ -242,6 +242,15 @@ export class ContractDetailComponent implements OnInit {
   readonly canCancel = computed(() => this.contract()?.SState.CodState === 'ACTIVO');
   cancelForm = this.buildCancelForm();
 
+  /** Acción explícita "Activar contrato" -- sin diálogo (no requiere
+   *  datos adicionales, a diferencia de Anular/los suplementos): un solo
+   *  botón que llama directo a `ContractsService.activate()`. Solo
+   *  habilitado mientras el contrato esté en "Borrador" (`SEED_BORRADOR`,
+   *  confirmado contra el seed real de fixtures de contrato) -- una vez
+   *  activo, esta acción ya no aplica. */
+  readonly activateSubmitting = signal(false);
+  readonly canActivate = computed(() => this.contract()?.SState.CodState === 'SEED_BORRADOR');
+
   private buildCancelForm() {
     return this.fb.nonNullable.group({
       ideProductEndorsement: ['', Validators.required],
@@ -531,6 +540,27 @@ export class ContractDetailComponent implements OnInit {
 
   closeCancelDialog(): void {
     this.cancelDialogVisible.set(false);
+  }
+
+  activateContract(): void {
+    const c = this.contract();
+    if (!c) return;
+    this.activateSubmitting.set(true);
+    this.contracts.activate(c.IdeContract).subscribe({
+      next: (result) => {
+        this.activateSubmitting.set(false);
+        this.contract.set(result);
+        this.messages.add({
+          severity: 'success',
+          summary: this.transloco.translate('common.done'),
+          detail: this.transloco.translate('contractDetail.activatedDetail'),
+        });
+      },
+      error: (err: HttpErrorResponse) => {
+        this.activateSubmitting.set(false);
+        this.showError(err);
+      },
+    });
   }
 
   submitCancel(): void {
@@ -1051,6 +1081,8 @@ export class ContractDetailComponent implements OnInit {
         return 'success';
       case 'SEED_ANULADO':
         return 'warn';
+      case 'SEED_BORRADOR':
+        return 'info';
       default:
         return 'secondary';
     }

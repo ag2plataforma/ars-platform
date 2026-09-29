@@ -63,6 +63,16 @@ export class ContractsController {
    * Endpoint dedicado (no el genérico `/state`) porque requiere parámetros
    * propios del endoso de anulación -- ver `CancelContractDto`.
    */
+  /**
+   * Acción explícita "Activar contrato" -- ver el doc-comment de
+   * `ContractsService.activate` para el detalle completo. Sin DTO: no
+   * requiere body, solo el id del contrato.
+   */
+  @Post('contracts/:id/activate')
+  activate(@Param('id') id: string, @CurrentUser() actor: JwtPayload) {
+    return this.service.activate(id, actor.code);
+  }
+
   @Post('contracts/:id/cancel')
   cancel(@Param('id') id: string, @Body() dto: CancelContractDto, @CurrentUser() actor: JwtPayload) {
     return this.service.cancel(id, dto, actor.code);

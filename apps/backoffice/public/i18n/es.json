@@ -694,6 +694,8 @@
       "confirmButton": "Anular contrato",
       "cancelledDetail": "Se anuló el contrato."
     },
+    "activateButton": "Activar contrato",
+    "activatedDetail": "Se activó el contrato.",
     "actionsColumn": "Acciones",
     "changeAmountDialog": {
       "button": "Suplemento",
