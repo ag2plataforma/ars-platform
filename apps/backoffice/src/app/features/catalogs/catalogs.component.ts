@@ -76,8 +76,18 @@ export class CatalogsComponent {
   readonly dialogMode = signal<'create' | 'edit'>('create');
   private editingRow: CatalogRow | null = null;
 
-  /** Opciones de los `select` (cacheadas por `optionsPath`, ej. idiomas para países). */
-  private readonly optionsCache = new Map<string, CatalogRow[]>();
+  /** Opciones de los `select` de campos extra (ej. idiomas para
+   *  países). Deliberadamente SIN cachear por `optionsPath` (a
+   *  diferencia de una versión anterior de este componente): esta misma
+   *  pantalla genérica atiende TODOS los catálogos de un registro
+   *  (`COMMON_CATALOG_REGISTRY`/`PRODUCT_CATALOG_REGISTRY`), así que si
+   *  el usuario crea un valor nuevo en un catálogo (ej. "Idiomas") y sin
+   *  recargar la página cambia a otro que lo referencia (ej. "Países"),
+   *  una lista cacheada quedaría desactualizada -- mismo bug ya evitado
+   *  en `ApplicationRolesTabComponent`/`SiteMapRolesTabComponent`
+   *  (reportado y confirmado por el usuario, 2026-09-29). Se vuelve a
+   *  pedir cada vez que se abre el diálogo de alta/edición
+   *  (`loadExtraFieldOptions`, llamado desde `openCreate`/`openEdit`). */
   readonly extraFieldOptions = signal<Record<string, CatalogRow[]>>({});
 
   form = this.fb.nonNullable.group({
@@ -235,14 +245,8 @@ export class CatalogsComponent {
     const config = this.selected();
     for (const field of config.extraFields ?? []) {
       if (field.type !== 'select' || !field.optionsPath) continue;
-      const cached = this.optionsCache.get(field.optionsPath);
-      if (cached) {
-        this.extraFieldOptions.update((current) => ({ ...current, [field.key]: cached }));
-        continue;
-      }
       this.catalogService.list(field.optionsPath).subscribe({
         next: (options) => {
-          this.optionsCache.set(field.optionsPath!, options);
           this.extraFieldOptions.update((current) => ({ ...current, [field.key]: options }));
         },
       });

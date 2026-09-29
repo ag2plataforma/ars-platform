@@ -82,6 +82,15 @@ export class CoverageGuaranteesTabComponent {
     this.loadPlanProductRisks();
   }
 
+  /** Se vuelve a pedir cada vez que el usuario abre el desplegable
+   *  (`(onShow)` en el template, mismo criterio ya usado en
+   *  `SiteMapRolesTabComponent`/`ApplicationRolesTabComponent`) -- si
+   *  crea un Plan x Riesgo nuevo en la pestaña "Plan x Riesgo" (sibling,
+   *  las 7 pestañas de `ProductsComponent` se montan todas juntas) y
+   *  vuelve acá sin recargar la página, la lista pedida solo en el
+   *  `constructor` quedaría desactualizada (bug reportado y confirmado
+   *  por el usuario, 2026-09-29). Pública por eso mismo, ya no `private`. */
+
   planProductRiskLabel(row: CatalogRow): string {
     const plan = row['SPlanProduct'] as Record<string, unknown> | undefined;
     const riskProduct = row['SRiskProduct'] as Record<string, unknown> | undefined;
@@ -104,7 +113,7 @@ export class CoverageGuaranteesTabComponent {
     return guarantee ? String(guarantee['DesGuarantee'] ?? '') : dash;
   }
 
-  private loadPlanProductRisks(): void {
+  loadPlanProductRisks(): void {
     this.catalogService.list(PLAN_PRODUCT_RISKS_PATH).subscribe({
       next: (all) => {
         const codProduct = this.product()['CodProduct'];
@@ -127,9 +136,25 @@ export class CoverageGuaranteesTabComponent {
       this.coveragePlans.set([]);
       return;
     }
-    this.catalogService.list(COVERAGE_PLANS_PATH, { idePlanProductRisk: id }).subscribe({
+    this.loadCoveragePlanOptions(id);
+  }
+
+  /** Extraído de `onSelectPlanProductRisk` para poder pedirlo de nuevo
+   *  desde `(onShow)` del segundo desplegable sin cambiar la selección
+   *  -- mismo motivo que `loadPlanProductRisks` (bug reportado y
+   *  confirmado por el usuario, 2026-09-29): si se crea una cobertura
+   *  nueva en la pestaña "Coverage Plans" (sibling) mientras este
+   *  Plan x Riesgo ya está elegido acá, la lista pedida una sola vez en
+   *  `onSelectPlanProductRisk` quedaría desactualizada. */
+  private loadCoveragePlanOptions(idePlanProductRisk: string): void {
+    this.catalogService.list(COVERAGE_PLANS_PATH, { idePlanProductRisk }).subscribe({
       next: (rows) => this.coveragePlans.set(rows),
     });
+  }
+
+  reloadCoveragePlanOptions(): void {
+    const id = this.selectedPlanProductRiskId();
+    if (id) this.loadCoveragePlanOptions(id);
   }
 
   onSelectCoveragePlan(id: string | null): void {

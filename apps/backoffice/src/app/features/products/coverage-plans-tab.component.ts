@@ -80,6 +80,15 @@ export class CoveragePlansTabComponent {
     this.loadPlanProductRisks();
   }
 
+  /** Se vuelve a pedir cada vez que el usuario abre el desplegable
+   *  (`(onShow)` en el template, mismo criterio ya usado en
+   *  `SiteMapRolesTabComponent`/`ApplicationRolesTabComponent`) -- si
+   *  crea un Plan x Riesgo nuevo en la pestaña "Plan x Riesgo" (sibling,
+   *  las 7 pestañas de `ProductsComponent` se montan todas juntas) y
+   *  vuelve acá sin recargar la página, la lista pedida solo en el
+   *  `constructor` quedaría desactualizada (bug reportado y confirmado
+   *  por el usuario, 2026-09-29). Pública por eso mismo, ya no `private`. */
+
   planProductRiskLabel(row: CatalogRow): string {
     const plan = row['SPlanProduct'] as Record<string, unknown> | undefined;
     const riskProduct = row['SRiskProduct'] as Record<string, unknown> | undefined;
@@ -88,7 +97,7 @@ export class CoveragePlansTabComponent {
     return `${plan ? String(plan['DesPlanProduct'] ?? '') : dash} / ${risk ? String(risk['DesRisk'] ?? '') : dash}`;
   }
 
-  private loadPlanProductRisks(): void {
+  loadPlanProductRisks(): void {
     this.catalogService.list(PLAN_PRODUCT_RISKS_PATH).subscribe({
       next: (all) => {
         const codProduct = this.product()['CodProduct'];
