@@ -80,6 +80,7 @@
                 <th pSortableColumn="TPerson.DesFirstName"><span class="ars-th-flex">{{ 'contractDetail.nameColumn' | transloco }} <p-sortIcon field="TPerson.DesFirstName" /> <p-columnFilter type="text" field="TPerson.DesFirstName" display="menu" /></span></th>
                 <th pSortableColumn="SPersonRol.DesPersonRol"><span class="ars-th-flex">{{ 'contractDetail.roleColumn' | transloco }} <p-sortIcon field="SPersonRol.DesPersonRol" /></span></th>
                 <th pSortableColumn="SState.DesState"><span class="ars-th-flex">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="SState.DesState" /></span></th>
+                <th>{{ 'contractDetail.actionsColumn' | transloco }}</th>
               </tr>
             </ng-template>
             <ng-template pTemplate="body" let-cp>
@@ -87,11 +88,22 @@
                 <td>{{ cp.TPerson.DesFirstName }} {{ cp.TPerson.DesLastName1 }}</td>
                 <td>{{ cp.SPersonRol.DesPersonRol }}</td>
                 <td><p-tag [value]="cp.SState.DesState" [severity]="stateSeverity(cp.SState.CodState)" /></td>
+                <td>
+                  <button
+                    pButton
+                    type="button"
+                    [text]="true"
+                    size="small"
+                    [disabled]="c.SState.CodState !== 'ACTIVO' || cp.SState.CodState !== 'ACTIVO'"
+                    [label]="'contractDetail.changePersonDialog.button' | transloco"
+                    (click)="openChangePersonDialog(cp)"
+                  ></button>
+                </td>
               </tr>
             </ng-template>
             <ng-template pTemplate="emptymessage">
               <tr>
-                <td colspan="3" class="py-6 text-center text-sm text-slate-500">{{ 'contractDetail.personsEmpty' | transloco }}</td>
+                <td colspan="4" class="py-6 text-center text-sm text-slate-500">{{ 'contractDetail.personsEmpty' | transloco }}</td>
               </tr>
             </ng-template>
           </p-table>
@@ -820,6 +832,84 @@
     <div class="mt-2 flex justify-end gap-2">
       <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeRemoveRiskDialog()"></button>
       <button pButton type="submit" severity="danger" [label]="'contractDetail.removeRiskDialog.confirmButton' | transloco" [loading]="removeRiskSubmitting()"></button>
+    </div>
+  </form>
+</p-dialog>
+
+<!-- ============================== Popup: Cambiar datos Titular/Tomador ============================== -->
+<p-dialog
+  [header]="'contractDetail.changePersonDialog.title' | transloco"
+  [visible]="changePersonDialogVisible()"
+  (visibleChange)="!$event && closeChangePersonDialog()"
+  [modal]="true"
+  [style]="{ width: '32rem' }"
+>
+  <form [formGroup]="changePersonForm" (ngSubmit)="submitChangePersonData()" class="flex flex-col gap-4 pt-2">
+    <p class="text-sm text-slate-500">{{ 'contractDetail.changePersonDialog.subtitle' | transloco }}</p>
+    @if (changePersonLoading()) {
+      <p class="text-xs text-slate-400">{{ 'quotes.loadingRiskData' | transloco }}</p>
+    }
+    <div class="grid grid-cols-2 gap-3">
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.changePersonDialog.firstNameLabel' | transloco }}</label>
+        <input pInputText type="text" formControlName="desFirstName" class="w-full" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.changePersonDialog.lastNameLabel' | transloco }}</label>
+        <input pInputText type="text" formControlName="desLastName1" class="w-full" />
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.changePersonDialog.emailLabel' | transloco }}</label>
+        <input pInputText type="email" formControlName="desEmail" class="w-full" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.changePersonDialog.identificationLabel' | transloco }}</label>
+        <input pInputText type="text" formControlName="numIdentification" class="w-full" />
+      </div>
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.changePersonDialog.addressLine1Label' | transloco }}</label>
+      <input pInputText type="text" formControlName="desAddressLine1" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.changePersonDialog.addressLine2Label' | transloco }}</label>
+      <input pInputText type="text" formControlName="desAddressLine2" class="w-full" />
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.changePersonDialog.postalCodeLabel' | transloco }}</label>
+        <input pInputText type="text" formControlName="codPostal" class="w-full" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.changePersonDialog.mobilePhoneLabel' | transloco }}</label>
+        <input pInputText type="text" formControlName="mobilePhone" class="w-full" />
+      </div>
+    </div>
+    <div class="flex flex-col gap-2 border-t border-slate-200 pt-3">
+      <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.cancelDialog.endorsementLabel' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="ideProductEndorsement"
+        [options]="productEndorsements()"
+        optionLabel="DesProductEndorsement"
+        optionValue="IdeProductEndorsement"
+        [placeholder]="'contractDetail.cancelDialog.endorsementPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.changePersonDialog.dateLabel' | transloco }}</label>
+      <input pInputText type="date" formControlName="tstSupplement" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.changePersonDialog.reasonLabel' | transloco }}</label>
+      <textarea pTextarea formControlName="desSupplement" rows="3" class="w-full"></textarea>
+    </div>
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeChangePersonDialog()"></button>
+      <button pButton type="submit" [label]="'contractDetail.changePersonDialog.confirmButton' | transloco" [loading]="changePersonSubmitting()"></button>
     </div>
   </form>
 </p-dialog>

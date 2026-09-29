@@ -10,6 +10,7 @@ import { AddCoverageDto } from './dto/add-coverage.dto';
 import { RemoveCoverageDto } from './dto/remove-coverage.dto';
 import { AddRiskDto } from './dto/add-risk.dto';
 import { RemoveRiskDto } from './dto/remove-risk.dto';
+import { ChangePersonDataDto } from './dto/change-person-data.dto';
 import { ListContractsDto } from './dto/list-contracts.dto';
 
 /**
@@ -3166,6 +3167,195 @@ export class ContractsService {
         IdeState: nextState,
         UsrModification: actor,
         TstModification: new Date(),
+      },
+    });
+  }
+
+  /**
+   * Suplemento "Cambio de datos Titular/Tomador" (Etapa 5 de
+   * "Movimientos y suplementos del contrato", ver docs/02-roadmap.md) --
+   * a diferencia de `addRisk`/`addCoverage`, esta cascada NO toca ninguna
+   * prima ni `TCoverageMovement`: solo dos cosas en la MISMA transacción,
+   * para que queden atómicas: (1) la operación de contrato de
+   * trazabilidad, igual que cualquier otro suplemento (decisión explícita
+   * del usuario, conversación anterior a esta implementación: "necesito
+   * que quede como endoso aunque no afecte la prima"), y (2) la
+   * actualización real de `TPerson`/`TAddress`/`TContactData` --
+   * accedidos DIRECTAMENTE vía `this.prisma` (mismo esquema compartido
+   * que ya usa `QuotesService.setPerson`/`listPersons`, sin llamada HTTP
+   * a `party-service`) para que ambos pasos queden atómicos de verdad.
+   *
+   * Alcance de campos, decisión explícita del usuario (`AskUserQuestion`,
+   * 2026-09-29): "Contacto + identidad básica" -- ver el doc-comment de
+   * `ChangePersonDataDto` para el detalle completo. El diálogo reemplaza
+   * el VALOR COMPLETO de cada campo (no un patch parcial como
+   * `PersonsService.update` en `party-service`): dirección y teléfono
+   * móvil principal se actualizan si ya existen, o se crean si la
+   * persona todavía no tenía (defensivo -- en la práctica ya deberían
+   * existir, por `assertPersonsReadyForIssuance` al emitir el contrato).
+   */
+  async changePersonData(ideContract: string, dto: ChangePersonDataDto, actor: string) {
+    const existing = await this.prisma.tContract.findUnique({ where: { IdeContract: ideContract } });
+    if (!existing) {
+      throw new NotFoundException(`No existe contrato con id "${ideContract}"`);
+    }
+
+    const tstSupplement = new Date(dto.tstSupplement);
+
+    await this.prisma.$transaction(
+      async (tx) => {
+        const contractPerson = await this.validateChangePersonData(ideContract, dto.ideContractPerson, tstSupplement, tx);
+
+        const codOperation = await this.resolveOperationCodeByEndorsement(dto.ideProductEndorsement, tx);
+        await this.createContractOperation(ideContract, existing.IdeProduct, codOperation, actor, tx);
+
+        await this.updatePersonCoreData(contractPerson.IdePerson, contractPerson.TPerson, dto, actor, tx);
+        await this.upsertMainAddress(contractPerson.IdePerson, dto, actor, tx);
+        await this.upsertMobilePhone(contractPerson.IdePerson, dto.mobilePhone, actor, tx);
+      },
+      { timeout: SUPPLEMENT_TRANSACTION_TIMEOUT_MS, maxWait: 10_000 },
+    );
+
+    return this.findOne(ideContract);
+  }
+
+  private async validateChangePersonData(
+    ideContract: string,
+    ideContractPerson: string,
+    tstSupplement: Date,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const ideActivo = await this.stateMachine.getStateByCode('Activo');
+    const contract = await tx.tContract.findFirst({
+      where: { IdeContract: ideContract, IdeState: ideActivo, TstInitial: { lte: tstSupplement }, TstEnd: { gte: tstSupplement } },
+    });
+    if (!contract) {
+      throw new ConflictException('No se pudo procesar el suplemento: el contrato no está en estado "Activo" o la fecha del suplemento no está dentro de su vigencia');
+    }
+    const contractPerson = await tx.tContractPerson.findFirst({
+      where: { IdeContractPerson: ideContractPerson, IdeContract: ideContract, IdeState: ideActivo },
+      include: { TPerson: true },
+    });
+    if (!contractPerson) {
+      throw new NotFoundException(`No existe una persona activa "${ideContractPerson}" en el contrato "${ideContract}"`);
+    }
+    return contractPerson;
+  }
+
+  private async updatePersonCoreData(
+    idePerson: string,
+    currentPerson: { DesEmail: string; NumIdentification: string | null; IdeIdentificationType: string | null },
+    dto: ChangePersonDataDto,
+    actor: string,
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
+    if (dto.desEmail !== currentPerson.DesEmail) {
+      const emailTaken = await tx.tPerson.findFirst({ where: { DesEmail: dto.desEmail, NOT: { IdePerson: idePerson } } });
+      if (emailTaken) {
+        throw new ConflictException(`Ya existe una persona con el email "${dto.desEmail}"`);
+      }
+    }
+    if (
+      dto.numIdentification !== undefined &&
+      dto.numIdentification !== currentPerson.NumIdentification &&
+      currentPerson.IdeIdentificationType
+    ) {
+      const idTaken = await tx.tPerson.findFirst({
+        where: {
+          NumIdentification: dto.numIdentification,
+          IdeIdentificationType: currentPerson.IdeIdentificationType,
+          NOT: { IdePerson: idePerson },
+        },
+      });
+      if (idTaken) {
+        throw new ConflictException('Ya existe una persona con esa identificación');
+      }
+    }
+
+    await tx.tPerson.update({
+      where: { IdePerson: idePerson },
+      data: {
+        DesFirstName: dto.desFirstName,
+        DesLastName1: dto.desLastName1 ?? null,
+        DesEmail: dto.desEmail,
+        NumIdentification: dto.numIdentification ?? null,
+        UsrModification: actor,
+        TstModification: new Date(),
+      },
+    });
+  }
+
+  private async upsertMainAddress(
+    idePerson: string,
+    dto: ChangePersonDataDto,
+    actor: string,
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
+    const ideActivo = await this.stateMachine.getStateByCode('Activo');
+    const now = new Date();
+    const existingAddress = await tx.tAddress.findFirst({ where: { IdePerson: idePerson, IndMain: true, IdeState: ideActivo } });
+    if (existingAddress) {
+      await tx.tAddress.update({
+        where: { IdeAddress: existingAddress.IdeAddress },
+        data: {
+          DesAddressLine1: dto.desAddressLine1,
+          DesAddressLine2: dto.desAddressLine2 ?? null,
+          CodPostal: dto.codPostal,
+          UsrModification: actor,
+          TstModification: now,
+        },
+      });
+      return;
+    }
+    await tx.tAddress.create({
+      data: {
+        IdePerson: idePerson,
+        DesAddressLine1: dto.desAddressLine1,
+        DesAddressLine2: dto.desAddressLine2 ?? null,
+        CodPostal: dto.codPostal,
+        IndMain: true,
+        IdeState: ideActivo,
+        UsrCreation: actor,
+        TstCreation: now,
+        UsrModification: actor,
+        TstModification: now,
+      },
+    });
+  }
+
+  private async upsertMobilePhone(
+    idePerson: string,
+    mobilePhone: string,
+    actor: string,
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
+    const ideActivo = await this.stateMachine.getStateByCode('Activo');
+    const now = new Date();
+    const existingContact = await tx.tContactData.findFirst({
+      where: { IdePerson: idePerson, IndMain: true, IdeState: ideActivo, SContactClass: { CodContactClass: 'MOBILE_PHONE' } },
+    });
+    if (existingContact) {
+      await tx.tContactData.update({
+        where: { IdeContactData: existingContact.IdeContactData },
+        data: { DesContactData: mobilePhone, UsrModification: actor, TstModification: now },
+      });
+      return;
+    }
+    const contactClass = await tx.sContactClass.findFirst({ where: { CodContactClass: 'MOBILE_PHONE' } });
+    if (!contactClass) {
+      throw new NotFoundException('No existe la clase de contacto "MOBILE_PHONE"');
+    }
+    await tx.tContactData.create({
+      data: {
+        IdePerson: idePerson,
+        IdeContactClass: contactClass.IdeContactClass,
+        DesContactData: mobilePhone,
+        IndMain: true,
+        IdeState: ideActivo,
+        UsrCreation: actor,
+        TstCreation: now,
+        UsrModification: actor,
+        TstModification: now,
       },
     });
   }

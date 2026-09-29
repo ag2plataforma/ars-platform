@@ -48,6 +48,33 @@ export interface CreateContactDataPayload {
   desContactData: string;
 }
 
+/** `TAddress`/`TContactData` activos de una persona, tal como los anida
+ *  `PersonsService.findOne` real (`party-service`) -- mismo shape que
+ *  `PersonAddress`/`PersonContactData` en `quoting.service.ts`
+ *  (duplicado acá a propósito: `core/party` es la capa de más abajo, no
+ *  depende de `features/quotes`). Usado por el diálogo "Cambiar datos"
+ *  de Tomador/Titular (Etapa 5 de "Movimientos y suplementos del
+ *  contrato") para precargar el form con los valores actuales. */
+export interface PersonAddress {
+  IdeAddress: string;
+  DesAddressLine1: string;
+  DesAddressLine2: string | null;
+  CodPostal: string;
+  IndMain: boolean;
+}
+
+export interface PersonContactData {
+  IdeContactData: string;
+  DesContactData: string;
+  IndMain: boolean;
+  SContactClass: { CodContactClass: string; DesContactClass: string };
+}
+
+export interface PersonDetail extends Person {
+  TAddress: PersonAddress[];
+  TContactData: PersonContactData[];
+}
+
 /** Cliente HTTP contra `party-service` (`/party/persons`, vía el
  * gateway): buscar una persona existente (`GET /persons/lookup`,
  * equivalente a `FPerson_GetBy`), crear una nueva (`POST /persons`), y
@@ -98,5 +125,15 @@ export class PersonsService {
 
   addMobilePhone(idePerson: string, desContactData: string): Observable<unknown> {
     return this.addContactData(idePerson, { codContactClass: MOBILE_PHONE_CONTACT_CLASS, desContactData });
+  }
+
+  /** `GET /persons/:id` -- solo lectura, usada para precargar el
+   *  diálogo "Cambiar datos" de Tomador/Titular con los valores
+   *  actuales de la persona (identidad + dirección/teléfono principal
+   *  activos). La escritura real de ese endoso NO pasa por acá -- va
+   *  por `ContractsService.changePersonData` (underwriting-service),
+   *  para que quede atómica junto con la operación de trazabilidad. */
+  findOne(idePerson: string): Observable<PersonDetail> {
+    return this.http.get<PersonDetail>(`${this.base}/${idePerson}`);
   }
 }

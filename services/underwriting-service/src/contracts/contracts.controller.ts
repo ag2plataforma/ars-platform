@@ -9,6 +9,7 @@ import { AddCoverageDto } from './dto/add-coverage.dto';
 import { RemoveCoverageDto } from './dto/remove-coverage.dto';
 import { AddRiskDto } from './dto/add-risk.dto';
 import { RemoveRiskDto } from './dto/remove-risk.dto';
+import { ChangePersonDataDto } from './dto/change-person-data.dto';
 import { ListContractsDto } from './dto/list-contracts.dto';
 
 /**
@@ -116,5 +117,14 @@ export class ContractsController {
   @Post('contracts/:id/remove-risk')
   removeRisk(@Param('id') id: string, @Body() dto: RemoveRiskDto, @CurrentUser() actor: JwtPayload) {
     return this.service.removeRisk(id, dto, actor.code);
+  }
+
+  /**
+   * Suplemento "Cambio de datos Titular/Tomador" -- ver el doc-comment
+   * de `ContractsService.changePersonData` para el detalle completo.
+   */
+  @Post('contracts/:id/change-person-data')
+  changePersonData(@Param('id') id: string, @Body() dto: ChangePersonDataDto, @CurrentUser() actor: JwtPayload) {
+    return this.service.changePersonData(id, dto, actor.code);
   }
 }

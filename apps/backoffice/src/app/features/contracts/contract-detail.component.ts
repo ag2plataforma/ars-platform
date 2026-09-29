@@ -17,6 +17,7 @@ import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { RiskAttributeField, RiskAttributesService } from '../quotes/risk-attributes.service';
+import { MOBILE_PHONE_CONTACT_CLASS, PersonDetail, PersonsService } from '../../core/party/persons.service';
 import { CatalogService } from '../../core/catalogs/catalog.service';
 import { CatalogRow } from '../../core/catalogs/catalog.model';
 import {
@@ -24,6 +25,7 @@ import {
   ContractDetail,
   ContractFile,
   ContractOperation,
+  ContractPerson,
   ContractRequirement,
   ContractRisk,
   ContractsService,
@@ -170,6 +172,7 @@ export class ContractDetailComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly contracts = inject(ContractsService);
   private readonly riskAttributes = inject(RiskAttributesService);
+  private readonly personsService = inject(PersonsService);
   private readonly catalogService = inject(CatalogService);
   private readonly fb = inject(FormBuilder);
   private readonly messages = inject(MessageService);
@@ -390,6 +393,40 @@ export class ContractDetailComponent implements OnInit {
 
   private buildRemoveRiskForm() {
     return this.fb.nonNullable.group({
+      ideProductEndorsement: ['', Validators.required],
+      tstSupplement: ['', Validators.required],
+      desSupplement: ['', Validators.required],
+    });
+  }
+
+  /** Diálogo "Cambiar datos" de Tomador/Titular (Etapa 5 de
+   *  "Movimientos y suplementos del contrato") -- llama a
+   *  `ContractsService.changePersonData()`, que en el backend real
+   *  actualiza `TPerson`/`TAddress`/`TContactData` de la persona elegida
+   *  Y registra la operación de trazabilidad en "Movimientos", aunque no
+   *  toque ninguna prima (decisión explícita del usuario). Alcance de
+   *  campos (`AskUserQuestion`, 2026-09-29): "Contacto + identidad
+   *  básica" -- nombre, apellido, email, DNI, dirección y teléfono
+   *  móvil. El form se precarga con los valores actuales de la persona
+   *  (`PersonsService.findOne`, solo lectura contra `party-service`) al
+   *  abrir el diálogo -- reemplaza el valor completo de cada campo, no
+   *  un patch parcial. */
+  readonly changePersonDialogVisible = signal(false);
+  readonly changePersonSubmitting = signal(false);
+  readonly changePersonLoading = signal(false);
+  readonly changePersonTarget = signal<ContractPerson | null>(null);
+  changePersonForm = this.buildChangePersonForm();
+
+  private buildChangePersonForm() {
+    return this.fb.nonNullable.group({
+      desFirstName: ['', Validators.required],
+      desLastName1: [''],
+      desEmail: ['', [Validators.required, Validators.email]],
+      numIdentification: [''],
+      desAddressLine1: ['', Validators.required],
+      desAddressLine2: [''],
+      codPostal: ['', Validators.required],
+      mobilePhone: ['', Validators.required],
       ideProductEndorsement: ['', Validators.required],
       tstSupplement: ['', Validators.required],
       desSupplement: ['', Validators.required],
@@ -901,6 +938,92 @@ export class ContractDetailComponent implements OnInit {
         },
         error: (err: HttpErrorResponse) => {
           this.removeRiskSubmitting.set(false);
+          this.showError(err);
+        },
+      });
+  }
+
+  openChangePersonDialog(cp: ContractPerson): void {
+    const c = this.contract();
+    if (!c) return;
+    this.changePersonTarget.set(cp);
+    this.changePersonForm = this.buildChangePersonForm();
+    this.changePersonLoading.set(true);
+    this.changePersonDialogVisible.set(true);
+    this.personsService.findOne(cp.IdePerson).subscribe({
+      next: (person: PersonDetail) => {
+        const mainAddress = person.TAddress.find((a) => a.IndMain) ?? person.TAddress[0] ?? null;
+        const mobileContact =
+          person.TContactData.find((cd) => cd.SContactClass.CodContactClass === MOBILE_PHONE_CONTACT_CLASS && cd.IndMain) ??
+          person.TContactData.find((cd) => cd.SContactClass.CodContactClass === MOBILE_PHONE_CONTACT_CLASS) ??
+          null;
+        this.changePersonForm.patchValue({
+          desFirstName: person.DesFirstName,
+          desLastName1: person.DesLastName1 ?? '',
+          desEmail: person.DesEmail,
+          numIdentification: person.NumIdentification ?? '',
+          desAddressLine1: mainAddress?.DesAddressLine1 ?? '',
+          desAddressLine2: mainAddress?.DesAddressLine2 ?? '',
+          codPostal: mainAddress?.CodPostal ?? '',
+          mobilePhone: mobileContact?.DesContactData ?? '',
+        });
+        this.changePersonLoading.set(false);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.changePersonLoading.set(false);
+        this.showError(err);
+      },
+    });
+    this.productEndorsements.set([]);
+    this.catalogService.list(PRODUCT_ENDORSEMENTS_PATH, { codProduct: c.SProduct.CodProduct }).subscribe({
+      next: (rows) => this.productEndorsements.set(rows.filter((row) => row.SState?.CodState === 'ACTIVO')),
+      error: (err: HttpErrorResponse) => this.showError(err),
+    });
+  }
+
+  closeChangePersonDialog(): void {
+    this.changePersonDialogVisible.set(false);
+    this.changePersonTarget.set(null);
+  }
+
+  submitChangePersonData(): void {
+    const c = this.contract();
+    const cp = this.changePersonTarget();
+    if (!c || !cp) return;
+    if (this.changePersonForm.invalid || this.changePersonLoading()) {
+      this.changePersonForm.markAllAsTouched();
+      return;
+    }
+    const raw = this.changePersonForm.getRawValue();
+    this.changePersonSubmitting.set(true);
+    this.contracts
+      .changePersonData(c.IdeContract, {
+        ideContractPerson: cp.IdeContractPerson,
+        ideProductEndorsement: raw.ideProductEndorsement,
+        tstSupplement: raw.tstSupplement,
+        desSupplement: raw.desSupplement,
+        desFirstName: raw.desFirstName,
+        desLastName1: raw.desLastName1 || undefined,
+        desEmail: raw.desEmail,
+        numIdentification: raw.numIdentification || undefined,
+        desAddressLine1: raw.desAddressLine1,
+        desAddressLine2: raw.desAddressLine2 || undefined,
+        codPostal: raw.codPostal,
+        mobilePhone: raw.mobilePhone,
+      })
+      .subscribe({
+        next: (result) => {
+          this.contract.set(result);
+          this.changePersonSubmitting.set(false);
+          this.closeChangePersonDialog();
+          this.messages.add({
+            severity: 'success',
+            summary: this.transloco.translate('common.done'),
+            detail: this.transloco.translate('contractDetail.changePersonDialog.appliedDetail'),
+          });
+        },
+        error: (err: HttpErrorResponse) => {
+          this.changePersonSubmitting.set(false);
           this.showError(err);
         },
       });

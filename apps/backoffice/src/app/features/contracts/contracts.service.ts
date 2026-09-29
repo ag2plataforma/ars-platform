@@ -79,6 +79,7 @@ export interface ContractPersonRef {
 }
 
 export interface ContractPerson {
+  IdeContractPerson: string;
   IdePerson: string;
   SPersonRol: { CodPersonRol: string; DesPersonRol: string };
   TPerson: ContractPersonRef;
@@ -341,6 +342,28 @@ export interface RemoveRiskPayload {
   desSupplement: string;
 }
 
+/** Payload de `POST /contracts/:id/change-person-data` -- mismo shape
+ *  que `ChangePersonDataDto` en el backend real
+ *  (`ContractsService.changePersonData`, underwriting-service).
+ *  Suplemento "Cambio de datos Titular/Tomador" (Etapa 5): reemplaza el
+ *  valor completo de identidad básica + contacto de la persona elegida
+ *  -- no un patch parcial, ver el doc-comment del DTO real para el
+ *  detalle de alcance. */
+export interface ChangePersonDataPayload {
+  ideContractPerson: string;
+  ideProductEndorsement: string;
+  tstSupplement: string;
+  desSupplement: string;
+  desFirstName: string;
+  desLastName1?: string;
+  desEmail: string;
+  numIdentification?: string;
+  desAddressLine1: string;
+  desAddressLine2?: string;
+  codPostal: string;
+  mobilePhone: string;
+}
+
 /** Cliente HTTP contra `underwriting-service` (`/underwriting/contracts`,
  *  vía el gateway) -- mismo criterio que `QuotingService`: no reutiliza
  *  `CatalogService` porque estas rutas no siguen su shape Cod/Des
@@ -425,5 +448,14 @@ export class ContractsService {
    *  caller recargue el detalle. */
   removeRisk(ideContract: string, payload: RemoveRiskPayload): Observable<ContractDetail> {
     return this.http.post<ContractDetail>(`${this.base}/${ideContract}/remove-risk`, payload);
+  }
+
+  /** `POST /contracts/:id/change-person-data` -- suplemento "Cambio de
+   *  datos Titular/Tomador" (Etapa 5). El backend real actualiza
+   *  `TPerson`/`TAddress`/`TContactData` y registra la operación de
+   *  trazabilidad en la misma transacción; acá solo se hace el POST y se
+   *  deja que el caller recargue el detalle. */
+  changePersonData(ideContract: string, payload: ChangePersonDataPayload): Observable<ContractDetail> {
+    return this.http.post<ContractDetail>(`${this.base}/${ideContract}/change-person-data`, payload);
   }
 }

@@ -751,6 +751,23 @@
       "reasonLabel": "Motivo del suplemento",
       "confirmButton": "Dar de baja",
       "appliedDetail": "Se dio de baja el riesgo."
+    },
+    "changePersonDialog": {
+      "button": "Cambiar datos",
+      "title": "Nuevo suplemento: cambio de datos",
+      "subtitle": "Corrige los datos de esta persona. Queda registrado como endoso en Movimientos, aunque no afecte la prima.",
+      "firstNameLabel": "Nombre",
+      "lastNameLabel": "Apellido",
+      "emailLabel": "Email",
+      "identificationLabel": "DNI / identificación",
+      "addressLine1Label": "Dirección",
+      "addressLine2Label": "Dirección (línea 2, opcional)",
+      "postalCodeLabel": "Código postal",
+      "mobilePhoneLabel": "Teléfono móvil",
+      "dateLabel": "Fecha del suplemento",
+      "reasonLabel": "Motivo del suplemento",
+      "confirmButton": "Guardar cambios",
+      "appliedDetail": "Se actualizaron los datos de la persona."
     }
   },
   "rateTables": {
