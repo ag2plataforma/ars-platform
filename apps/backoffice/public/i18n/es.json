@@ -627,7 +627,8 @@
     "paymentFractionColumn": "Fracción de pago",
     "createdColumn": "Emitido",
     "openButton": "Abrir",
-    "emptyState": "No se encontraron contratos."
+    "emptyState": "No se encontraron contratos.",
+    "noRenewTag": "No renovar"
   },
   "renewalsList": {
     "title": "Renovaciones",
@@ -641,6 +642,33 @@
     "markedNoRenewDetail": "Se marcó el contrato para que no se renueve.",
     "unmarkedNoRenewDetail": "Se deshizo la marca de \"no renovar\".",
     "emptyState": "No hay contratos próximos a vencer."
+  },
+  "backgroundJobs": {
+    "title": "Trabajos Programados",
+    "subtitle": "Procesos en segundo plano administrables sin tocar código: horario, activar/desactivar, ejecutar ahora e historial de corridas.",
+    "jobColumn": "Trabajo",
+    "statusColumn": "Estado",
+    "scheduleColumn": "Horario",
+    "configureButton": "Configurar",
+    "runNowButton": "Ejecutar ahora",
+    "historyButton": "Historial",
+    "emptyState": "Todavía no hay trabajos registrados.",
+    "configDialogTitle": "Configurar trabajo",
+    "activeLabel": "Activo",
+    "hourLabel": "Hora del día (0 a 23)",
+    "minuteLabel": "Minuto (0 a 59)",
+    "savedDetail": "Se guardó la configuración del trabajo.",
+    "runNowDetail": "Se ejecutó el trabajo manualmente.",
+    "startColumn": "Inicio",
+    "typeColumn": "Tipo",
+    "succeededColumn": "Éxitos",
+    "failedColumn": "Fallidos",
+    "skippedColumn": "Saltados",
+    "detailColumn": "Detalle",
+    "manualTag": "Manual",
+    "automaticTag": "Automático",
+    "emptyHistoryState": "Todavía no hay corridas registradas.",
+    "schedulePreview": "Se ejecutará todos los días a las {{ time }}."
   },
   "contractDetail": {
     "title": "Detalle de contrato",
@@ -785,7 +813,8 @@
       "reasonLabel": "Motivo del suplemento",
       "confirmButton": "Guardar cambios",
       "appliedDetail": "Se actualizaron los datos de la persona."
-    }
+    },
+    "noRenewTag": "No renovar"
   },
   "rateTables": {
     "title": "Tablas de tarifa",

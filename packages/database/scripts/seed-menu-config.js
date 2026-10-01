@@ -141,6 +141,20 @@ const SITE_MAP_ITEMS = [
   },
   { cod: 'COMISIONES', des: 'Comisiones', order: 9, path: '/comisiones', icon: 'pi-wallet' },
   {
+    // "Trabajos Programados" -- Etapa 3 de "Gestión de renovaciones" (ver
+    // docs/02-roadmap.md), rediseñada a pedido explícito del usuario
+    // (2026-10-01) como pantalla GENÉRICA de administración de jobs en
+    // segundo plano (no específica de renovaciones). Agregado
+    // 2026-10-01, al final del orden existente (no reemplaza ni
+    // renumera nada previo -- el orden real lo da `order`, no la
+    // posición en este archivo).
+    cod: 'TRABAJOS_PROGRAMADOS',
+    des: 'Trabajos Programados',
+    order: 12,
+    path: '/trabajos-programados',
+    icon: 'pi-clock',
+  },
+  {
     // "Siniestros" -- Fase 4, Etapa 1 (2026-09-24): declarar/ver un
     // siniestro + sus catálogos propios (SClaimType/SClaimEvent). Mismo
     // patrón de ítem padre con hijos que CONFIG_PRODUCTOS/FLUJOS_PROCESO.

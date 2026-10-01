@@ -833,6 +833,11 @@ export class ContractsService {
         desPaymentFraction: row.SPaymentFraction.DesPaymentFraction,
         codState: row.SState.CodState,
         desState: row.SState.DesState,
+        /** Pedido explícito del usuario (2026-10-01): visible también en
+         *  el listado general, no solo en la pantalla "Renovaciones" (ver
+         *  `findRenewalCandidates`) -- un operador que entra directo al
+         *  listado de contratos también necesita ver la marca. */
+        indNoRenovar: row.IndNoRenovar,
       })),
       total,
       page: query.page,

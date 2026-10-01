@@ -21,6 +21,9 @@
       <div class="flex items-center gap-2">
         <span class="text-slate-500">{{ 'catalogs.stateColumn' | transloco }}</span>
         <p-tag [value]="c.SState.DesState" [severity]="stateSeverity(c.SState.CodState)" />
+        @if (c.IndNoRenovar) {
+          <p-tag [value]="'contractDetail.noRenewTag' | transloco" severity="warn" icon="pi pi-ban" />
+        }
       </div>
       <div class="flex items-center gap-2">
         <span class="text-slate-500">{{ 'contractDetail.validityLabel' | transloco }}</span>

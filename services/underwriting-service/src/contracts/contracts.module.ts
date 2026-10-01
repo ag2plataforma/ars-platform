@@ -17,5 +17,6 @@ import { ContractsService } from './contracts.service';
   imports: [UnderwritingStateMachineModule, UnderwritingRulesEngineModule, QuotingModule, RequirementsModule],
   controllers: [ContractsController],
   providers: [ContractsService],
+  exports: [ContractsService],
 })
 export class ContractsModule {}

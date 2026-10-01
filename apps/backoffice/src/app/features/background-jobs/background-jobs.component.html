@@ -1,0 +1,163 @@
+<p-toast />
+
+<div class="mx-auto flex max-w-6xl flex-col gap-6">
+  <div>
+    <h1 class="text-lg font-semibold text-slate-900">{{ 'backgroundJobs.title' | transloco }}</h1>
+    <p class="text-sm text-slate-500">{{ 'backgroundJobs.subtitle' | transloco }}</p>
+  </div>
+
+  <p-table [value]="jobs()" [loading]="loading()" dataKey="codJob" styleClass="p-datatable-sm rounded-lg border border-slate-200 text-sm">
+    <ng-template #header>
+      <tr>
+        <th>{{ 'backgroundJobs.jobColumn' | transloco }}</th>
+        <th>{{ 'backgroundJobs.statusColumn' | transloco }}</th>
+        <th>{{ 'backgroundJobs.scheduleColumn' | transloco }}</th>
+        <th class="w-80">{{ 'catalogs.actionsColumn' | transloco }}</th>
+      </tr>
+    </ng-template>
+    <ng-template #body let-item>
+      <tr>
+        <td>{{ item.desJob }}</td>
+        <td>
+          @if (item.indActive) {
+            <p-tag [value]="'common.active' | transloco" severity="success" />
+          } @else {
+            <p-tag [value]="'common.inactive' | transloco" severity="secondary" />
+          }
+        </td>
+        <td>{{ schedule(item) }}</td>
+        <td>
+          <div class="flex gap-2">
+            <button
+              pButton
+              type="button"
+              [text]="true"
+              icon="pi pi-cog"
+              [label]="'backgroundJobs.configureButton' | transloco"
+              (click)="openConfig(item)"
+            ></button>
+            <button
+              pButton
+              type="button"
+              [text]="true"
+              severity="secondary"
+              icon="pi pi-play"
+              [loading]="runningCod() === item.codJob"
+              [label]="'backgroundJobs.runNowButton' | transloco"
+              (click)="runNow(item)"
+            ></button>
+            <button
+              pButton
+              type="button"
+              [text]="true"
+              severity="secondary"
+              icon="pi pi-history"
+              [label]="'backgroundJobs.historyButton' | transloco"
+              (click)="openHistory(item)"
+            ></button>
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="4" class="py-6 text-center text-sm text-slate-500">{{ 'backgroundJobs.emptyState' | transloco }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-dialog
+  [header]="'backgroundJobs.configDialogTitle' | transloco"
+  [visible]="configDialogVisible()"
+  [modal]="true"
+  [style]="{ width: '22rem' }"
+  (visibleChange)="!$event && closeConfig()"
+>
+  <form [formGroup]="configForm" (ngSubmit)="submitConfig()" class="flex flex-col gap-4 pt-2">
+    <div class="flex items-center gap-2">
+      <p-checkbox formControlName="indActive" [binary]="true" inputId="job-ind-active" />
+      <label for="job-ind-active" class="text-sm font-medium text-slate-700">{{ 'backgroundJobs.activeLabel' | transloco }}</label>
+    </div>
+
+    <!-- Pedido explícito del usuario (2026-10-01): dejar claro que esto
+         es UN horario fijo diario (ej. "02:00"), no un intervalo de
+         repetición cada N minutos -- de ahí la vista previa en vivo más
+         abajo (el texto explicativo aparte se sacó a pedido del usuario,
+         la vista previa ya alcanza). Apiladas (no una al lado de la
+         otra) -- con los botones de incremento/decremento de
+         p-inputNumber, dos columnas lado a lado no entraban en el ancho
+         del diálogo y generaban scroll horizontal innecesario. -->
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'backgroundJobs.hourLabel' | transloco }}</label>
+      <p-inputNumber inputId="job-num-hour" formControlName="numHour" [min]="0" [max]="23" [showButtons]="true" styleClass="w-full" inputStyleClass="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'backgroundJobs.minuteLabel' | transloco }}</label>
+      <p-inputNumber inputId="job-num-minute" formControlName="numMinute" [min]="0" [max]="59" [showButtons]="true" styleClass="w-full" inputStyleClass="w-full" />
+    </div>
+
+    <p class="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
+      {{ 'backgroundJobs.schedulePreview' | transloco: { time: previewSchedule() } }}
+    </p>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeConfig()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco" [loading]="configSaving()"></button>
+    </div>
+  </form>
+</p-dialog>
+
+<p-dialog
+  [header]="historyDesJob()"
+  [visible]="historyVisible()"
+  [modal]="true"
+  [style]="{ width: '48rem' }"
+  (visibleChange)="historyVisible.set($event)"
+>
+  <p-table
+    [value]="historyItems()"
+    [lazy]="true"
+    (onLazyLoad)="loadHistory($event)"
+    [paginator]="true"
+    [rows]="20"
+    [totalRecords]="historyTotal()"
+    [loading]="historyLoading()"
+    [showCurrentPageReport]="true"
+    currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+    dataKey="ideBackgroundJobRun"
+    styleClass="p-datatable-sm"
+  >
+    <ng-template #header>
+      <tr>
+        <th>{{ 'backgroundJobs.startColumn' | transloco }}</th>
+        <th>{{ 'backgroundJobs.typeColumn' | transloco }}</th>
+        <th>{{ 'backgroundJobs.succeededColumn' | transloco }}</th>
+        <th>{{ 'backgroundJobs.failedColumn' | transloco }}</th>
+        <th>{{ 'backgroundJobs.skippedColumn' | transloco }}</th>
+        <th>{{ 'backgroundJobs.detailColumn' | transloco }}</th>
+      </tr>
+    </ng-template>
+    <ng-template #body let-run>
+      <tr>
+        <td>{{ run.tstStart | date: 'dd/MM/yyyy HH:mm' }}</td>
+        <td>
+          @if (run.indManual) {
+            <p-tag [value]="'backgroundJobs.manualTag' | transloco" severity="info" />
+          } @else {
+            <p-tag [value]="'backgroundJobs.automaticTag' | transloco" severity="secondary" />
+          }
+        </td>
+        <td>{{ run.numSucceeded }}</td>
+        <td>{{ run.numFailed }}</td>
+        <td>{{ run.numSkipped }}</td>
+        <td class="text-sm text-slate-600">{{ run.desError ?? run.desDetail ?? ('common.dash' | transloco) }}</td>
+      </tr>
+    </ng-template>
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="6" class="py-6 text-center text-sm text-slate-500">{{ 'backgroundJobs.emptyHistoryState' | transloco }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</p-dialog>

@@ -22,6 +22,10 @@ export interface ContractListItem {
   desPaymentFraction: string;
   codState: string;
   desState: string;
+  /** "No renovar" (Etapa 2 de "Gestión de renovaciones") -- visible acá
+   *  además de en la pantalla "Renovaciones", pedido explícito del
+   *  usuario (2026-10-01). */
+  indNoRenovar: boolean;
 }
 
 export interface ContractListResponse {
@@ -264,6 +268,11 @@ export interface ContractDetail {
   SValidityType: { DesValidityType: string };
   SPaymentFraction: { DesPaymentFraction: string };
   SState: ContractStateRef;
+  /** "No renovar" (Etapa 2 de "Gestión de renovaciones") -- columna
+   *  escalar propia de `TContract`, ya viene incluida en el pass-through
+   *  de Prisma (`ContractsService.findOne` no usa `select`). Pedido
+   *  explícito del usuario (2026-10-01): visible en el detalle. */
+  IndNoRenovar: boolean;
   TContractPerson: ContractPerson[];
   TContractBilling: ContractBillingPeriod[];
   TReceipt: ContractReceipt[];

@@ -2498,6 +2498,7 @@ model TContract {
   TstCreation                  DateTime                       @db.Timestamp(6)
   UsrModification              String                         @db.VarChar(60)
   TstModification              DateTime                       @db.Timestamp(6)
+  IndNoRenovar                 Boolean                        @default(false)
   SPaymentFraction             SPaymentFraction               @relation(fields: [IdePaymentFraction], references: [IdePaymentFraction], onDelete: NoAction, onUpdate: NoAction, map: "FK_TContract_SPaymentFraction")
   SProduct                     SProduct                       @relation(fields: [IdeProduct], references: [IdeProduct], onDelete: NoAction, onUpdate: NoAction, map: "FK_TContract_SProduct")
   SState                       SState                         @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_TContract_SState")
@@ -3416,4 +3417,39 @@ model TClaimPayment {
 
   @@index([IdeState], map: "IX_TClaimPayment_SState")
   @@index([IdeApproval], map: "IX_TClaimPayment_TApproval")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model SBackgroundJob {
+  IdeBackgroundJob  String              @id(map: "PK_SBackgroundJob") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  CodJob            String              @unique(map: "UQ_SBackgroundJob_CodJob") @db.VarChar(50)
+  DesJob            String              @db.VarChar(200)
+  IndActive         Boolean             @default(false)
+  NumHour           Int                 @default(2)
+  NumMinute         Int                 @default(0)
+  UsrCreation       String              @db.VarChar(60)
+  TstCreation       DateTime            @db.Timestamp(6)
+  UsrModification   String              @db.VarChar(60)
+  TstModification   DateTime            @db.Timestamp(6)
+  TBackgroundJobRun TBackgroundJobRun[]
+}
+
+model TBackgroundJobRun {
+  IdeBackgroundJobRun String         @id(map: "PK_TBackgroundJobRun") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  IdeBackgroundJob    String         @db.Uuid
+  TstStart            DateTime       @db.Timestamp(6)
+  TstEnd              DateTime       @db.Timestamp(6)
+  IndManual           Boolean
+  NumSucceeded        Int            @default(0)
+  NumFailed           Int            @default(0)
+  NumSkipped          Int            @default(0)
+  DesDetail           String?        @db.VarChar
+  DesError            String?        @db.VarChar
+  UsrCreation         String         @db.VarChar(60)
+  TstCreation         DateTime       @db.Timestamp(6)
+  UsrModification     String         @db.VarChar(60)
+  TstModification     DateTime       @db.Timestamp(6)
+  SBackgroundJob      SBackgroundJob @relation(fields: [IdeBackgroundJob], references: [IdeBackgroundJob], onDelete: NoAction, onUpdate: NoAction, map: "FK_TBackgroundJobRun_SBackgroundJob")
+
+  @@index([IdeBackgroundJob, TstStart(sort: Desc)], map: "IX_TBackgroundJobRun_IdeBackgroundJob_TstStart")
 }

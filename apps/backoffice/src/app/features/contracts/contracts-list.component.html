@@ -73,7 +73,14 @@
         <td>{{ item.desValidityType }}</td>
         <td>{{ item.contractAge }}</td>
         <td>{{ item.desPaymentFraction }}</td>
-        <td><p-tag [value]="item.desState" [severity]="stateSeverity(item.codState)" /></td>
+        <td>
+          <div class="flex items-center gap-2">
+            <p-tag [value]="item.desState" [severity]="stateSeverity(item.codState)" />
+            @if (item.indNoRenovar) {
+              <p-tag [value]="'contractsList.noRenewTag' | transloco" severity="warn" icon="pi pi-ban" />
+            }
+          </div>
+        </td>
         <td>
           <button
             pButton

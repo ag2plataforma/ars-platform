@@ -81,6 +81,18 @@ export const routes: Routes = [
           import('./features/renewals/renewals-list.component').then((m) => m.RenewalsListComponent),
       },
       {
+        // "Trabajos Programados" -- Etapa 3 de "Gestión de renovaciones"
+        // (ver docs/02-roadmap.md), rediseñada a pedido explícito del
+        // usuario (2026-10-01) como pantalla GENÉRICA de administración
+        // de cualquier `BackgroundJobHandler` del backend (horario,
+        // activar/desactivar, "ejecutar ahora", historial) -- hoy solo
+        // "Renovación automática de contratos", pensada para sumar más
+        // jobs sin tocar esta pantalla.
+        path: 'trabajos-programados',
+        loadComponent: () =>
+          import('./features/background-jobs/background-jobs.component').then((m) => m.BackgroundJobsComponent),
+      },
+      {
         // "Siniestros" -- Fase 4, Etapa 1 (2026-09-24). Orden importante:
         // 'nuevo'/'tipos-de-siniestro'/'catalogos' (segmentos literales)
         // ANTES que ':id' -- mismo motivo que 'nueva' en 'cotizacion'.
