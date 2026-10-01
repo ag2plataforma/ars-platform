@@ -1,6 +1,6 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, PrismaService } from '@ars-platform/database';
-import { StateMachineService } from '@ars-platform/shared-common';
+import { EMAIL_SENDER, EmailSender, StateMachineService } from '@ars-platform/shared-common';
 import { TemplatesService } from '../templates/templates.service';
 import { renderDocxTemplate } from '../rendering/render-template';
 import { convertDocxToPdf } from '../rendering/docx-to-pdf';
@@ -53,10 +53,13 @@ interface PersonVariables {
  */
 @Injectable()
 export class GenerationService {
+  private readonly logger = new Logger(GenerationService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly stateMachine: StateMachineService,
     private readonly templates: TemplatesService,
+    @Inject(EMAIL_SENDER) private readonly emailSender: EmailSender,
   ) {}
 
   async generateContractDocument(ideContract: string, codTemplateType: string, idePersonRol: string, actor: string) {
@@ -280,6 +283,78 @@ export class GenerationService {
     return Object.entries(riskAttributeValue)
       .map(([ideAttributeProperty, value]) => `${labelById.get(ideAttributeProperty) ?? ideAttributeProperty}: ${value}`)
       .join(', ');
+  }
+
+  /**
+   * Correo de bienvenida con la póliza en PDF adjunta -- disparado por
+   * `underwriting-service` justo después de "Activar contrato"
+   * (`ContractsService.activate`, ver `DocumentsHttpClient` ahí), vía
+   * llamada HTTP real entre servicios (mismo patrón ya establecido con
+   * `social-impact-service`: `fetch` nativo, reenvía el `Authorization`
+   * del usuario, sin credencial service-to-service aparte).
+   *
+   * Reusa `generateContractDocument` tal cual (mismo documento
+   * "Póliza/Contrato emitido" que ya se puede generar a mano desde la
+   * pestaña Documentos) -- el rol destinatario es SIEMPRE el Titular acá
+   * (es quien recibe el correo), resuelto por código (`SPersonRol.
+   * CodPersonRol==='TITULAR'`) en vez de pedirlo como parámetro.
+   *
+   * Deliberadamente NO lanza si algo falla (plantilla todavía no
+   * configurada para este producto, LibreOffice no disponible, Brevo mal
+   * configurado, Titular sin email) -- "Activar contrato" no debe
+   * quedar bloqueado por un correo de cortesía. Se loguea el motivo y
+   * `DocumentsHttpClient` del otro lado también ignora el resultado,
+   * mismo criterio de "degradación elegante" ya usado en
+   * `EmissionsDevClient`.
+   */
+  async generateWelcomeEmail(ideContract: string, actor: string): Promise<{ sent: boolean; reason?: string }> {
+    try {
+      const titularRole = await this.prisma.sPersonRol.findFirst({ where: { CodPersonRol: 'TITULAR' } });
+      if (!titularRole) {
+        return { sent: false, reason: 'No existe el rol TITULAR en SPersonRol' };
+      }
+
+      const titularPerson = await this.prisma.tContractPerson.findFirst({
+        where: { IdeContract: ideContract, SPersonRol: { CodPersonRol: 'TITULAR' } },
+        include: { TPerson: true },
+      });
+      if (!titularPerson?.TPerson.DesEmail) {
+        return { sent: false, reason: 'El contrato no tiene Titular con email resuelto' };
+      }
+
+      const { ideContractOperationDocument } = await this.generateContractDocument(
+        ideContract,
+        'CONTRATO',
+        titularRole.IdePersonRol,
+        actor,
+      );
+      const { bytes, desFileName } = await this.getFile(ideContractOperationDocument);
+      const contract = await this.prisma.tContract.findUniqueOrThrow({
+        where: { IdeContract: ideContract },
+        select: { NumContract: true },
+      });
+
+      const desTitular = [titularPerson.TPerson.DesFirstName, titularPerson.TPerson.DesLastName1]
+        .filter(Boolean)
+        .join(' ');
+
+      await this.emailSender.send({
+        to: titularPerson.TPerson.DesEmail,
+        subject: `¡Bienvenido a ARS! Tu póliza ${contract.NumContract} ya está activa`,
+        html: `
+          <p>Hola ${desTitular || 'cliente'},</p>
+          <p>Tu póliza <strong>${contract.NumContract}</strong> ya está activa. Te adjuntamos el documento con las condiciones particulares.</p>
+          <p>¡Gracias por confiar en nosotros!</p>
+        `,
+        attachments: [{ name: desFileName, contentBase64: bytes.toString('base64') }],
+      });
+
+      return { sent: true };
+    } catch (err) {
+      const reason = (err as Error).message;
+      this.logger.error(`No se pudo enviar el correo de bienvenida del contrato "${ideContract}": ${reason}`);
+      return { sent: false, reason };
+    }
   }
 
   async listForContract(ideContract: string) {

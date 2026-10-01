@@ -36,4 +36,12 @@ export class GenerationController {
   listForContract(@Param('ideContract') ideContract: string) {
     return this.service.listForContract(ideContract);
   }
+
+  /** Llamado por `underwriting-service` (`DocumentsHttpClient`) justo
+   *  después de "Activar contrato" -- ver el doc-comment de
+   *  `GenerationService.generateWelcomeEmail` para el detalle completo. */
+  @Post(':ideContract/welcome-email')
+  sendWelcomeEmail(@Param('ideContract') ideContract: string, @CurrentUser() actor: JwtPayload) {
+    return this.service.generateWelcomeEmail(ideContract, actor.code);
+  }
 }

@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { join } from 'path';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '@ars-platform/database';
-import { AuthModule } from '@ars-platform/shared-common';
+import { AuthModule, EmailModule } from '@ars-platform/shared-common';
 import { HealthController } from './health/health.controller';
 import { OperationProductsModule } from './operation-products/operation-products.module';
 import { TemplatesModule } from './templates/templates.module';
@@ -32,6 +32,7 @@ import { GenerationModule } from './generation/generation.module';
     }),
     PrismaModule,
     AuthModule, // guard JWT global — mismo JWT_SECRET que iam-service, este servicio solo VERIFICA tokens
+    EmailModule, // EMAIL_SENDER (Brevo) -- correo de bienvenida con la póliza adjunta al activar un contrato
     OperationProductsModule,
     TemplatesModule,
     GenerationModule,

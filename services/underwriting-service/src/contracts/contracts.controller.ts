@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Patch, Post, Query } from '@nestjs/common';
 import { CurrentUser, JwtPayload } from '@ars-platform/shared-common';
 import { ContractsService } from './contracts.service';
 import { CreateContractDto } from './dto/create-contract.dto';
@@ -82,8 +82,12 @@ export class ContractsController {
    * requiere body, solo el id del contrato.
    */
   @Post('contracts/:id/activate')
-  activate(@Param('id') id: string, @CurrentUser() actor: JwtPayload) {
-    return this.service.activate(id, actor.code);
+  activate(
+    @Param('id') id: string,
+    @CurrentUser() actor: JwtPayload,
+    @Headers('authorization') authorization: string,
+  ) {
+    return this.service.activate(id, actor.code, authorization);
   }
 
   /**

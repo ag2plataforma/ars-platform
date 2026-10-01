@@ -3,6 +3,7 @@ import { Prisma, PrismaService } from '@ars-platform/database';
 import { RulesEngineService, StateMachineService } from '@ars-platform/shared-common';
 import { QuotesService } from '../quoting/quotes.service';
 import { RequirementsService } from '../requirements/requirements.service';
+import { DocumentsHttpClient } from '../documents/documents-http.client';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { CancelContractDto } from './dto/cancel-contract.dto';
 import { ChangeInsuredAmountDto } from './dto/change-insured-amount.dto';
@@ -125,6 +126,7 @@ export class ContractsService {
     private readonly rulesEngine: RulesEngineService,
     private readonly quotesService: QuotesService,
     private readonly requirementsService: RequirementsService,
+    private readonly documentsHttpClient: DocumentsHttpClient,
   ) {}
 
   /**
@@ -222,7 +224,7 @@ export class ContractsService {
    * `applyStateCascade`) -- quedan en su estado inicial, comportamiento
    * preexistente, no algo que este método deba corregir.
    */
-  async activate(ideContract: string, actor: string) {
+  async activate(ideContract: string, actor: string, authorization?: string) {
     const existing = await this.prisma.tContract.findUnique({ where: { IdeContract: ideContract } });
     if (!existing) {
       throw new NotFoundException(`No existe contrato con id "${ideContract}"`);
@@ -240,6 +242,17 @@ export class ContractsService {
       },
       { timeout: CREATE_TRANSACTION_TIMEOUT_MS, maxWait: 10_000 },
     );
+
+    // Correo de bienvenida con la póliza adjunta (ver docs/02-roadmap.md,
+    // pedido explícito del usuario 2026-10-01) -- DESPUÉS de que la
+    // transacción de activación ya confirmó, y sin bloquear la respuesta
+    // de este endpoint si falla (ver doc-comment de `DocumentsHttpClient`:
+    // ese cliente nunca lanza, solo loguea). Si no llega `authorization`
+    // (llamador interno sin JWT de usuario, ej. un futuro job automático),
+    // se salta en silencio en vez de llamar con un header inválido.
+    if (authorization) {
+      await this.documentsHttpClient.sendWelcomeEmail(ideContract, authorization);
+    }
 
     return this.findOne(ideContract);
   }

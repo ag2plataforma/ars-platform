@@ -41,6 +41,12 @@ export class BrevoEmailSender implements EmailSender {
         to: [{ email: message.to }],
         subject: message.subject,
         htmlContent: message.html,
+        // Campo real de la API de Brevo para adjuntos -- confirmado
+        // contra su documentación oficial antes de implementarlo:
+        // `attachment: [{ name, content (base64) }]`.
+        ...(message.attachments?.length
+          ? { attachment: message.attachments.map((a) => ({ name: a.name, content: a.contentBase64 })) }
+          : {}),
       }),
     });
 

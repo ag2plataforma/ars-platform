@@ -1,7 +1,18 @@
+export interface EmailAttachment {
+  /** Nombre de archivo tal como lo verá el destinatario (ej. "Poliza.pdf"). */
+  name: string;
+  /** Contenido del archivo codificado en base64. */
+  contentBase64: string;
+}
+
 export interface EmailMessage {
   to: string;
   subject: string;
   html: string;
+  /** Opcional -- hoy usado por `documents-service` para adjuntar el PDF
+   *  de la póliza al correo de bienvenida al activar un contrato (ver
+   *  `GenerationService.generateWelcomeEmail`). */
+  attachments?: EmailAttachment[];
 }
 
 /**
