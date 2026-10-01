@@ -3993,6 +3993,32 @@ export class ContractsService {
     }
     const ideReceiptType = await this.resolveReceiptType(receiptTypeCode);
 
+    /**
+     * Comisión de cartera (renovación) -- backlog item 3 (depende del
+     * item 2, "Gestión de renovaciones", ya cerrado). ANTES de esto, la
+     * comisión de CUALQUIER recibo (nuevo, suplemento o renovación) se
+     * resolvía siempre contra `operationProduct.IdeProcess` -- el
+     * proceso FIJO configurado para RECEGENE en este producto
+     * (normalmente "Contratación"), el mismo para los tres casos. Una
+     * renovación terminaba pagando exactamente la misma comisión que una
+     * venta nueva, sin forma de configurar una tasa de cartera distinta
+     * (más baja, como es la práctica real del seguro). `SCommission` ya
+     * soporta una fila distinta por `IdeProcess` (`@@unique([IdeCommissionTable,
+     * IdeProcess, NumMovement])`) y la pantalla de Comisiones ya permite
+     * elegir cualquier proceso al darla de alta -- lo único que faltaba
+     * era resolver contra el proceso correcto. Para una renovación, se
+     * usa en cambio el proceso real de la operación `RENOVGENE` (el
+     * `SProcess` "RENOVACION" ya existente, ver Etapa 1 de "Gestión de
+     * renovaciones") -- Nuevo/Suplemento no cambian, siguen contra el
+     * proceso fijo de RECEGENE, igual que siempre.
+     */
+    const commissionOperationProduct =
+      receiptTypeCode === 'REN'
+        ? await tx.sOperationProduct.findFirstOrThrow({
+            where: { IdeProduct: contract.IdeProduct, SOperation: { CodOperation: 'RENOVGENE' } },
+          })
+        : operationProduct;
+
     const movements = await tx.tCoverageMovement.findMany({
       where: { IdeContractOperation: contractOperation.IdeContractOperation },
       include: {
@@ -4073,7 +4099,7 @@ export class ContractsService {
             ideProduct: contract.IdeProduct,
             idePlanProductRisk: movement.TRiskCoverage.TFileRisk.IdePlanProductRisk,
             ideCoveragePlan: movement.TRiskCoverage.IdeCoveragePlan,
-            ideProcess: operationProduct.IdeProcess,
+            ideProcess: commissionOperationProduct.IdeProcess,
           }, tx);
           const netValue = Number(concept.ConceptNetValue);
           let commissionValue = 0;
