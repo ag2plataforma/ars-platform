@@ -51,7 +51,9 @@
     "start:social-impact": "npm run build:libs && npm run build --workspace=services/social-impact-service && node services/social-impact-service/dist/main.js",
     "start:social-impact:watch": "npm run build:libs && npm run start:dev --workspace=services/social-impact-service",
     "start:gateway": "npm run build:libs && npm run build --workspace=services/gateway && node services/gateway/dist/main.js",
-    "start:gateway:watch": "npm run build:libs && npm run start:dev --workspace=services/gateway"
+    "start:gateway:watch": "npm run build:libs && npm run start:dev --workspace=services/gateway",
+    "start:documents": "npm run build:libs && npm run build --workspace=services/documents-service && node services/documents-service/dist/main.js",
+    "start:documents:watch": "npm run build:libs && npm run start:dev --workspace=services/documents-service"
   },
   "devDependencies": {
     "pg": "^8.13.0"

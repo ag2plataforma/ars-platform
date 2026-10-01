@@ -1,0 +1,136 @@
+<p-toast />
+
+<div class="flex flex-col gap-4 p-4">
+  <div>
+    <h1 class="text-xl font-semibold text-slate-800">{{ 'documentTemplates.title' | transloco }}</h1>
+    <p class="text-sm text-slate-500">{{ 'documentTemplates.subtitle' | transloco }}</p>
+  </div>
+
+  <div class="flex flex-wrap items-end gap-3">
+    <div class="flex flex-col gap-1">
+      <label class="text-sm text-slate-600">{{ 'documentTemplates.productLabel' | transloco }}</label>
+      <p-select
+        [options]="products()"
+        optionLabel="DesProduct"
+        optionValue="IdeProduct"
+        [ngModel]="selectedProduct()"
+        (ngModelChange)="onProductChange($event)"
+        [style]="{ width: '18rem' }"
+        [placeholder]="'documentTemplates.productPlaceholder' | transloco"
+      />
+    </div>
+
+    <div class="flex flex-col gap-1">
+      <label class="text-sm text-slate-600">{{ 'documentTemplates.operationLabel' | transloco }}</label>
+      <p-select
+        [options]="operationProducts()"
+        optionLabel="desOperation"
+        optionValue="ideOperationProduct"
+        [ngModel]="selectedOperationProduct()"
+        (ngModelChange)="onOperationProductChange($event)"
+        [disabled]="!selectedProduct()"
+        [style]="{ width: '18rem' }"
+        [placeholder]="'documentTemplates.operationPlaceholder' | transloco"
+      />
+    </div>
+
+    <p-button
+      [label]="'documentTemplates.uploadButton' | transloco"
+      icon="pi pi-upload"
+      [disabled]="!selectedOperationProduct()"
+      (onClick)="openUpload()"
+    />
+  </div>
+
+  <p-table [value]="templates()" [loading]="loadingTemplates()" styleClass="rounded-lg border border-slate-200 text-sm">
+    <ng-template pTemplate="header">
+      <tr>
+        <th>{{ 'documentTemplates.typeColumn' | transloco }}</th>
+        <th>{{ 'documentTemplates.roleColumn' | transloco }}</th>
+        <th>{{ 'documentTemplates.fileColumn' | transloco }}</th>
+        <th>{{ 'documentTemplates.orderColumn' | transloco }}</th>
+        <th></th>
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="body" let-row>
+      <tr>
+        <td>{{ row.codTemplateType }}</td>
+        <td>{{ row.desPersonRol }}</td>
+        <td>{{ row.desFileName }}</td>
+        <td>{{ row.numOrder }}</td>
+        <td>
+          <p-button
+            [label]="'documentTemplates.replaceButton' | transloco"
+            icon="pi pi-refresh"
+            severity="secondary"
+            [text]="true"
+            (onClick)="openReplace(row)"
+          />
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="emptymessage">
+      <tr>
+        <td colspan="5" class="py-6 text-center text-sm text-slate-500">
+          {{ selectedOperationProduct() ? ('documentTemplates.emptyState' | transloco) : ('documentTemplates.selectFirst' | transloco) }}
+        </td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-dialog
+  [visible]="uploadDialogVisible()"
+  (visibleChange)="!$event && closeUpload()"
+  [modal]="true"
+  [style]="{ width: '24rem' }"
+  [header]="'documentTemplates.uploadDialogTitle' | transloco"
+>
+  <form [formGroup]="uploadForm" class="flex flex-col gap-3">
+    <div class="flex flex-col gap-1">
+      <label class="text-sm text-slate-600">{{ 'documentTemplates.typeLabel' | transloco }}</label>
+      <p-select [options]="templateTypes" optionLabel="label" optionValue="value" formControlName="codTemplateType" appendTo="body" />
+    </div>
+
+    <div class="flex flex-col gap-1">
+      <label class="text-sm text-slate-600">{{ 'documentTemplates.roleLabel' | transloco }}</label>
+      <p-select [options]="personRoles()" optionLabel="desPersonRol" optionValue="idePersonRol" formControlName="idePersonRol" appendTo="body" />
+    </div>
+
+    <div class="flex flex-col gap-1">
+      <label class="text-sm text-slate-600">{{ 'documentTemplates.orderLabel' | transloco }}</label>
+      <p-inputNumber formControlName="numOrder" [min]="1" [showButtons]="true" />
+    </div>
+
+    <div class="flex flex-col gap-1">
+      <label class="text-sm text-slate-600">{{ 'documentTemplates.fileLabel' | transloco }}</label>
+      <input type="file" accept=".docx" (change)="onFileSelected($event)" class="text-sm" />
+    </div>
+  </form>
+
+  <ng-template pTemplate="footer">
+    <p-button [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (onClick)="closeUpload()" />
+    <p-button [label]="'common.save' | transloco" [loading]="uploading()" (onClick)="submitUpload()" />
+  </ng-template>
+</p-dialog>
+
+<p-dialog
+  [visible]="replaceDialogVisible()"
+  (visibleChange)="!$event && closeReplace()"
+  [modal]="true"
+  [style]="{ width: '24rem' }"
+  [header]="'documentTemplates.replaceDialogTitle' | transloco"
+>
+  <div class="flex flex-col gap-3">
+    <p class="text-sm text-slate-600">{{ replaceTarget?.desFileName }}</p>
+    <div class="flex flex-col gap-1">
+      <label class="text-sm text-slate-600">{{ 'documentTemplates.fileLabel' | transloco }}</label>
+      <input type="file" accept=".docx" (change)="onReplaceFileSelected($event)" class="text-sm" />
+    </div>
+  </div>
+
+  <ng-template pTemplate="footer">
+    <p-button [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (onClick)="closeReplace()" />
+    <p-button [label]="'common.save' | transloco" [loading]="replacing()" (onClick)="submitReplace()" />
+  </ng-template>
+</p-dialog>

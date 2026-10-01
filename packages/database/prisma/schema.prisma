@@ -1131,6 +1131,7 @@ model SOperationProductTemplate {
   TstCreation                 DateTime          @db.Timestamp(6)
   UsrModification             String            @db.VarChar(60)
   TstModification             DateTime          @db.Timestamp(6)
+  TemplateFile                Bytes?
   SOperationProduct           SOperationProduct @relation(fields: [IdeOperationProduct], references: [IdeOperationProduct], onDelete: NoAction, onUpdate: NoAction, map: "FK_SOperationProductTemplate_SOperationProduct")
   SPersonRol                  SPersonRol        @relation(fields: [IdePersonRol], references: [IdePersonRol], onDelete: NoAction, onUpdate: NoAction, map: "FK_SOperationProductTemplate_SPersonRol")
   SState                      SState            @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_SOperationProductTemplate_SState")
@@ -2646,6 +2647,8 @@ model TContractOperationDocument {
   TstCreation                  DateTime           @db.Timestamp(6)
   UsrModification              String             @db.VarChar(60)
   TstModification              DateTime           @db.Timestamp(6)
+  PdfData                      Bytes?
+  DesFileName                  String?            @db.VarChar(255)
   TContractOperation           TContractOperation @relation(fields: [IdeContractOperation], references: [IdeContractOperation], onDelete: NoAction, onUpdate: NoAction, map: "FK_TContractOperationDocument_TContractOperation")
   SState                       SState             @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_TContractRequirement_SState")
 

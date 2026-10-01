@@ -13,6 +13,7 @@ export const PROXY_TARGETS = {
   claims: { envVar: 'CLAIMS_SERVICE_URL', defaultUrl: 'http://localhost:3006' },
   billing: { envVar: 'BILLING_SERVICE_URL', defaultUrl: 'http://localhost:3007' },
   'social-impact': { envVar: 'SOCIAL_IMPACT_SERVICE_URL', defaultUrl: 'http://localhost:3008' },
+  documents: { envVar: 'DOCUMENTS_SERVICE_URL', defaultUrl: 'http://localhost:3009' },
 } as const;
 
 export type ProxyServiceKey = keyof typeof PROXY_TARGETS;

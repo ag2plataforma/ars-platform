@@ -155,6 +155,15 @@ const SITE_MAP_ITEMS = [
     icon: 'pi-clock',
   },
   {
+    // "Gestión de plantillas de documentos físicos" (docs/02-roadmap.md,
+    // item 5). Agregado 2026-10-01, al final del orden existente.
+    cod: 'PLANTILLAS_DOCUMENTOS',
+    des: 'Plantillas de Documentos',
+    order: 13,
+    path: '/plantillas-documentos',
+    icon: 'pi-file-word',
+  },
+  {
     // "Siniestros" -- Fase 4, Etapa 1 (2026-09-24): declarar/ver un
     // siniestro + sus catálogos propios (SClaimType/SClaimEvent). Mismo
     // patrón de ítem padre con hijos que CONFIG_PRODUCTOS/FLUJOS_PROCESO.

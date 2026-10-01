@@ -30,6 +30,7 @@ import {
   ContractRisk,
   ContractsService,
 } from './contracts.service';
+import { ContractDocumentsComponent } from '../documents/contract-documents.component';
 
 const PRODUCT_ENDORSEMENTS_PATH = '/product-rating/product-endorsements';
 const COVERAGE_PLANS_PATH = '/product-rating/coverage-plans';
@@ -163,6 +164,7 @@ interface RequirementRow {
     TagModule,
     ToastModule,
     TranslocoPipe,
+    ContractDocumentsComponent,
   ],
   providers: [MessageService],
   templateUrl: './contract-detail.component.html',

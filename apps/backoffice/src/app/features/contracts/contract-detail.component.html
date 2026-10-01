@@ -84,6 +84,7 @@
         <p-tab value="riesgos" [disabled]="risksDisabled()">{{ 'contractDetail.tabs.risks' | transloco }}</p-tab>
         <p-tab value="coberturas" [disabled]="coveragesDisabled()">{{ 'contractDetail.tabs.coverages' | transloco }}</p-tab>
         <p-tab value="movimientos">{{ 'contractDetail.tabs.operations' | transloco }}</p-tab>
+        <p-tab value="documentos">{{ 'contractDetail.tabs.documents' | transloco }}</p-tab>
         <p-tab value="canal">{{ 'contractDetail.tabs.channel' | transloco }}</p-tab>
         <p-tab value="requisitos">{{ 'contractDetail.tabs.requirements' | transloco }}</p-tab>
       </p-tablist>
@@ -370,6 +371,10 @@
               </tr>
             </ng-template>
           </p-table>
+        </p-tabpanel>
+
+        <p-tabpanel value="documentos">
+          <app-contract-documents [ideContract]="c.IdeContract" />
         </p-tabpanel>
 
         <!-- ============================== Canales de distribución ============================== -->

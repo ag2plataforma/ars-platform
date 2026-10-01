@@ -684,6 +684,7 @@
       "risks": "Riesgos",
       "coverages": "Coberturas",
       "operations": "Movimientos",
+      "documents": "Documentos",
       "channel": "Canal de distribución",
       "requirements": "Requisitos"
     },
@@ -1188,5 +1189,39 @@
       "toggledDetail": "Estado del umbral actualizado.",
       "levelLabel": "Nivel"
     }
+  },
+  "documentTemplates": {
+    "title": "Plantillas de Documentos",
+    "subtitle": "Plantillas .docx usadas para generar pólizas, recibos, cotizaciones y comunicados -- una por producto, operación, tipo de documento y rol de persona destinataria.",
+    "productLabel": "Producto",
+    "productPlaceholder": "Elegí un producto",
+    "operationLabel": "Operación",
+    "operationPlaceholder": "Elegí una operación",
+    "uploadButton": "Subir plantilla",
+    "typeColumn": "Tipo de documento",
+    "roleColumn": "Rol destinatario",
+    "fileColumn": "Archivo",
+    "orderColumn": "Orden",
+    "emptyState": "Sin plantillas cargadas para esta combinación.",
+    "selectFirst": "Elegí un producto y una operación para ver sus plantillas.",
+    "uploadDialogTitle": "Subir plantilla",
+    "typeLabel": "Tipo de documento",
+    "roleLabel": "Rol destinatario",
+    "orderLabel": "Orden",
+    "fileLabel": "Archivo (.docx)",
+    "missingFile": "Elegí un archivo .docx y completá los campos obligatorios.",
+    "uploadSaved": "Plantilla guardada.",
+    "uploadError": "No se pudo leer el archivo seleccionado.",
+    "replaceButton": "Reemplazar archivo",
+    "replaceDialogTitle": "Reemplazar archivo de plantilla",
+    "replaceSaved": "Archivo reemplazado."
+  },
+  "contractDocuments": {
+    "generateButton": "Generar documento",
+    "generateDialogTitle": "Generar documento",
+    "fileColumn": "Archivo",
+    "dateColumn": "Fecha",
+    "emptyState": "Todavía no se generó ningún documento para este contrato.",
+    "generated": "Documento generado correctamente."
   }
 }

@@ -1,0 +1,55 @@
+import { IsIn, IsInt, IsOptional, IsString, IsUUID, Min, MinLength } from 'class-validator';
+
+/** Tipos de documento soportados en esta primera versión (alcance
+ *  acordado con el usuario: arrancar por "Póliza/Contrato emitido",
+ *  dejando los otros tres ya listados para cuando se implementen sus
+ *  disparadores reales). */
+export const TEMPLATE_TYPES = ['CONTRATO', 'RECIBO', 'COTIZACION', 'COMUNICADO'] as const;
+export type TemplateType = (typeof TEMPLATE_TYPES)[number];
+
+export class CreateTemplateDto {
+  @IsUUID()
+  ideOperationProduct!: string;
+
+  @IsIn([...TEMPLATE_TYPES])
+  codTemplateType!: TemplateType;
+
+  @IsUUID()
+  idePersonRol!: string;
+
+  @IsInt()
+  @Min(1)
+  numOrder!: number;
+
+  @IsString()
+  @MinLength(1)
+  fileName!: string;
+
+  /** Contenido del .docx en base64 -- ver doc-comment de main.ts: viaja
+   *  así (no multipart) para pasar sin cambios por el proxy del gateway. */
+  @IsString()
+  @MinLength(1)
+  fileBase64!: string;
+}
+
+/** Reemplaza el archivo de una plantilla ya creada (ej. corregir un
+ *  typo en el Word) sin tener que borrar y volver a cargar toda la fila
+ *  -- deliberadamente sin activar/desactivar en esta primera versión
+ *  (ver doc-comment de TemplatesService: no hay forma confirmada todavía
+ *  de saber qué código de `SState` usar para "Inactivo" en esta tabla
+ *  nueva, así que se deja fuera de alcance en vez de adivinar uno que
+ *  podría no existir y romper en producción). */
+export class ReplaceTemplateFileDto {
+  @IsString()
+  @MinLength(1)
+  fileName!: string;
+
+  @IsString()
+  @MinLength(1)
+  fileBase64!: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  numOrder?: number;
+}
