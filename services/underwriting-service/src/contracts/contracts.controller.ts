@@ -73,6 +73,16 @@ export class ContractsController {
     return this.service.activate(id, actor.code);
   }
 
+  /**
+   * Acción "Renovar contrato" -- ver el doc-comment de
+   * `ContractsService.renew` para el detalle completo. Sin DTO: no
+   * requiere body, solo el id del contrato.
+   */
+  @Post('contracts/:id/renew')
+  renew(@Param('id') id: string, @CurrentUser() actor: JwtPayload) {
+    return this.service.renew(id, actor.code);
+  }
+
   @Post('contracts/:id/cancel')
   cancel(@Param('id') id: string, @Body() dto: CancelContractDto, @CurrentUser() actor: JwtPayload) {
     return this.service.cancel(id, dto, actor.code);

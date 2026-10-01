@@ -696,6 +696,8 @@
     },
     "activateButton": "Activar contrato",
     "activatedDetail": "Se activó el contrato.",
+    "renewButton": "Renovar contrato",
+    "renewedDetail": "Se renovó el contrato.",
     "actionsColumn": "Acciones",
     "changeAmountDialog": {
       "button": "Suplemento",

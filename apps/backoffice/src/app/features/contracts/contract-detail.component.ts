@@ -251,6 +251,28 @@ export class ContractDetailComponent implements OnInit {
   readonly activateSubmitting = signal(false);
   readonly canActivate = computed(() => this.contract()?.SState.CodState === 'SEED_BORRADOR');
 
+  /** Acción explícita "Renovar contrato" (backlog item 2, ver
+   *  docs/02-roadmap.md) -- sin diálogo, mismo criterio que Activar: la
+   *  renovación recalcula todo sola (fechas, prima, recibo), no hace
+   *  falta pedirle nada al usuario para esta primera pasada manual (la
+   *  pantalla de candidatos/aviso automático llega en una etapa
+   *  posterior). Habilitado mientras el contrato esté Activo, tenga fecha
+   *  de vencimiento definida, y esté dentro de los `MANUAL_RENEWAL_WINDOW_DAYS`
+   *  días previos a esa fecha (o ya vencido) -- mismo criterio que valida
+   *  el backend (`MANUAL_RENEWAL_WINDOW_DAYS` en `contracts.service.ts`
+   *  del `underwriting-service`; si ese valor cambia hay que actualizar
+   *  este también). Esto es solo para no mostrar el botón habilitado
+   *  cuando obviamente va a fallar -- el backend es quien manda. */
+  private readonly MANUAL_RENEWAL_WINDOW_DAYS = 30;
+  readonly renewSubmitting = signal(false);
+  readonly canRenew = computed(() => {
+    const c = this.contract();
+    if (!c || c.SState.CodState !== 'ACTIVO' || !c.TstEnd) return false;
+    const msUntilExpiry = new Date(c.TstEnd).getTime() - Date.now();
+    const daysUntilExpiry = msUntilExpiry / 86_400_000;
+    return daysUntilExpiry <= this.MANUAL_RENEWAL_WINDOW_DAYS;
+  });
+
   private buildCancelForm() {
     return this.fb.nonNullable.group({
       ideProductEndorsement: ['', Validators.required],
@@ -558,6 +580,27 @@ export class ContractDetailComponent implements OnInit {
       },
       error: (err: HttpErrorResponse) => {
         this.activateSubmitting.set(false);
+        this.showError(err);
+      },
+    });
+  }
+
+  renewContract(): void {
+    const c = this.contract();
+    if (!c) return;
+    this.renewSubmitting.set(true);
+    this.contracts.renew(c.IdeContract).subscribe({
+      next: (result) => {
+        this.renewSubmitting.set(false);
+        this.contract.set(result);
+        this.messages.add({
+          severity: 'success',
+          summary: this.transloco.translate('common.done'),
+          detail: this.transloco.translate('contractDetail.renewedDetail'),
+        });
+      },
+      error: (err: HttpErrorResponse) => {
+        this.renewSubmitting.set(false);
         this.showError(err);
       },
     });

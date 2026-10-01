@@ -2508,6 +2508,7 @@ model TContract {
   TContractFile                TContractFile[]
   TContractOperation           TContractOperation[]
   TContractPerson              TContractPerson[]
+  TContractRenewalCycle        TContractRenewalCycle[]
   TReceipt                     TReceipt[]
 
   @@index([IdeDistributionChannelSale], map: "IX_TContract_SDistributionChannel")
@@ -2671,6 +2672,31 @@ model TContractPerson {
   @@index([IdeState], map: "IX_TContractPerson_SState")
   @@index([IdeContract], map: "IX_TContractPerson_TContract")
   @@index([IdePerson], map: "IX_TContractPerson_TPerson")
+}
+
+/// Historial de renovaciones de un contrato (backlog item 2, ver
+/// docs/02-roadmap.md) -- tabla NUEVA por completo, no hay nada legado que
+/// preservar (ninguna de las funciones PL/pgSQL originales implementa
+/// renovación, ver docs/01-especificacion-motor-negocio-actual.md). Una
+/// fila por cada vez que ContractsService.renew() corre exitosamente:
+/// TstTrigger es el TstEnd que tenía el contrato ANTES de renovarse,
+/// TstRenewed cuándo se ejecutó la renovación. Todavía no tiene columnas
+/// de notificación/opt-out del cliente/operador -- esas llegan en las
+/// etapas 2/3 (pantalla de candidatos a renovar y aviso automático por
+/// email), se agregan con un ALTER TABLE cuando se implementen, en vez de
+/// adivinar su forma ahora.
+model TContractRenewalCycle {
+  IdeContractRenewalCycle String    @id(map: "PK_TContractRenewalCycle") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  IdeContract             String    @db.Uuid
+  TstTrigger              DateTime  @db.Timestamp(6)
+  TstRenewed              DateTime  @db.Timestamp(6)
+  UsrCreation             String    @db.VarChar(60)
+  TstCreation             DateTime  @db.Timestamp(6)
+  UsrModification         String    @db.VarChar(60)
+  TstModification         DateTime  @db.Timestamp(6)
+  TContract               TContract @relation(fields: [IdeContract], references: [IdeContract], onDelete: NoAction, onUpdate: NoAction, map: "FK_TContractRenewalCycle_TContract")
+
+  @@index([IdeContract], map: "IX_TContractRenewalCycle_TContract")
 }
 
 model TContractRequirement {

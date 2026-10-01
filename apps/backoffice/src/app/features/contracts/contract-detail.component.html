@@ -53,6 +53,17 @@
         <button
           pButton
           type="button"
+          icon="pi pi-refresh"
+          severity="info"
+          [text]="true"
+          [disabled]="!canRenew()"
+          [loading]="renewSubmitting()"
+          [label]="'contractDetail.renewButton' | transloco"
+          (click)="renewContract()"
+        ></button>
+        <button
+          pButton
+          type="button"
           icon="pi pi-ban"
           severity="danger"
           [text]="true"

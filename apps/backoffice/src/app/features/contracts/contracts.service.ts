@@ -405,6 +405,15 @@ export class ContractsService {
     return this.http.post<ContractDetail>(`${this.base}/${ideContract}/activate`, {});
   }
 
+  /** `POST /contracts/:id/renew` -- renueva el contrato (acción
+   *  explícita "Renovar contrato"). Sin body: el backend real recalcula
+   *  la prima de cada cobertura con el motor de reglas vigente y extiende
+   *  la vigencia al siguiente período; acá solo se hace el POST y se deja
+   *  que el caller recargue el detalle. */
+  renew(ideContract: string): Observable<ContractDetail> {
+    return this.http.post<ContractDetail>(`${this.base}/${ideContract}/renew`, {});
+  }
+
   /** `POST /contracts/:id/cancel` -- anula el contrato (Etapa 1 de
    *  "Movimientos y suplementos del contrato"). El backend real crea el
    *  `TContractOperation` de anulación y aplica las devoluciones según

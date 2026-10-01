@@ -43,6 +43,18 @@ const SUPPLEMENT_TRANSACTION_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutos
 const CREATE_TRANSACTION_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutos
 
 /**
+ * Ventana de renovación manual: cuántos días antes del vencimiento (o ya
+ * vencido) se permite tocar "Renovar contrato" -- fuera de esa ventana el
+ * botón/endpoint lo rechaza, para que no se pueda renovar por error un
+ * contrato recién contratado al que todavía le queda mucho tiempo de
+ * vigencia. Valor fijo por ahora; se vuelve configurable en la Etapa 2
+ * (pantalla de candidatos a renovar, ver docs/02-roadmap.md), que va a
+ * aplicar el mismo criterio ("X meses antes de vencer") a nivel de
+ * pantalla en vez de depender de este chequeo del endpoint.
+ */
+const MANUAL_RENEWAL_WINDOW_DAYS = 30;
+
+/**
  * Cascada de creación de contrato, equivalente a `FContract('CONTRACTNEW', ...)`
  * -- "el trabajo de mayor riesgo del proyecto" (ver README de este servicio
  * y docs/02-roadmap.md). Confirmado contra el código real de `FContract`
@@ -978,6 +990,338 @@ export class ContractsService {
   }
 
   /**
+   * Acción "Renovar contrato" (backlog item 2, ver docs/02-roadmap.md) --
+   * a diferencia de Contratar/Anular/Activar, ACÁ NO HAY una función
+   * `FContract` legado que replicar: la renovación nunca se implementó en
+   * el sistema original (confirmado contra
+   * docs/01-especificacion-motor-negocio-actual.md, que documenta las 44
+   * funciones PL/pgSQL reales y ninguna cubre esto). Es diseño nuevo,
+   * decidido junto con el usuario (2026-09-29):
+   *
+   * - Renovar EXTIENDE el mismo `TContract` (mismo `IdeContract`,
+   *   `NumContract`) en vez de crear uno nuevo -- el schema no tiene forma
+   *   de crear un contrato sin una `TQuote` de origen propia (obligatoria
+   *   y 1 a 1), y no hay necesidad real de cotizar de nuevo algo que ya
+   *   está contratado.
+   * - La prima de cada cobertura se RECALCULA con el motor de reglas
+   *   vigente (`RulesEngineService`, mismo motor que cotización y
+   *   contratación) -- no se prorroga el monto anterior tal cual.
+   * - El nuevo movimiento de cada cobertura usa la MISMA fórmula que el
+   *   "movimiento inicial" de `createInitialMovements`/`setNetPrime`
+   *   (proporcional según fracción de pago), en vez de encadenarse a la
+   *   rama de "ya existe un movimiento anterior" de `setNetPrime` -- esa
+   *   rama nunca se llegó a ejecutar ni una sola vez (`create()` solo
+   *   genera un movimiento inicial por cobertura) y depende de encontrar
+   *   un `TContractBilling` en estado Activo, que HOY NUNCA EXISTE
+   *   (`TContractBilling` está seedeado "sin transición", mismo gap que
+   *   `TContractPerson` tenía -- ver `activateContractPersons`). Decisión
+   *   explícita del usuario: no tocar `setNetPrime` (código compartido
+   *   con `create()`/`cancel()`, ya de por sí frágil) para resolver esto
+   *   -- una renovación es un período nuevo, no la continuación del
+   *   anterior, así que la fórmula proporcional es semánticamente
+   *   correcta igual.
+   * - CORREGIDO 2026-09-30 (encontrado por el usuario al probar en
+   *   pantalla): SÍ se crea una `TContractOperation` propia para la
+   *   renovación (`'RENOVGENE'`, catálogo nuevo -- ver
+   *   `packages/database/scripts/setup-renewal-operation-catalog.js`),
+   *   ANTES de `generateReceipts`, mismo orden que los suplementos
+   *   (`changeInsuredAmount`/`addCoverage`/etc: primero su propia
+   *   operación, después `RECEGENE`) -- así queda con 2 operaciones como
+   *   cualquier otro suplemento, en vez de 1 sola apuntando al proceso de
+   *   Contratación. La primera versión de este método NO creaba esta
+   *   operación (asumiendo que el cálculo de tipo de recibo por
+   *   `NumOperation` de `generateReceipts` iba a resolver solo a `'REN'`)
+   *   -- resultó ser una suposición incorrecta, nunca verificada contra
+   *   un contrato real: cualquier contrato con al menos un suplemento
+   *   previo ya tiene `NumOperation>2` de por sí, así que ese cálculo
+   *   siempre da `'SUP'` (mismo defecto ya documentado para anulación).
+   *   Por eso `generateReceipts` ahora recibe `forceReceiptTypeCode='REN'`
+   *   acá -- fija el tipo directamente en vez de depender de ese cálculo.
+   * - Se registra un `TContractRenewalCycle` por cada renovación (tabla
+   *   nueva, ver
+   *   `packages/database/scripts/setup-contract-renewal-cycle-table.js`)
+   *   como historial de cuándo se renovó y desde qué vencimiento. Todavía
+   *   sin columnas de notificación/opt-out -- llegan en las etapas 2/3
+   *   (pantalla de candidatos y aviso automático por email).
+   *
+   * Solo se puede renovar un contrato Activo con `TstEnd` definido y que
+   * esté dentro de `MANUAL_RENEWAL_WINDOW_DAYS` días de su vencimiento (o
+   * ya vencido) -- fuera de esa ventana se rechaza con `ConflictException`
+   * para evitar renovar por error un contrato recién contratado. El
+   * nuevo período dura lo mismo que el anterior (`TstEnd - TstInitial`
+   * actual), y `ContractAge` se incrementa en 1 -- fórmula de incremento
+   * que había quedado deliberadamente sin confirmar en `create()` (no hay
+   * fuente legado que replicar) y se fija acá por primera vez.
+   */
+  async renew(ideContract: string, actor: string) {
+    const existing = await this.prisma.tContract.findUnique({ where: { IdeContract: ideContract } });
+    if (!existing) {
+      throw new NotFoundException(`No existe contrato con id "${ideContract}"`);
+    }
+    const ideActivo = await this.stateMachine.getStateByCode('Activo');
+    if (existing.IdeState !== ideActivo) {
+      throw new ConflictException(`El contrato "${ideContract}" debe estar "Activo" para poder renovarse`);
+    }
+    if (!existing.TstEnd) {
+      throw new ConflictException(
+        `El contrato "${ideContract}" no tiene fecha de vencimiento definida -- no se puede renovar`,
+      );
+    }
+    const daysUntilExpiry = daysBetween(new Date(), existing.TstEnd);
+    if (daysUntilExpiry > MANUAL_RENEWAL_WINDOW_DAYS) {
+      throw new ConflictException(
+        `El contrato "${ideContract}" vence el ${existing.TstEnd.toISOString().slice(0, 10)} -- ` +
+          `todavía faltan más de ${MANUAL_RENEWAL_WINDOW_DAYS} días, no se puede renovar todavía`,
+      );
+    }
+
+    const durationMs = existing.TstEnd.getTime() - existing.TstInitial.getTime();
+    const newTstInitial = existing.TstEnd;
+    const newTstEnd = new Date(newTstInitial.getTime() + durationMs);
+    const tstTrigger = existing.TstEnd;
+
+    await this.prisma.$transaction(
+      async (tx) => {
+        const now = new Date();
+        await tx.tContract.update({
+          where: { IdeContract: ideContract },
+          data: {
+            TstInitial: newTstInitial,
+            TstEnd: newTstEnd,
+            ContractAge: { increment: 1 },
+            UsrModification: actor,
+            TstModification: now,
+          },
+        });
+
+        // Operación propia de la renovación (igual que los suplementos:
+        // primero SU operación, después RECEGENE) -- requiere
+        // packages/database/scripts/setup-renewal-operation-catalog.js
+        // ya corrido (SOperation "RENOVGENE" + SOperationProduct bajo el
+        // SProcess "RENOVACION" ya existente).
+        await this.createContractOperation(ideContract, existing.IdeProduct, 'RENOVGENE', actor, tx);
+
+        const files = await tx.tContractFile.findMany({
+          where: { IdeContract: ideContract, IdeState: ideActivo },
+        });
+        for (const file of files) {
+          await tx.tContractFile.update({
+            where: { IdeContractFile: file.IdeContractFile },
+            data: { TstInitial: newTstInitial, TstEnd: newTstEnd, UsrModification: actor, TstModification: now },
+          });
+          await this.renewContractFile(file.IdeContractFile, existing.IdeProduct, newTstInitial, newTstEnd, actor, tx);
+        }
+
+        const lastPeriod = await tx.tContractBilling.findFirst({
+          where: { IdeContract: ideContract },
+          orderBy: { NumPeriod: 'desc' },
+          select: { NumPeriod: true },
+        });
+        await this.setContractBilling(
+          {
+            IdeContract: ideContract,
+            TstInitial: newTstInitial,
+            TstEnd: newTstEnd,
+            IdePaymentFraction: existing.IdePaymentFraction,
+          },
+          actor,
+          tx,
+          (lastPeriod?.NumPeriod ?? 0) + 1,
+        );
+
+        // 'REN' fijo -- ver doc-comment de generateReceipts: el cálculo
+        // genérico por NumOperation es inalcanzable en la práctica para
+        // un contrato que ya tuvo algún suplemento antes de renovarse.
+        await this.generateReceipts(ideContract, null, actor, tx, 'REN');
+
+        await tx.tContractRenewalCycle.create({
+          data: {
+            IdeContract: ideContract,
+            TstTrigger: tstTrigger,
+            TstRenewed: now,
+            UsrCreation: actor,
+            TstCreation: now,
+            UsrModification: actor,
+            TstModification: now,
+          },
+        });
+      },
+      { timeout: SUPPLEMENT_TRANSACTION_TIMEOUT_MS, maxWait: 10_000 },
+    );
+
+    return this.findOne(ideContract);
+  }
+
+  /**
+   * Renueva un `TContractFile`: extiende la vigencia de sus `TFileRisk`/
+   * `TRiskCoverage` activos al nuevo período, y genera un
+   * `TCoverageMovement` nuevo por cobertura con la prima recalculada --
+   * ver el doc-comment de `renew()` para el porqué de la fórmula usada
+   * (la del "movimiento inicial" de `createInitialMovements`/
+   * `setNetPrime`, no la rama de continuación de `setNetPrime`).
+   */
+  private async renewContractFile(
+    ideContractFile: string,
+    ideProduct: string,
+    newTstInitial: Date,
+    newTstEnd: Date,
+    actor: string,
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
+    const ideActivo = await this.stateMachine.getStateByCode('Activo');
+    const now = new Date();
+
+    const contractFile = await tx.tContractFile.findUniqueOrThrow({
+      where: { IdeContractFile: ideContractFile },
+      select: { IdeContract: true },
+    });
+    const contract = await tx.tContract.findUniqueOrThrow({
+      where: { IdeContract: contractFile.IdeContract },
+      select: { IdePaymentFraction: true },
+    });
+    const product = await tx.sProduct.findFirst({
+      where: { IdeProduct: ideProduct, TstInitial: { lte: now }, TstEnd: { gte: now }, IdeState: ideActivo },
+    });
+    if (!product) {
+      throw new ConflictException(
+        'No se pudo renovar: no hay configuración vigente de "SProduct" para este producto.',
+      );
+    }
+    if (!product.IndProportionalPrime) {
+      // Ver doc-comment de `renew()`: la renovación solo soporta el
+      // cálculo proporcional (default del esquema) -- el cálculo por días
+      // exactos depende de `TContractBilling` estar Activo, que hoy nunca
+      // pasa (mismo gap de `TContractPerson`, deliberadamente no resuelto
+      // acá).
+      throw new ConflictException(
+        'No se pudo renovar: este producto no usa prima proporcional ("IndProportionalPrime=false") -- la renovación todavía no soporta el cálculo por días exactos.',
+      );
+    }
+    const productPaymentFraction = await tx.sProductPaymentFraction.findFirst({
+      where: {
+        IdeProduct: ideProduct,
+        IdePaymentFraction: contract.IdePaymentFraction,
+        TstInitial: { lte: now },
+        TstEnd: { gte: now },
+        IdeState: ideActivo,
+      },
+    });
+    const paymentFraction = productPaymentFraction
+      ? await tx.sPaymentFraction.findFirst({
+          where: { IdePaymentFraction: productPaymentFraction.IdePaymentFraction, IdeState: ideActivo },
+        })
+      : null;
+    if (!productPaymentFraction || !paymentFraction) {
+      throw new ConflictException(
+        'No se pudo renovar: falta configuración vigente de fracción de pago para este producto.',
+      );
+    }
+    const porSurcharge = Number(productPaymentFraction.PorSurCharge);
+    const numFraction = paymentFraction.NumFraction;
+
+    const [ideMovementInitial, ideMovementConceptInitial, primaTotalConcept] = await Promise.all([
+      this.stateMachine.getInitialState('TCoverageMovement'),
+      this.stateMachine.getInitialState('TMovementConcept'),
+      tx.sConcept.findFirst({ where: { CodConcept: 'PrimaTotal' } }),
+    ]);
+
+    const fileRisks = await tx.tFileRisk.findMany({
+      where: { IdeContractFile: ideContractFile, IdeState: ideActivo },
+    });
+    for (const fileRisk of fileRisks) {
+      await tx.tFileRisk.update({
+        where: { IdeFileRisk: fileRisk.IdeFileRisk },
+        data: { TstInitial: newTstInitial, TstEnd: newTstEnd, UsrModification: actor, TstModification: now },
+      });
+
+      const riskCoverages = await tx.tRiskCoverage.findMany({
+        where: { IdeFileRisk: fileRisk.IdeFileRisk, IdeState: ideActivo },
+      });
+      for (const riskCoverage of riskCoverages) {
+        await tx.tRiskCoverage.update({
+          where: { IdeRiskCoverage: riskCoverage.IdeRiskCoverage },
+          data: { TstInitial: newTstInitial, TstEnd: newTstEnd, UsrModification: actor, TstModification: now },
+        });
+
+        const lastMovement = await tx.tCoverageMovement.findFirst({
+          where: { IdeRiskCoverage: riskCoverage.IdeRiskCoverage },
+          orderBy: { NumCoverageMovement: 'desc' },
+          select: { NumCoverageMovement: true },
+        });
+        const nextNum = (lastMovement?.NumCoverageMovement ?? 0) + 1;
+
+        const movement = await tx.tCoverageMovement.create({
+          data: {
+            IdeRiskCoverage: riskCoverage.IdeRiskCoverage,
+            NumCoverageMovement: nextNum,
+            TstInitial: newTstInitial,
+            TstEnd: newTstEnd,
+            Amount: riskCoverage.Amount,
+            Rate: riskCoverage.Rate,
+            Prime: 0,
+            IdeState: ideMovementInitial,
+            UsrCreation: actor,
+            TstCreation: now,
+            UsrModification: actor,
+            TstModification: now,
+          },
+        });
+
+        const rules = await this.rulesEngine.getApplicableRules({
+          ideProduct,
+          idePlanProductRisk: fileRisk.IdePlanProductRisk,
+          ideCoveragePlan: riskCoverage.IdeCoveragePlan,
+        });
+        const results = await this.rulesEngine.evaluateChain(rules, {
+          origin: 'Contract',
+          ideOriginRisk: fileRisk.IdeFileRisk,
+          ideCoverageOrMovement: movement.IdeCoverageMovement,
+          dbTransaction: tx,
+        });
+
+        for (const result of results) {
+          if (result.columnName) continue; // ver createInitialMovements: sin columnas dinámicas equivalentes acá.
+          const grossValue = Number(result.value);
+          const netValue = grossValue / numFraction + (grossValue / numFraction) * (porSurcharge / 100);
+          await tx.tMovementConcept.create({
+            data: {
+              IdeCoverageMovement: movement.IdeCoverageMovement,
+              IdeConcept: result.ideConcept,
+              ConceptValue: result.value,
+              ConceptNetValue: netValue,
+              IdeState: ideMovementConceptInitial,
+              UsrCreation: actor,
+              TstCreation: now,
+              UsrModification: actor,
+              TstModification: now,
+            },
+          });
+        }
+
+        let primeNet = 0;
+        let primeGross = 0;
+        if (primaTotalConcept) {
+          const primaTotalRow = await tx.tMovementConcept.findFirst({
+            where: { IdeCoverageMovement: movement.IdeCoverageMovement, IdeConcept: primaTotalConcept.IdeConcept },
+          });
+          if (primaTotalRow) {
+            primeNet = round2(Number(primaTotalRow.ConceptNetValue));
+            primeGross = round2(Number(primaTotalRow.ConceptValue));
+          }
+        }
+        await tx.tCoverageMovement.update({
+          where: { IdeCoverageMovement: movement.IdeCoverageMovement },
+          data: { Prime: primeNet, UsrModification: actor, TstModification: now },
+        });
+        await tx.tRiskCoverage.update({
+          where: { IdeRiskCoverage: riskCoverage.IdeRiskCoverage },
+          data: { Prime: primeGross, UsrModification: actor, TstModification: now },
+        });
+      }
+    }
+  }
+
+  /**
    * Equivalente a `FContract('SETSTATE', ...)`: aplica una transición al
    * contrato Y a todo su árbol (`TContractFile` -> `TFileRisk` ->
    * `TRiskCoverage` -> `TCoverageMovement`) -- mismo mecanismo de cascada
@@ -1371,6 +1715,7 @@ export class ContractsService {
     contract: { IdeContract: string; TstInitial: Date; TstEnd: Date | null; IdePaymentFraction: string },
     actor: string,
     tx: Prisma.TransactionClient = this.prisma,
+    startPeriod = 1,
   ): Promise<void> {
     const paymentFraction = await tx.sPaymentFraction.findUniqueOrThrow({
       where: { IdePaymentFraction: contract.IdePaymentFraction },
@@ -1383,9 +1728,13 @@ export class ContractsService {
     const numFraction = Math.max(paymentFraction.NumFraction, 1);
     const periodMs = (end - start) / numFraction;
 
+    // `startPeriod` (default 1) permite continuar la numeración de
+    // `NumPeriod` en vez de reiniciarla en 1 -- lo usa `renew()` para no
+    // colisionar con los períodos del ciclo de vigencia anterior
+    // (`@@unique([IdeContract, NumPeriod])`, mismo contrato para siempre).
     const periods = Array.from({ length: numFraction }, (_, index) => ({
       IdeContract: contract.IdeContract,
-      NumPeriod: index + 1,
+      NumPeriod: startPeriod + index,
       TstInitial: new Date(start + periodMs * index),
       TstEnd: new Date(start + periodMs * (index + 1)),
       IdeState: ideStateInitial,
@@ -3469,12 +3818,29 @@ export class ContractsService {
    * CONTRACTNEW) resuelven a `'NEW'`; para una anulación, `NumOperation`
    * ya es > 2 (CONTGENE=1, operación de anulación=2, RECEGENE=3+), así
    * que siempre resuelve a `'SUP'`.
+   *
+   * CORREGIDO 2026-09-30 (encontrado por el usuario al probar "Renovar
+   * contrato" en pantalla): la rama `NumOperation===2 && ContractAge>1
+   * -> 'REN'` es efectivamente inalcanzable en la práctica -- confirmado
+   * contra un contrato real recién renovado, que ya traía varios
+   * suplementos (`SUPMONTO`/`COVEALTA`/`COVEBAJA`/etc.) antes de
+   * renovarse, así que `NumOperation` ya estaba en 13, no en 2. Cualquier
+   * contrato con al menos un suplemento previo a su renovación cae
+   * siempre en `NumOperation>2`, quedando `'SUP'` igual que una anulación
+   * -- el mismo defecto ya documentado arriba, ahora también alcanza a
+   * renovación. En vez de intentar arreglar el `CASE` genérico (usado
+   * también por `create()`/`cancel()`/todos los suplementos, no vale la
+   * pena tocarlo), `renew()` pasa `forceReceiptTypeCode='REN'` para fijar
+   * el tipo directamente, sin pasar por ese cálculo -- una renovación
+   * SIEMPRE es `'REN'`, sin importar cuántos suplementos tuvo el contrato
+   * antes.
    */
   private async generateReceipts(
     ideContract: string,
     ideProductEndorsement: string | null,
     actor: string,
     tx: Prisma.TransactionClient = this.prisma,
+    forceReceiptTypeCode?: 'REN',
   ): Promise<void> {
     const conditionData = ideProductEndorsement
       ? (((
@@ -3520,13 +3886,14 @@ export class ContractsService {
 
     const numOperation = contractOperation.NumOperation;
     const receiptTypeCode =
-      numOperation === 2 && contract.ContractAge === 1
+      forceReceiptTypeCode ??
+      (numOperation === 2 && contract.ContractAge === 1
         ? 'NEW'
         : numOperation > 2
           ? 'SUP'
           : numOperation === 2 && contract.ContractAge > 1
             ? 'REN'
-            : null;
+            : null);
     if (!receiptTypeCode) {
       throw new ConflictException(
         `No se pudo determinar el tipo de recibo para NumOperation=${numOperation}/ContractAge=${contract.ContractAge}`,
