@@ -134,16 +134,19 @@ export class QuotesListComponent implements OnInit {
     });
   }
 
-  /** Color del `p-tag` de estado -- los códigos de prueba de hoy (ver
-   *  docs/02-roadmap.md) mapeados a algo razonable; cualquier otro
-   *  código (ej. si se migran los estados reales del legado más
-   *  adelante) cae en el `default` neutro, sin romper. */
+  /** Color del `p-tag` de estado -- `BORRADOR`/`ACEPTADO`/`CONTRATADO` son
+   *  los códigos reales que usan las cotizaciones hoy; los `SEED_*` quedan
+   *  como fallback por si queda algún dato viejo de los fixtures de
+   *  prueba. Cualquier otro código cae en el `default` neutro, sin
+   *  romper. */
   stateSeverity(codState: string): 'info' | 'warn' | 'success' | 'secondary' {
     switch (codState) {
+      case 'BORRADOR':
       case 'SEED_BORRADOR':
         return 'info';
       case 'ACEPTADO':
         return 'warn';
+      case 'CONTRATADO':
       case 'SEED_CONTRATADO':
         return 'success';
       default:
@@ -151,7 +154,16 @@ export class QuotesListComponent implements OnInit {
     }
   }
 
+  /** Pedido explícito del usuario (2026-09-27): una cotización ya
+   *  contratada abre directo el detalle del contrato (mismo destino que
+   *  `QuotesComponent.verContrato`, ver `/contratos/:id` en
+   *  `app.routes.ts`) en vez del wizard de cotización, que no tiene
+   *  sentido reabrir sobre algo que ya se convirtió en contrato. */
   abrir(item: QuoteListItem): void {
+    if (item.contract) {
+      this.router.navigate(['/contratos', item.contract.ideContract]);
+      return;
+    }
     this.router.navigate(['/cotizacion', item.ideQuote]);
   }
 

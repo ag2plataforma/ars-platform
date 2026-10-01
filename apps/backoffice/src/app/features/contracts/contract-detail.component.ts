@@ -247,11 +247,12 @@ export class ContractDetailComponent implements OnInit {
   /** Acción explícita "Activar contrato" -- sin diálogo (no requiere
    *  datos adicionales, a diferencia de Anular/los suplementos): un solo
    *  botón que llama directo a `ContractsService.activate()`. Solo
-   *  habilitado mientras el contrato esté en "Borrador" (`SEED_BORRADOR`,
-   *  confirmado contra el seed real de fixtures de contrato) -- una vez
-   *  activo, esta acción ya no aplica. */
+   *  habilitado mientras el contrato esté en "Borrador" (`BORRADOR`, el
+   *  código real que usan las cotizaciones/contratos hoy -- `SEED_BORRADOR`
+   *  es el código legado de los fixtures de prueba, ya no el que usan los
+   *  contratos reales) -- una vez activo, esta acción ya no aplica. */
   readonly activateSubmitting = signal(false);
-  readonly canActivate = computed(() => this.contract()?.SState.CodState === 'SEED_BORRADOR');
+  readonly canActivate = computed(() => this.contract()?.SState.CodState === 'BORRADOR');
 
   /** Acción explícita "Renovar contrato" (backlog item 2, ver
    *  docs/02-roadmap.md) -- sin diálogo, mismo criterio que Activar: la
@@ -1124,8 +1125,10 @@ export class ContractDetailComponent implements OnInit {
     switch (codState) {
       case 'ACTIVO':
         return 'success';
+      case 'ANULADO':
       case 'SEED_ANULADO':
         return 'warn';
+      case 'BORRADOR':
       case 'SEED_BORRADOR':
         return 'info';
       default:
