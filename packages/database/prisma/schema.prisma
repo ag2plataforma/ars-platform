@@ -2499,6 +2499,7 @@ model TContract {
   UsrModification              String                         @db.VarChar(60)
   TstModification              DateTime                       @db.Timestamp(6)
   IndNoRenovar                 Boolean                        @default(false)
+  TstRenewalNoticeSent         DateTime?                      @db.Timestamp(6)
   SPaymentFraction             SPaymentFraction               @relation(fields: [IdePaymentFraction], references: [IdePaymentFraction], onDelete: NoAction, onUpdate: NoAction, map: "FK_TContract_SPaymentFraction")
   SProduct                     SProduct                       @relation(fields: [IdeProduct], references: [IdeProduct], onDelete: NoAction, onUpdate: NoAction, map: "FK_TContract_SProduct")
   SState                       SState                         @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_TContract_SState")

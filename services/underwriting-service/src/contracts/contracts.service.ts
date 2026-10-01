@@ -1046,9 +1046,12 @@ export class ContractsService {
    * - Se registra un `TContractRenewalCycle` por cada renovación (tabla
    *   nueva, ver
    *   `packages/database/scripts/setup-contract-renewal-cycle-table.js`)
-   *   como historial de cuándo se renovó y desde qué vencimiento. Todavía
-   *   sin columnas de notificación/opt-out -- llegan en las etapas 2/3
-   *   (pantalla de candidatos y aviso automático por email).
+   *   como historial de cuándo se renovó y desde qué vencimiento. El
+   *   opt-out manual ya existe (`IndNoRenovar`, Etapa 2). El aviso
+   *   automático por email (Etapa 3, `RenewalNoticeJobHandler`) NO usa
+   *   esta tabla -- se resuelve con `TContract.TstRenewalNoticeSent`
+   *   (ver `setup-renewal-notice-column.js`), limpiada acá abajo a
+   *   `null` para que el próximo ciclo dispare un aviso nuevo.
    *
    * Solo se puede renovar un contrato Activo con `TstEnd` definido y que
    * esté dentro de `MANUAL_RENEWAL_WINDOW_DAYS` días de su vencimiento (o
@@ -1095,6 +1098,10 @@ export class ContractsService {
             TstInitial: newTstInitial,
             TstEnd: newTstEnd,
             ContractAge: { increment: 1 },
+            // Nuevo ciclo de renovación -- limpia el aviso por email del
+            // ciclo anterior (ver RenewalNoticeJobHandler) para que el
+            // PRÓXIMO vencimiento dispare un aviso nuevo.
+            TstRenewalNoticeSent: null,
             UsrModification: actor,
             TstModification: now,
           },

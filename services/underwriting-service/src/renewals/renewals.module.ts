@@ -3,15 +3,20 @@ import { UnderwritingStateMachineModule } from '../state-machine/underwriting-st
 import { ContractsModule } from '../contracts/contracts.module';
 import { BackgroundJobsModule } from '../background-jobs/background-jobs.module';
 import { RenewalBatchJobHandler } from './renewal-batch-job.handler';
+import { RenewalNoticeJobHandler } from './renewal-notice-job.handler';
 
 /**
- * Registra `RenewalBatchJobHandler` (ver ese archivo) contra la
- * infraestructura genérica de jobs. Importa `ContractsModule` por
- * `ContractsService` (`exports` agregado ahí para esto) y
- * `BackgroundJobsModule` por `BackgroundJobsService`.
+ * Registra los `BackgroundJobHandler` de renovaciones (ver ese archivo)
+ * contra la infraestructura genérica de jobs:
+ * - `RenewalBatchJobHandler`: renovación automática de contratos vencidos.
+ * - `RenewalNoticeJobHandler`: aviso por email al cliente antes del
+ *   vencimiento (sub-item pendiente de la Etapa 3, ver ese archivo).
+ *
+ * Importa `ContractsModule` por `ContractsService` (`exports` agregado
+ * ahí para esto) y `BackgroundJobsModule` por `BackgroundJobsService`.
  */
 @Module({
   imports: [UnderwritingStateMachineModule, ContractsModule, BackgroundJobsModule],
-  providers: [RenewalBatchJobHandler],
+  providers: [RenewalBatchJobHandler, RenewalNoticeJobHandler],
 })
 export class RenewalsModule {}
