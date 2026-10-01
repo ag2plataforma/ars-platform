@@ -76,19 +76,32 @@ const SITE_MAP_ITEMS = [
   { cod: 'DASHBOARD', des: 'Inicio', order: 1, path: '/dashboard', icon: 'pi-home' },
   { cod: 'COTIZACION', des: 'Cotización', order: 2, path: '/cotizacion', icon: 'pi-calculator' },
   { cod: 'CONTRATOS', des: 'Contratos', order: 3, path: '/contratos', icon: 'pi-file' },
-  { cod: 'CATALOGOS', des: 'Catálogos', order: 4, path: '/catalogos', icon: 'pi-book' },
-  { cod: 'UBICACIONES', des: 'Ubicaciones', order: 5, path: '/ubicaciones', icon: 'pi-map-marker' },
+  {
+    // "Renovaciones" -- Etapa 2 de "Gestión de renovaciones" (ver
+    // docs/02-roadmap.md), agregado 2026-10-01. Justo después de
+    // "Contratos" en el orden del sidebar por ser una acción directamente
+    // relacionada (no se renumeran los ítems siguientes, solo se corre
+    // este script de nuevo -- el orden real lo da `order`, no la posición
+    // en este archivo).
+    cod: 'RENOVACIONES',
+    des: 'Renovaciones',
+    order: 4,
+    path: '/renovaciones',
+    icon: 'pi-refresh',
+  },
+  { cod: 'CATALOGOS', des: 'Catálogos', order: 5, path: '/catalogos', icon: 'pi-book' },
+  { cod: 'UBICACIONES', des: 'Ubicaciones', order: 6, path: '/ubicaciones', icon: 'pi-map-marker' },
   {
     cod: 'CONFIGURACION_MENU',
     des: 'Configuración de menú',
-    order: 6,
+    order: 7,
     path: '/configuracion-menu',
     icon: 'pi-sitemap',
   },
   {
     cod: 'CONFIG_PRODUCTOS',
     des: 'Configuración de productos',
-    order: 7,
+    order: 8,
     path: null,
     icon: 'pi-box',
     children: [
@@ -126,7 +139,7 @@ const SITE_MAP_ITEMS = [
       },
     ],
   },
-  { cod: 'COMISIONES', des: 'Comisiones', order: 8, path: '/comisiones', icon: 'pi-wallet' },
+  { cod: 'COMISIONES', des: 'Comisiones', order: 9, path: '/comisiones', icon: 'pi-wallet' },
   {
     // "Siniestros" -- Fase 4, Etapa 1 (2026-09-24): declarar/ver un
     // siniestro + sus catálogos propios (SClaimType/SClaimEvent). Mismo
@@ -135,7 +148,7 @@ const SITE_MAP_ITEMS = [
     // botón "Nuevo" del listado (mismo criterio que Cotización).
     cod: 'SINIESTROS',
     des: 'Siniestros',
-    order: 9,
+    order: 10,
     path: null,
     icon: 'pi-exclamation-triangle',
     children: [
@@ -177,7 +190,7 @@ const SITE_MAP_ITEMS = [
     // patrón de ítem padre con hijos que CONFIG_PRODUCTOS.
     cod: 'FLUJOS_PROCESO',
     des: 'Flujos de proceso',
-    order: 10,
+    order: 11,
     path: null,
     icon: 'pi-directions',
     children: [

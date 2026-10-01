@@ -629,6 +629,19 @@
     "openButton": "Abrir",
     "emptyState": "No se encontraron contratos."
   },
+  "renewalsList": {
+    "title": "Renovaciones",
+    "subtitle": "Contratos activos próximos a vencer -- marcá los que no deban renovarse automáticamente.",
+    "titularColumn": "Titular",
+    "statusColumn": "Estado",
+    "noRenewTag": "No renovar",
+    "willRenewTag": "Se renovará",
+    "markNoRenewButton": "No renovar",
+    "undoNoRenewButton": "Deshacer",
+    "markedNoRenewDetail": "Se marcó el contrato para que no se renueve.",
+    "unmarkedNoRenewDetail": "Se deshizo la marca de \"no renovar\".",
+    "emptyState": "No hay contratos próximos a vencer."
+  },
   "contractDetail": {
     "title": "Detalle de contrato",
     "subtitle": "Tomador, certificados, riesgos, coberturas, movimientos, canal y requisitos del contrato.",

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { CurrentUser, JwtPayload } from '@ars-platform/shared-common';
 import { ContractsService } from './contracts.service';
 import { CreateContractDto } from './dto/create-contract.dto';
@@ -11,6 +11,8 @@ import { AddRiskDto } from './dto/add-risk.dto';
 import { RemoveRiskDto } from './dto/remove-risk.dto';
 import { ChangePersonDataDto } from './dto/change-person-data.dto';
 import { ListContractsDto } from './dto/list-contracts.dto';
+import { ListRenewalCandidatesDto } from './dto/list-renewal-candidates.dto';
+import { SetRenewalOptOutDto } from './dto/set-renewal-opt-out.dto';
 
 /**
  * Cascada de creación de contrato (`FContract('CONTRACTNEW', ...)` y todo lo
@@ -42,6 +44,17 @@ export class ContractsController {
   @Get('contracts')
   findAll(@Query() query: ListContractsDto, @CurrentUser() actor: JwtPayload) {
     return this.service.findAll(query, actor.code);
+  }
+
+  /**
+   * Candidatos a renovar (Etapa 2, pantalla "Renovaciones", ver
+   * docs/02-roadmap.md). Declarado ANTES que `:id` -- mismo motivo que
+   * `contracts` (plural): si fuera después, Express/Nest tomaría
+   * "renewal-candidates" como el valor de `:id`.
+   */
+  @Get('contracts/renewal-candidates')
+  findRenewalCandidates(@Query() query: ListRenewalCandidatesDto) {
+    return this.service.findRenewalCandidates(query);
   }
 
   @Get('contracts/:id')
@@ -81,6 +94,13 @@ export class ContractsController {
   @Post('contracts/:id/renew')
   renew(@Param('id') id: string, @CurrentUser() actor: JwtPayload) {
     return this.service.renew(id, actor.code);
+  }
+
+  /** Etapa 2 de "Gestión de renovaciones" -- marcar/desmarcar "No
+   *  renovar" sobre un contrato candidato (ver docs/02-roadmap.md). */
+  @Patch('contracts/:id/renewal-opt-out')
+  setRenewalOptOut(@Param('id') id: string, @Body() dto: SetRenewalOptOutDto, @CurrentUser() actor: JwtPayload) {
+    return this.service.setRenewalOptOut(id, dto.noRenovar, actor.code);
   }
 
   @Post('contracts/:id/cancel')

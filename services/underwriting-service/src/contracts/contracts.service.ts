@@ -12,6 +12,7 @@ import { AddRiskDto } from './dto/add-risk.dto';
 import { RemoveRiskDto } from './dto/remove-risk.dto';
 import { ChangePersonDataDto } from './dto/change-person-data.dto';
 import { ListContractsDto } from './dto/list-contracts.dto';
+import { ListRenewalCandidatesDto } from './dto/list-renewal-candidates.dto';
 
 /**
  * Timeout de la transacción que envuelve `cancel()` -- generoso porque
@@ -1319,6 +1320,92 @@ export class ContractsService {
         });
       }
     }
+  }
+
+  /**
+   * Candidatos a renovar (Etapa 2 de "Gestión de renovaciones", pantalla
+   * "Renovaciones", ver docs/02-roadmap.md): contratos Activos cuyo
+   * `TstEnd` cae dentro de los próximos `RENEWAL_CANDIDATE_WINDOW_DAYS`
+   * días (variable de entorno, default 60 si no está seteada -- pedido
+   * explícito del usuario que viva en `.env` en vez de una constante en
+   * código, a diferencia de `MANUAL_RENEWAL_WINDOW_DAYS` de la Etapa 1).
+   * Ya vencidos NO entran acá (esta pantalla es para anticiparse, no
+   * para gestionar morosidad). Incluye los que YA están marcados
+   * `IndNoRenovar=true` -- el operador tiene que poder ver y deshacer
+   * esa marca desde la misma pantalla, no solo ponerla.
+   *
+   * Trae el Titular (si existe) para que el operador pueda identificar
+   * la póliza sin tener que abrir cada contrato -- mismo criterio que
+   * `findOne`, pero acá solo el nombre, no el objeto completo.
+   */
+  async findRenewalCandidates(query: ListRenewalCandidatesDto) {
+    const ideActivo = await this.stateMachine.getStateByCode('Activo');
+    const now = new Date();
+    const windowDays = Number(process.env.RENEWAL_CANDIDATE_WINDOW_DAYS ?? '60');
+    const windowEnd = addDays(now, windowDays);
+
+    const where: Prisma.TContractWhereInput = {
+      IdeState: ideActivo,
+      TstEnd: { gte: now, lte: windowEnd },
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.tContract.findMany({
+        where,
+        include: {
+          SProduct: { select: { DesProduct: true } },
+          TContractPerson: {
+            where: { SPersonRol: { CodPersonRol: 'TITULAR' } },
+            include: { TPerson: { select: { DesFirstName: true, DesLastName1: true } } },
+          },
+        },
+        orderBy: { TstEnd: 'asc' },
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+      }),
+      this.prisma.tContract.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((row) => {
+        const titular = row.TContractPerson[0]?.TPerson;
+        return {
+          ideContract: row.IdeContract,
+          numContract: row.NumContract,
+          desProduct: row.SProduct.DesProduct,
+          desTitular: titular ? [titular.DesFirstName, titular.DesLastName1].filter(Boolean).join(' ') : null,
+          tstEnd: row.TstEnd,
+          contractAge: row.ContractAge,
+          indNoRenovar: row.IndNoRenovar,
+        };
+      }),
+      total,
+      page: query.page,
+      limit: query.limit,
+    };
+  }
+
+  /**
+   * Marca o desmarca "No renovar" sobre un contrato puntual (Etapa 2,
+   * pantalla "Renovaciones") -- decisión del operador de que ESTE
+   * contrato en particular no se renueve automáticamente al vencer (ej.
+   * no rentable para la compañía). Solo cambia el flag -- no cancela ni
+   * toca ningún otro dato del contrato. La Etapa 3 (cron de renovación
+   * automática, todavía no implementado) va a filtrar por
+   * `IndNoRenovar=false` antes de renovar; esta acción manual
+   * (`renew()`) deliberadamente NO lo valida -- marcar "no renovar" no
+   * debería impedirle a un operador renovar a mano si igual lo necesita.
+   */
+  async setRenewalOptOut(ideContract: string, noRenovar: boolean, actor: string) {
+    const existing = await this.prisma.tContract.findUnique({ where: { IdeContract: ideContract } });
+    if (!existing) {
+      throw new NotFoundException(`No existe contrato con id "${ideContract}"`);
+    }
+    await this.prisma.tContract.update({
+      where: { IdeContract: ideContract },
+      data: { IndNoRenovar: noRenovar, UsrModification: actor, TstModification: new Date() },
+    });
+    return { ideContract, indNoRenovar: noRenovar };
   }
 
   /**

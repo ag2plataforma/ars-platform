@@ -73,6 +73,14 @@ export const routes: Routes = [
           import('./features/catalogs/catalogs.component').then((m) => m.CatalogsComponent),
       },
       {
+        // "Renovaciones" -- Etapa 2 de "Gestión de renovaciones" (ver
+        // docs/02-roadmap.md): pantalla de contratos candidatos a
+        // renovar + marcar/desmarcar "No renovar".
+        path: 'renovaciones',
+        loadComponent: () =>
+          import('./features/renewals/renewals-list.component').then((m) => m.RenewalsListComponent),
+      },
+      {
         // "Siniestros" -- Fase 4, Etapa 1 (2026-09-24). Orden importante:
         // 'nuevo'/'tipos-de-siniestro'/'catalogos' (segmentos literales)
         // ANTES que ':id' -- mismo motivo que 'nueva' en 'cotizacion'.

@@ -31,6 +31,27 @@ export interface ContractListResponse {
   limit: number;
 }
 
+/** Una fila de `GET /contracts/renewal-candidates` (Etapa 2 de "Gestión
+ *  de renovaciones", pantalla "Renovaciones", ver docs/02-roadmap.md).
+ *  Ver `ContractsService.findRenewalCandidates` en el backend real. */
+export interface RenewalCandidate {
+  ideContract: string;
+  numContract: string;
+  desProduct: string;
+  /** Nombre del Titular, o `null` si el contrato no tiene uno asociado. */
+  desTitular: string | null;
+  tstEnd: string;
+  contractAge: number;
+  indNoRenovar: boolean;
+}
+
+export interface RenewalCandidateListResponse {
+  items: RenewalCandidate[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 /** Filtros de `GET /contracts` -- mismo shape que `ListContractsDto` en
  *  el backend real. Todo opcional. */
 export interface ListContractsParams {
@@ -412,6 +433,23 @@ export class ContractsService {
    *  que el caller recargue el detalle. */
   renew(ideContract: string): Observable<ContractDetail> {
     return this.http.post<ContractDetail>(`${this.base}/${ideContract}/renew`, {});
+  }
+
+  /** `GET /contracts/renewal-candidates` -- Etapa 2 de "Gestión de
+   *  renovaciones", pantalla "Renovaciones". Sin filtros todavía (alcance
+   *  "simple" acordado con el usuario), solo paginación. */
+  listRenewalCandidates(page: number, limit: number): Observable<RenewalCandidateListResponse> {
+    const params = new HttpParams().set('page', String(page)).set('limit', String(limit));
+    return this.http.get<RenewalCandidateListResponse>(`${this.base}/renewal-candidates`, { params });
+  }
+
+  /** `PATCH /contracts/:id/renewal-opt-out` -- marca/desmarca "No
+   *  renovar" sobre un contrato candidato (Etapa 2). */
+  setRenewalOptOut(ideContract: string, noRenovar: boolean): Observable<{ ideContract: string; indNoRenovar: boolean }> {
+    return this.http.patch<{ ideContract: string; indNoRenovar: boolean }>(
+      `${this.base}/${ideContract}/renewal-opt-out`,
+      { noRenovar },
+    );
   }
 
   /** `POST /contracts/:id/cancel` -- anula el contrato (Etapa 1 de
