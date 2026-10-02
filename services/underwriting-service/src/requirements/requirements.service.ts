@@ -1,9 +1,47 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, PrismaService, SProductRequirement } from '@ars-platform/database';
 import { StateMachineService } from '@ars-platform/shared-common';
 import { PROCESS_CODE_CONTRACT, PROCESS_CODE_QUOTE } from './requirements.constants';
+import { UploadRequirementFileDto } from './dto/upload-requirement-file.dto';
 
-const REQUIREMENT_INCLUDE = {
+/**
+ * `select` explícito (Etapa 2, ver docs/02-roadmap.md ítem 4) en vez del
+ * `include` original -- `include` trae TODAS las columnas escalares de
+ * la tabla, y eso ahora incluiría `FileData` (bytea, el archivo
+ * completo) en cada fila del checklist. Se expone `DesFileName` (si no
+ * es null, hay archivo cargado) como señal liviana de "tiene archivo",
+ * y el archivo en sí se sirve aparte por un endpoint de descarga
+ * dedicado (`downloadQuoteRequirementFile`/`downloadContractRequirementFile`).
+ */
+const QUOTE_REQUIREMENT_SELECT = {
+  IdeQuoteRequirement: true,
+  IdeQuoteRisk: true,
+  IdeQuoteRiskPlan: true,
+  IdeQuoteCoverage: true,
+  IdeProductRequirement: true,
+  Data: true,
+  DesFileName: true,
+  IdeState: true,
+  UsrCreation: true,
+  TstCreation: true,
+  UsrModification: true,
+  TstModification: true,
+  SProductRequirement: { include: { SRequirement: true } },
+  SState: true,
+} as const;
+
+const CONTRACT_REQUIREMENT_SELECT = {
+  IdeContractRequirement: true,
+  IdeFileRisk: true,
+  IdeRiskCoverage: true,
+  IdeProductRequirement: true,
+  Data: true,
+  DesFileName: true,
+  IdeState: true,
+  UsrCreation: true,
+  TstCreation: true,
+  UsrModification: true,
+  TstModification: true,
   SProductRequirement: { include: { SRequirement: true } },
   SState: true,
 } as const;
@@ -62,6 +100,16 @@ export interface DeliveredFlag {
  * `IdePlanProduct` (comodín) pero no `IdeCoveragePlan`, aplica a nivel
  * de riesgo pero solo si el plan seleccionado coincide; si no tiene
  * ninguno de los dos, aplica a nivel de riesgo sin importar el plan.
+ *
+ * Etapa 2 (2026-10-02, pedido explícito del usuario, ver docs/02-roadmap.md
+ * ítem 4): subida real de archivo (`FileData` bytea + `DesFileName`,
+ * mismo criterio de "archivo directo en Postgres" ya usado para
+ * plantillas de documentos) tanto para `TQuoteRequirement` como para
+ * `TContractRequirement`, y bloqueo de "Generar contrato"
+ * (`assertQuoteRequirementsReady`) si falta un obligatorio. El flag
+ * `Data.indDelivered` de la Etapa 1 se mantiene, pero ahora lo pone en
+ * `true` automáticamente la subida del archivo -- un documento real
+ * adjunto ES la entrega.
  */
 @Injectable()
 export class RequirementsService {
@@ -166,7 +214,7 @@ export class RequirementsService {
     await this.resolveForQuote(ideQuote, actor);
     return this.prisma.tQuoteRequirement.findMany({
       where: { TQuoteRisk: { IdeQuote: ideQuote } },
-      include: REQUIREMENT_INCLUDE,
+      select: QUOTE_REQUIREMENT_SELECT,
     });
   }
 
@@ -178,8 +226,114 @@ export class RequirementsService {
     return this.prisma.tQuoteRequirement.update({
       where: { IdeQuoteRequirement: ideQuoteRequirement },
       data: { Data: data as unknown as Prisma.InputJsonValue, UsrModification: actor, TstModification: new Date() },
-      include: REQUIREMENT_INCLUDE,
+      select: QUOTE_REQUIREMENT_SELECT,
     });
+  }
+
+  /**
+   * Sube (o reemplaza) el archivo real de un requisito de cotización --
+   * Etapa 2 (ver docs/02-roadmap.md ítem 4). Subir un archivo marca el
+   * requisito como entregado en el mismo `update` (decisión explícita:
+   * un documento real adjunto ES la entrega, no hace falta un segundo
+   * toggle manual aparte) -- el `PATCH` de `setQuoteRequirementDelivered`
+   * se deja igual por compatibilidad, pero la pantalla ya no lo usa para
+   * requisitos con archivo.
+   */
+  async uploadQuoteRequirementFile(ideQuoteRequirement: string, dto: UploadRequirementFileDto, actor: string) {
+    const row = await this.prisma.tQuoteRequirement.findUnique({ where: { IdeQuoteRequirement: ideQuoteRequirement } });
+    if (!row) throw new NotFoundException(`No existe requisito de cotización con id "${ideQuoteRequirement}"`);
+    const now = new Date();
+    const data: DeliveredFlag = { indDelivered: true, usrDelivered: actor, tstDelivered: now.toISOString() };
+    return this.prisma.tQuoteRequirement.update({
+      where: { IdeQuoteRequirement: ideQuoteRequirement },
+      data: {
+        FileData: Buffer.from(dto.fileBase64, 'base64'),
+        DesFileName: dto.fileName,
+        Data: data as unknown as Prisma.InputJsonValue,
+        UsrModification: actor,
+        TstModification: now,
+      },
+      select: QUOTE_REQUIREMENT_SELECT,
+    });
+  }
+
+  /** Descarga el archivo de un requisito de cotización -- `FileData` se
+   *  lee acá nomás (no en `listForQuote`/`uploadQuoteRequirementFile`,
+   *  ver el doc-comment de `QUOTE_REQUIREMENT_SELECT`). */
+  async downloadQuoteRequirementFile(ideQuoteRequirement: string): Promise<{ bytes: Buffer; desFileName: string }> {
+    const row = await this.prisma.tQuoteRequirement.findUnique({
+      where: { IdeQuoteRequirement: ideQuoteRequirement },
+      select: { FileData: true, DesFileName: true },
+    });
+    if (!row || !row.FileData) {
+      throw new NotFoundException(`No hay archivo cargado para el requisito de cotización "${ideQuoteRequirement}"`);
+    }
+    return { bytes: row.FileData, desFileName: row.DesFileName ?? 'documento' };
+  }
+
+  /** Igual que `uploadQuoteRequirementFile` pero para un requisito ya
+   *  copiado a un contrato (pestaña "Requisitos" del detalle de
+   *  contrato). */
+  async uploadContractRequirementFile(ideContractRequirement: string, dto: UploadRequirementFileDto, actor: string) {
+    const row = await this.prisma.tContractRequirement.findUnique({
+      where: { IdeContractRequirement: ideContractRequirement },
+    });
+    if (!row) throw new NotFoundException(`No existe requisito de contrato con id "${ideContractRequirement}"`);
+    const now = new Date();
+    const data: DeliveredFlag = { indDelivered: true, usrDelivered: actor, tstDelivered: now.toISOString() };
+    return this.prisma.tContractRequirement.update({
+      where: { IdeContractRequirement: ideContractRequirement },
+      data: {
+        FileData: Buffer.from(dto.fileBase64, 'base64'),
+        DesFileName: dto.fileName,
+        Data: data as unknown as Prisma.InputJsonValue,
+        UsrModification: actor,
+        TstModification: now,
+      },
+      select: CONTRACT_REQUIREMENT_SELECT,
+    });
+  }
+
+  async downloadContractRequirementFile(ideContractRequirement: string): Promise<{ bytes: Buffer; desFileName: string }> {
+    const row = await this.prisma.tContractRequirement.findUnique({
+      where: { IdeContractRequirement: ideContractRequirement },
+      select: { FileData: true, DesFileName: true },
+    });
+    if (!row || !row.FileData) {
+      throw new NotFoundException(`No hay archivo cargado para el requisito de contrato "${ideContractRequirement}"`);
+    }
+    return { bytes: row.FileData, desFileName: row.DesFileName ?? 'documento' };
+  }
+
+  /**
+   * Bloquea "Generar contrato" si falta subir el archivo de un
+   * requisito obligatorio (`SProductRequirement.IndMandatory`) -- Etapa
+   * 2 (ver docs/02-roadmap.md ítem 4), pedido explícito del usuario:
+   * validado también acá (no solo deshabilitando el botón en el
+   * frontend), mismo criterio que
+   * `ContractsService.assertPersonsReadyForIssuance`. Llamado desde
+   * `ContractsService.create()` justo al lado de esa otra validación.
+   * Re-resuelve el checklist primero (`resolveForQuote`, idempotente)
+   * por si el usuario llega a "Generar contrato" sin haber abierto antes
+   * el paso "Requisitos" del wizard.
+   */
+  async assertQuoteRequirementsReady(ideQuote: string, actor: string): Promise<void> {
+    await this.resolveForQuote(ideQuote, actor);
+    const missing = await this.prisma.tQuoteRequirement.findMany({
+      where: {
+        TQuoteRisk: { IdeQuote: ideQuote },
+        FileData: null,
+        SProductRequirement: { IndMandatory: true },
+      },
+      select: {
+        SProductRequirement: { select: { DesShort: true, SRequirement: { select: { DesRequirement: true } } } },
+      },
+    });
+    if (missing.length === 0) return;
+    const names = missing.map((m) => m.SProductRequirement.DesShort ?? m.SProductRequirement.SRequirement.DesRequirement);
+    throw new ConflictException(
+      `No se puede generar el contrato -- faltan documentos obligatorios: ${names.join(', ')}`,
+    );
   }
 
   /**

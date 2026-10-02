@@ -165,6 +165,7 @@ export class ContractsService {
     }
 
     await this.assertPersonsReadyForIssuance(quote.IdeQuote);
+    await this.requirementsService.assertQuoteRequirementsReady(quote.IdeQuote, actor);
 
     const ideContract = await this.prisma.$transaction(
       async (tx) => {
@@ -959,6 +960,16 @@ export class ContractsService {
                 /** Requisitos copiados de la cotización al contratar
                  *  (ver `copyRisksAndCoverages`) -- por riesgo y,
                  *  opcionalmente, por cobertura puntual dentro del riesgo. */
+                /** Requisitos copiados de la cotización al contratar
+                 *  (ver `copyRisksAndCoverages`) -- por riesgo y,
+                 *  opcionalmente, por cobertura puntual dentro del riesgo.
+                 *  `FileData` (bytea, Etapa 2) viaja en esta consulta
+                 *  porque `include` no permite excluir columnas
+                 *  escalares -- se quita a mano más abajo, justo antes
+                 *  de devolver el contrato (restringir acá con `select`
+                 *  rompía la inferencia de tipos del genérico de
+                 *  `enrichDistributionChannels`, un problema conocido de
+                 *  Prisma con árboles de `include` profundos). */
                 TContractRequirement: {
                   include: { SProductRequirement: { include: { SRequirement: true } }, SState: true },
                 },
@@ -979,6 +990,17 @@ export class ContractsService {
     });
     if (!contract) {
       throw new NotFoundException(`No existe contrato con id "${ideContract}"`);
+    }
+    // `FileData` (bytea, Etapa 2 de Requisitos) no tiene sentido mandarlo
+    // en cada fila del detalle del contrato -- se descarga aparte por
+    // `ContractRequirementsController.downloadFile`. `DesFileName` se
+    // deja (si no es null, hay archivo cargado).
+    for (const file of contract.TContractFile) {
+      for (const risk of file.TFileRisk) {
+        for (const requirement of risk.TContractRequirement) {
+          delete (requirement as { FileData?: unknown }).FileData;
+        }
+      }
     }
     return this.enrichDistributionChannels(contract);
   }
@@ -2012,6 +2034,11 @@ export class ContractsService {
             IdeFileRisk: fileRisk.IdeFileRisk,
             IdeProductRequirement: requirement.IdeProductRequirement,
             Data: requirement.Data ?? undefined,
+            // Si el Tomador/Titular ya subió el archivo al cotizar
+            // (Etapa 2 de Requisitos), se copia junto con el resto --
+            // no tiene sentido pedirlo de nuevo al contratar.
+            FileData: requirement.FileData ?? undefined,
+            DesFileName: requirement.DesFileName ?? undefined,
             IdeState: ideContractRequirementInitial,
             UsrCreation: actor,
             TstCreation: now,
@@ -2070,6 +2097,8 @@ export class ContractsService {
               IdeRiskCoverage: riskCoverage.IdeRiskCoverage,
               IdeProductRequirement: requirement.IdeProductRequirement,
               Data: requirement.Data ?? undefined,
+              FileData: requirement.FileData ?? undefined,
+              DesFileName: requirement.DesFileName ?? undefined,
               IdeState: ideContractRequirementInitial,
               UsrCreation: actor,
               TstCreation: now,

@@ -2715,6 +2715,8 @@ model TContractRequirement {
   TstCreation            DateTime            @db.Timestamp(6)
   UsrModification        String              @db.VarChar(60)
   TstModification        DateTime            @db.Timestamp(6)
+  FileData               Bytes?
+  DesFileName            String?             @db.VarChar(255)
   SProductRequirement    SProductRequirement @relation(fields: [IdeProductRequirement], references: [IdeProductRequirement], onDelete: NoAction, onUpdate: NoAction, map: "FK_TContractRequirement_SProductRequirement")
   SState                 SState              @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_TContractRequirement_SState")
   TFileRisk              TFileRisk           @relation(fields: [IdeFileRisk], references: [IdeFileRisk], onDelete: NoAction, onUpdate: NoAction, map: "FK_TContractRequirement_TFileRisk")
@@ -3127,6 +3129,8 @@ model TQuoteRequirement {
   TstCreation           DateTime            @db.Timestamp(6)
   UsrModification       String              @db.VarChar(60)
   TstModification       DateTime            @db.Timestamp(6)
+  FileData              Bytes?
+  DesFileName           String?             @db.VarChar(255)
   SProductRequirement   SProductRequirement @relation(fields: [IdeProductRequirement], references: [IdeProductRequirement], onDelete: NoAction, onUpdate: NoAction, map: "FK_TQuoteRequirement_SProductRequirement")
   SState                SState              @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_TQuoteRequirement_SState")
   TQuoteCoverage        TQuoteCoverage?     @relation(fields: [IdeQuoteCoverage], references: [IdeQuoteCoverage], onDelete: NoAction, onUpdate: NoAction, map: "FK_TQuoteRequirement_TQuoteCoverage")

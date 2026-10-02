@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { fileToBase64 } from '../../core/files/file.util';
 
 /** Formas del JSON real que devuelve `underwriting-service`
  * (`QuotesService.buildPricingResult`, ver su README/código fuente --
@@ -249,6 +250,9 @@ export interface QuotePerson {
 export interface QuoteRequirementRow {
   IdeQuoteRequirement: string;
   Data: { indDelivered: boolean; usrDelivered: string; tstDelivered: string } | null;
+  /** Nombre del archivo subido (Etapa 2, ver docs/02-roadmap.md ítem 4) --
+   *  `null` significa que todavía no se subió nada para este requisito. */
+  DesFileName: string | null;
   SProductRequirement: {
     IndMandatory: boolean;
     DesShort: string | null;
@@ -398,5 +402,33 @@ export class QuotingService {
       `${this.base}/${ideQuote}/requirements/${ideQuoteRequirement}`,
       { delivered },
     );
+  }
+
+  /** `PATCH :id/requirements/:ideQuoteRequirement/file` -- Etapa 2 (ver
+   *  docs/02-roadmap.md ítem 4): sube el archivo real del requisito, que
+   *  queda marcado como entregado en el mismo paso (ver doc-comment de
+   *  `RequirementsService.uploadQuoteRequirementFile` en el backend). */
+  async uploadRequirementFile(
+    ideQuote: string,
+    ideQuoteRequirement: string,
+    file: File,
+  ): Promise<QuoteRequirementRow> {
+    const fileBase64 = await fileToBase64(file);
+    return new Promise((resolve, reject) => {
+      this.http
+        .patch<QuoteRequirementRow>(`${this.base}/${ideQuote}/requirements/${ideQuoteRequirement}/file`, {
+          fileName: file.name,
+          fileBase64,
+        })
+        .subscribe({ next: resolve, error: reject });
+    });
+  }
+
+  /** `GET :id/requirements/:ideQuoteRequirement/file` -- descarga el
+   *  archivo ya subido. */
+  downloadRequirementFile(ideQuote: string, ideQuoteRequirement: string): Observable<Blob> {
+    return this.http.get(`${this.base}/${ideQuote}/requirements/${ideQuoteRequirement}/file`, {
+      responseType: 'blob',
+    });
   }
 }
