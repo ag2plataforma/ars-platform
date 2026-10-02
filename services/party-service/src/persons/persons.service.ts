@@ -1,9 +1,10 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService, TPerson } from '@ars-platform/database';
+import { Prisma, PrismaService, TPerson } from '@ars-platform/database';
 import { StateMachineService } from '@ars-platform/shared-common';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
 import { LookupPersonDto } from './dto/lookup-person.dto';
+import { ListPersonsDto } from './dto/list-persons.dto';
 import { CreateAddressDto } from './dto/create-address.dto';
 import { UpdateAddressDto } from './dto/update-address.dto';
 import { CreateContactDataDto } from './dto/create-contact-data.dto';
@@ -26,8 +27,11 @@ import { UpdateContactDataDto } from './dto/update-contact-data.dto';
  * real): toda persona creada acá nace `IndLead=true`/`IndClient=false`.
  * El original solo pone `IndClient=true` + `TstRelationshipStart=now()`
  * al crear un CONTRATO (`FContractPerson('SETQUOTE',...)`), nunca antes
- * -- ese paso es de underwriting-service (fase de contratación,
- * todavía no implementada), no de este servicio.
+ * -- ese paso es de underwriting-service (`ContractsService.
+ * setContractPersons`), no de este servicio. Mutuamente excluyentes
+ * desde el `update` agregado ahí (2026-10-02, pedido explícito del
+ * usuario): ese mismo paso también apaga `IndLead` -- un cliente no
+ * vuelve a ser "lead" aunque después genere una cotización nueva.
  *
  * Reglas agregadas explícitamente, ausentes como validación en el
  * original (que dependía del frontend Angular para no ofrecer más de
@@ -48,6 +52,196 @@ export class PersonsService {
     private readonly prisma: PrismaService,
     private readonly stateMachine: StateMachineService,
   ) {}
+
+  /**
+   * Listado paginado de "Personas" (CRM-lite, docs/02-roadmap.md item 6)
+   * -- hasta ahora `TPerson` solo se buscaba al vuelo (`lookup`/`search`,
+   * acotado a 20 resultados) dentro de un flujo puntual (Cotización,
+   * Corredores). Mismo patrón que `ContractsService.findAll`: `where`
+   * armado a partir de los filtros, `Promise.all` de `findMany`+`count`,
+   * respuesta `{items, total, page, limit}`.
+   */
+  private static readonly SORTABLE_FIELDS: Record<
+    string,
+    (dir: Prisma.SortOrder) => Prisma.TPersonOrderByWithRelationInput
+  > = {
+    desFirstName: (dir) => ({ DesFirstName: dir }),
+    desLastName1: (dir) => ({ DesLastName1: dir }),
+    desEmail: (dir) => ({ DesEmail: dir }),
+    numIdentification: (dir) => ({ NumIdentification: dir }),
+    tstCreation: (dir) => ({ TstCreation: dir }),
+  };
+
+  private resolveOrderBy(query: ListPersonsDto): Prisma.TPersonOrderByWithRelationInput {
+    const factory = query.sortField ? PersonsService.SORTABLE_FIELDS[query.sortField] : undefined;
+    if (!factory) return { TstCreation: 'desc' };
+    return factory(query.sortOrder === -1 ? 'desc' : 'asc');
+  }
+
+  async findAll(query: ListPersonsDto) {
+    const terms = query.q
+      ? query.q
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean)
+      : [];
+
+    const where: Prisma.TPersonWhereInput = {
+      ...(query.indLead !== undefined ? { IndLead: query.indLead } : {}),
+      ...(query.indClient !== undefined ? { IndClient: query.indClient } : {}),
+      ...(terms.length > 0
+        ? {
+            AND: terms.map((term) => ({
+              OR: [
+                { DesFirstName: { contains: term, mode: 'insensitive' as const } },
+                { DesMiddleName: { contains: term, mode: 'insensitive' as const } },
+                { DesLastName1: { contains: term, mode: 'insensitive' as const } },
+                { DesLastName2: { contains: term, mode: 'insensitive' as const } },
+                { DesEmail: { contains: term, mode: 'insensitive' as const } },
+                { NumIdentification: { contains: term, mode: 'insensitive' as const } },
+              ],
+            })),
+          }
+        : {}),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.tPerson.findMany({
+        where,
+        orderBy: this.resolveOrderBy(query),
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+      }),
+      this.prisma.tPerson.count({ where }),
+    ]);
+
+    return { items: rows, total, page: query.page, limit: query.limit };
+  }
+
+  /**
+   * Cotizaciones/contratos donde aparece esta persona -- pedido
+   * explícito del usuario al definir el alcance de "Personas" (CRM-lite:
+   * poder ver desde la persona qué cotizó/contrató). Vía Prisma directo
+   * sobre tablas que "pertenecen" a underwriting-service, mismo criterio
+   * ya establecido en todo el monorepo (un solo schema compartido;
+   * `ContractsService`/`QuotesService` ya acceden a `TPerson` directo sin
+   * pasar por este servicio) -- no amerita un cliente HTTP para una
+   * lectura simple.
+   *
+   * Cotizaciones: `TQuote.IdePerson` (Tomador, FK directa) UNIDO con
+   * `TQuotePerson` (cualquier otro rol, ej. Titular) -- una persona
+   * puede aparecer en una cotización por cualquiera de las dos vías,
+   * deduplicado por `IdeQuote`. Contratos: únicamente vía
+   * `TContractPerson` (no hay FK directa de persona en `TContract`).
+   * No se agrega a `findOne` (que varios llamadores ya consumen con un
+   * shape fijo, ej. el diálogo "Cambiar datos" de Tomador/Titular) --
+   * endpoint aparte para no romper esos consumidores.
+   */
+  async findRelated(idePerson: string) {
+    await this.findOne(idePerson);
+
+    const [quotesAsTomador, quotePersonRows, contractPersonRows] = await Promise.all([
+      this.prisma.tQuote.findMany({
+        where: { IdePerson: idePerson },
+        select: {
+          IdeQuote: true,
+          NumQuote: true,
+          TstCreation: true,
+          SProduct: { select: { DesProduct: true } },
+          SState: { select: { CodState: true, DesState: true } },
+        },
+      }),
+      this.prisma.tQuotePerson.findMany({
+        where: { IdePerson: idePerson },
+        select: {
+          SPersonRol: { select: { DesPersonRol: true } },
+          TQuote: {
+            select: {
+              IdeQuote: true,
+              NumQuote: true,
+              TstCreation: true,
+              SProduct: { select: { DesProduct: true } },
+              SState: { select: { CodState: true, DesState: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.tContractPerson.findMany({
+        where: { IdePerson: idePerson },
+        select: {
+          SPersonRol: { select: { DesPersonRol: true } },
+          TContract: {
+            select: {
+              IdeContract: true,
+              NumContract: true,
+              TstCreation: true,
+              SProduct: { select: { DesProduct: true } },
+              SState: { select: { CodState: true, DesState: true } },
+            },
+          },
+        },
+      }),
+    ]);
+
+    const quoteById = new Map<
+      string,
+      { ideQuote: string; numQuote: string; desProduct: string; codState: string; desState: string; tstCreation: Date }
+    >();
+    for (const q of quotesAsTomador) {
+      quoteById.set(q.IdeQuote, {
+        ideQuote: q.IdeQuote,
+        numQuote: q.NumQuote,
+        desProduct: q.SProduct.DesProduct,
+        codState: q.SState.CodState,
+        desState: q.SState.DesState,
+        tstCreation: q.TstCreation,
+      });
+    }
+    for (const row of quotePersonRows) {
+      if (!quoteById.has(row.TQuote.IdeQuote)) {
+        quoteById.set(row.TQuote.IdeQuote, {
+          ideQuote: row.TQuote.IdeQuote,
+          numQuote: row.TQuote.NumQuote,
+          desProduct: row.TQuote.SProduct.DesProduct,
+          codState: row.TQuote.SState.CodState,
+          desState: row.TQuote.SState.DesState,
+          tstCreation: row.TQuote.TstCreation,
+        });
+      }
+    }
+
+    const contractById = new Map<
+      string,
+      {
+        ideContract: string;
+        numContract: string;
+        desProduct: string;
+        codState: string;
+        desState: string;
+        tstCreation: Date;
+      }
+    >();
+    for (const row of contractPersonRows) {
+      if (!contractById.has(row.TContract.IdeContract)) {
+        contractById.set(row.TContract.IdeContract, {
+          ideContract: row.TContract.IdeContract,
+          numContract: row.TContract.NumContract,
+          desProduct: row.TContract.SProduct.DesProduct,
+          codState: row.TContract.SState.CodState,
+          desState: row.TContract.SState.DesState,
+          tstCreation: row.TContract.TstCreation,
+        });
+      }
+    }
+
+    const sortByDateDesc = <T extends { tstCreation: Date }>(rows: T[]): T[] =>
+      [...rows].sort((a, b) => b.tstCreation.getTime() - a.tstCreation.getTime());
+
+    return {
+      quotes: sortByDateDesc([...quoteById.values()]),
+      contracts: sortByDateDesc([...contractById.values()]),
+    };
+  }
 
   async create(dto: CreatePersonDto, actor: string) {
     await this.assertNoDuplicate(dto.desEmail, dto.numIdentification, dto.ideIdentificationType);

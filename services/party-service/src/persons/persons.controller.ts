@@ -5,6 +5,7 @@ import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
 import { LookupPersonDto } from './dto/lookup-person.dto';
 import { SearchPersonsDto } from './dto/search-persons.dto';
+import { ListPersonsDto } from './dto/list-persons.dto';
 import { CreateAddressDto } from './dto/create-address.dto';
 import { UpdateAddressDto } from './dto/update-address.dto';
 import { CreateContactDataDto } from './dto/create-contact-data.dto';
@@ -25,6 +26,13 @@ export class PersonsController {
     return this.service.create(dto, actor.code);
   }
 
+  // Listado paginado (pantalla "Personas", CRM-lite) -- sin conflicto de
+  // ruta con 'lookup'/'search'/':id', son todos segmentos distintos.
+  @Get()
+  findAll(@Query() query: ListPersonsDto) {
+    return this.service.findAll(query);
+  }
+
   // Antes de ':id' a propósito -- si no, Nest la matchea como :id="lookup".
   @Get('lookup')
   lookup(@Query() query: LookupPersonDto) {
@@ -40,6 +48,14 @@ export class PersonsController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);
+  }
+
+  // Cotizaciones/contratos asociados -- ver doc-comment de
+  // PersonsService.findRelated (endpoint aparte, no se agrega a
+  // findOne).
+  @Get(':id/related')
+  findRelated(@Param('id') id: string) {
+    return this.service.findRelated(id);
   }
 
   @Patch(':id')

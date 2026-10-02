@@ -1,0 +1,89 @@
+<p-toast />
+
+<div class="mx-auto flex max-w-6xl flex-col gap-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-lg font-semibold text-slate-900">{{ 'personsList.title' | transloco }}</h1>
+      <p class="text-sm text-slate-500">{{ 'personsList.subtitle' | transloco }}</p>
+    </div>
+    <button pButton type="button" [label]="'personsList.newButton' | transloco" icon="pi pi-plus" (click)="nueva()"></button>
+  </div>
+
+  <form [formGroup]="filters" class="flex flex-wrap items-end gap-6 rounded-lg border border-slate-200 p-4">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'personsList.searchLabel' | transloco }}</label>
+      <input
+        pInputText
+        type="text"
+        formControlName="q"
+        [placeholder]="'personsList.searchPlaceholder' | transloco"
+        class="w-72"
+      />
+    </div>
+    <div class="flex items-center gap-2 pb-2">
+      <p-checkbox formControlName="indLead" [binary]="true" inputId="indLead" />
+      <label for="indLead" class="text-sm text-slate-700">{{ 'personsList.leadsOnlyLabel' | transloco }}</label>
+    </div>
+    <div class="flex items-center gap-2 pb-2">
+      <p-checkbox formControlName="indClient" [binary]="true" inputId="indClient" />
+      <label for="indClient" class="text-sm text-slate-700">{{ 'personsList.clientsOnlyLabel' | transloco }}</label>
+    </div>
+  </form>
+
+  <p-table
+    [value]="items()"
+    [lazy]="true"
+    (onLazyLoad)="load($event)"
+    [paginator]="true"
+    [rows]="20"
+    [totalRecords]="total()"
+    [loading]="loading()"
+    [showCurrentPageReport]="true"
+    currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+    dataKey="IdePerson"
+    styleClass="rounded-lg border border-slate-200 text-sm"
+  >
+    <ng-template pTemplate="header">
+      <tr>
+        <th pSortableColumn="desFirstName"><span class="ars-th-flex">{{ 'personsList.nameColumn' | transloco }} <p-sortIcon field="desFirstName" /></span></th>
+        <th pSortableColumn="numIdentification"><span class="ars-th-flex">{{ 'personsList.documentColumn' | transloco }} <p-sortIcon field="numIdentification" /></span></th>
+        <th pSortableColumn="desEmail"><span class="ars-th-flex">{{ 'personsList.emailColumn' | transloco }} <p-sortIcon field="desEmail" /></span></th>
+        <th>{{ 'personsList.conditionColumn' | transloco }}</th>
+        <th pSortableColumn="tstCreation"><span class="ars-th-flex">{{ 'personsList.createdColumn' | transloco }} <p-sortIcon field="tstCreation" /></span></th>
+        <th></th>
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="body" let-item>
+      <tr class="cursor-pointer" (click)="abrir(item)">
+        <td>{{ nombreCompleto(item) }}</td>
+        <td>{{ item.NumIdentification ?? ('common.dash' | transloco) }}</td>
+        <td>{{ item.DesEmail }}</td>
+        <td>
+          <div class="flex items-center gap-2">
+            @if (item.IndLead) {
+              <p-tag [value]="'personsList.leadTag' | transloco" severity="info" />
+            }
+            @if (item.IndClient) {
+              <p-tag [value]="'personsList.clientTag' | transloco" severity="success" />
+            }
+          </div>
+        </td>
+        <td>{{ item.TstCreation | date: 'dd/MM/yyyy' }}</td>
+        <td>
+          <button
+            pButton
+            type="button"
+            [label]="'personsList.openButton' | transloco"
+            [text]="true"
+            (click)="abrir(item); $event.stopPropagation()"
+          ></button>
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="emptymessage">
+      <tr>
+        <td colspan="6" class="py-6 text-center text-sm text-slate-500">{{ 'personsList.emptyState' | transloco }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>

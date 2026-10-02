@@ -1,0 +1,64 @@
+<p-toast />
+
+<div class="mx-auto flex max-w-2xl flex-col gap-6">
+  <div>
+    <h1 class="text-lg font-semibold text-slate-900">{{ 'personForm.title' | transloco }}</h1>
+    <p class="text-sm text-slate-500">{{ 'personForm.subtitle' | transloco }}</p>
+  </div>
+
+  <form [formGroup]="form" (ngSubmit)="guardar()" class="flex flex-col gap-4 rounded-lg border border-slate-200 p-4">
+    <h2 class="text-sm font-semibold text-slate-900">{{ 'personDetail.dataSectionTitle' | transloco }}</h2>
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'personDetail.firstNameLabel' | transloco }}</label>
+        <input pInputText type="text" formControlName="desFirstName" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'personDetail.middleNameLabel' | transloco }}</label>
+        <input pInputText type="text" formControlName="desMiddleName" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'personDetail.lastName1Label' | transloco }}</label>
+        <input pInputText type="text" formControlName="desLastName1" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'personDetail.lastName2Label' | transloco }}</label>
+        <input pInputText type="text" formControlName="desLastName2" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'personDetail.emailLabel' | transloco }}</label>
+        <input pInputText type="email" formControlName="desEmail" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'personDetail.documentLabel' | transloco }}</label>
+        <input pInputText type="text" formControlName="numIdentification" />
+      </div>
+    </div>
+
+    <h2 class="text-sm font-semibold text-slate-900">{{ 'personForm.addressSectionTitle' | transloco }}</h2>
+    <p class="text-xs text-slate-500">{{ 'personForm.addressHint' | transloco }}</p>
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'personForm.addressLine1Label' | transloco }}</label>
+        <input pInputText type="text" formControlName="desAddressLine1" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'personForm.addressLine2Label' | transloco }}</label>
+        <input pInputText type="text" formControlName="desAddressLine2" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'personForm.postalCodeLabel' | transloco }}</label>
+        <input pInputText type="text" formControlName="codPostal" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'personForm.phoneLabel' | transloco }}</label>
+        <input pInputText type="text" formControlName="desPhone" />
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" [text]="true" (click)="cancelar()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco" [loading]="saving()"></button>
+    </div>
+  </form>
+</div>

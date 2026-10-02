@@ -19,6 +19,79 @@ export interface Person {
   NumIdentification: string | null;
 }
 
+/** Fila de `GET /persons` (plural) -- mismo objeto `TPerson` crudo, con
+ *  los campos adicionales que necesita el listado de la pantalla
+ *  "Personas" (CRM-lite, docs/02-roadmap.md item 6): Lead/Cliente y
+ *  fecha de alta. */
+export interface PersonListItem extends Person {
+  IndLead: boolean;
+  IndClient: boolean;
+  TstCreation: string;
+}
+
+export interface PersonListResponse {
+  items: PersonListItem[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+/** Filtros de `GET /persons` -- mismo shape que `ListPersonsDto` en el
+ *  backend real. */
+export interface ListPersonsParams {
+  q?: string;
+  indLead?: boolean;
+  indClient?: boolean;
+  page?: number;
+  limit?: number;
+  sortField?: string;
+  sortOrder?: number;
+}
+
+/** Fila de cotización/contrato asociado, tal como las devuelve
+ *  `PersonsService.findRelated` en el backend real (`GET
+ *  /persons/:id/related`). */
+export interface RelatedQuote {
+  ideQuote: string;
+  numQuote: string;
+  desProduct: string;
+  codState: string;
+  desState: string;
+  tstCreation: string;
+}
+
+export interface RelatedContract {
+  ideContract: string;
+  numContract: string;
+  desProduct: string;
+  codState: string;
+  desState: string;
+  tstCreation: string;
+}
+
+export interface PersonRelated {
+  quotes: RelatedQuote[];
+  contracts: RelatedContract[];
+}
+
+/** Payload de edición de datos básicos (`PATCH /persons/:id`) -- a
+ *  diferencia del backend real (`UpdatePersonDto`, que acepta ~15
+ *  campos demográficos opcionales vía uuid crudo), esta pantalla solo
+ *  expone los campos que no dependen de un selector de catálogo todavía
+ *  sin construir (género, país/localidad de nacimiento, profesión,
+ *  actividad económica, estado civil -- ver doc-comment de
+ *  `CreatePersonDto` en el backend: esos catálogos no tienen CRUD propio
+ *  todavía). El tipo de identificación tampoco se edita acá por el mismo
+ *  motivo -- el número de documento sí, sin cambiar su tipo. */
+export interface UpdatePersonPayload {
+  desFirstName?: string;
+  desMiddleName?: string;
+  desLastName1?: string;
+  desLastName2?: string;
+  desEmail?: string;
+  numIdentification?: string;
+}
+
 export interface LookupPersonCriteria {
   numIdentification?: string;
   email?: string;
@@ -26,7 +99,9 @@ export interface LookupPersonCriteria {
 
 export interface CreatePersonPayload {
   desFirstName: string;
+  desMiddleName?: string;
   desLastName1?: string;
+  desLastName2?: string;
   desEmail: string;
   numIdentification?: string;
 }
@@ -71,6 +146,8 @@ export interface PersonContactData {
 }
 
 export interface PersonDetail extends Person {
+  IndLead: boolean;
+  IndClient: boolean;
   TAddress: PersonAddress[];
   TContactData: PersonContactData[];
 }
@@ -93,6 +170,29 @@ export class PersonsService {
   private readonly base = `${environment.apiUrl}/party/persons`;
 
   constructor(private readonly http: HttpClient) {}
+
+  /** `GET /persons` (plural) -- listado paginado de la pantalla
+   *  "Personas" (CRM-lite). Mismo criterio de armado de `HttpParams` que
+   *  `QuotingService.list`. */
+  list(params: ListPersonsParams): Observable<PersonListResponse> {
+    let httpParams = new HttpParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== '') {
+        httpParams = httpParams.set(key, String(value));
+      }
+    }
+    return this.http.get<PersonListResponse>(this.base, { params: httpParams });
+  }
+
+  /** `GET /persons/:id/related` -- cotizaciones/contratos asociados,
+   *  mostrados en el detalle de la persona. */
+  findRelated(idePerson: string): Observable<PersonRelated> {
+    return this.http.get<PersonRelated>(`${this.base}/${idePerson}/related`);
+  }
+
+  update(idePerson: string, payload: UpdatePersonPayload): Observable<Person> {
+    return this.http.patch<Person>(`${this.base}/${idePerson}`, payload);
+  }
 
   lookup(criteria: LookupPersonCriteria): Observable<Person> {
     let params = new HttpParams();

@@ -240,6 +240,17 @@ const SITE_MAP_ITEMS = [
       },
     ],
   },
+  {
+    // "Personas" (CRM-lite, docs/02-roadmap.md item 6) -- listado/alta/
+    // detalle de TPerson independiente de los flujos al vuelo que ya la
+    // crean (Cotización, Corredores). Agregado 2026-10-01, al final del
+    // orden existente.
+    cod: 'PERSONAS',
+    des: 'Personas',
+    order: 14,
+    path: '/personas',
+    icon: 'pi-users',
+  },
 ];
 
 async function main() {

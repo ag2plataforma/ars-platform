@@ -68,6 +68,32 @@ export const routes: Routes = [
         ],
       },
       {
+        // "Personas" (CRM-lite, docs/02-roadmap.md item 6) -- listado +
+        // alta + detalle independientes de los flujos al vuelo que ya
+        // crean TPerson (Cotización, Corredores). Mismo patrón que
+        // 'cotizacion'/'contratos': 'nueva' (segmento literal) ANTES que
+        // ':id'.
+        path: 'personas',
+        children: [
+          {
+            path: '',
+            pathMatch: 'full',
+            loadComponent: () =>
+              import('./features/persons/persons-list.component').then((m) => m.PersonsListComponent),
+          },
+          {
+            path: 'nueva',
+            loadComponent: () =>
+              import('./features/persons/person-form.component').then((m) => m.PersonFormComponent),
+          },
+          {
+            path: ':id',
+            loadComponent: () =>
+              import('./features/persons/person-detail.component').then((m) => m.PersonDetailComponent),
+          },
+        ],
+      },
+      {
         path: 'catalogos',
         loadComponent: () =>
           import('./features/catalogs/catalogs.component').then((m) => m.CatalogsComponent),
