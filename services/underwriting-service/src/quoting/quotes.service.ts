@@ -908,6 +908,13 @@ export class QuotesService {
       ideQuote,
     );
 
+    // Recargos/descuentos genéricos (Fase 2 backlog ítem 7, ver
+    // docs/02-roadmap.md) -- a diferencia de Impacto Social, no depende
+    // del producto/flujo de proceso: cualquier `SAdjustment` "Manual"
+    // Activo se ofrece para cualquier cotización, el operador elige
+    // cuáles aplicar (0 o más).
+    const genericAdjustments = await this.resolveGenericAdjustments(ideQuote);
+
     return {
       ideQuote: quote.IdeQuote,
       numQuote: quote.NumQuote,
@@ -925,6 +932,7 @@ export class QuotesService {
         ? { ideContract: quote.TContract[0].IdeContract, numContract: quote.TContract[0].NumContract }
         : null,
       socialImpact,
+      genericAdjustments,
       risks: quote.TQuoteRisk.map((risk) => ({
         ideQuoteRisk: risk.IdeQuoteRisk,
         numRisk: risk.NumRisk,
@@ -1115,6 +1123,95 @@ export class QuotesService {
     // aca. `ContractsService.createInitialMovements` re-evalua la MISMA
     // cadena al contratar, asi que el descuento llega solo hasta el
     // contrato/factura real tambien, sin tocar ese servicio.
+    await this.calculateQuoteCoverageConcepts(quote.IdeProduct, ideQuote, actor);
+
+    return this.buildPricingResult(ideQuote);
+  }
+
+  /**
+   * Recargos/descuentos genéricos (Fase 2 backlog ítem 7, ver
+   * docs/02-roadmap.md): catálogo `SAdjustment` "Manual" Activo, con
+   * `applied` indicando si ya está aplicado a esta cotización puntual
+   * (`TQuoteAdjustment`) -- lo consume el wizard para pintar el checklist
+   * del paso "Recargos y descuentos". Los ajustes "Automático"
+   * (`IndAutomatic: true`) quedan deliberadamente AFUERA de este listado
+   * -- por ahora no hay ninguna condición real que los aplique sola (ver
+   * doc-comment de `setup-generic-adjustments-tables.js`), así que no
+   * tendría sentido ofrecerlos para que el operador los marque a mano.
+   */
+  private async resolveGenericAdjustments(ideQuote: string) {
+    const [catalog, applied] = await Promise.all([
+      this.prisma.sAdjustment.findMany({
+        where: { IndAutomatic: false, SState: { CodState: 'ACTIVO' } },
+        orderBy: { DesAdjustment: 'asc' },
+      }),
+      this.prisma.tQuoteAdjustment.findMany({
+        where: { IdeQuote: ideQuote },
+        select: { IdeAdjustment: true },
+      }),
+    ]);
+    const appliedIds = new Set(applied.map((row) => row.IdeAdjustment));
+    return catalog.map((adjustment) => ({
+      ideAdjustment: adjustment.IdeAdjustment,
+      codAdjustment: adjustment.CodAdjustment,
+      desAdjustment: adjustment.DesAdjustment,
+      pctAdjustment: Number(adjustment.PctAdjustment),
+      applied: appliedIds.has(adjustment.IdeAdjustment),
+    }));
+  }
+
+  /**
+   * Reemplaza el set completo de `SAdjustment` "Manual" aplicados a esta
+   * cotización (`TQuoteAdjustment`) -- lista vacía = el operador
+   * desmarcó todos. Valida que cada id exista, esté Activo y sea
+   * "Manual" (un ajuste Automático o Inactivo no se aplica a mano, ver
+   * doc-comment de `CreateAdjustmentDto`). Mismo cierre que
+   * `submitSocialImpactAnswers`: recalcula la cadena de reglas para que
+   * `adjustment('COD')` quede reflejado de inmediato en `TQuoteCoverage.Prime`
+   * (y por lo tanto en el Resumen) sin esperar a que el usuario navegue
+   * a otro paso.
+   */
+  async setQuoteAdjustments(ideQuote: string, ideAdjustments: string[], actor: string) {
+    const quote = await this.prisma.tQuote.findUnique({ where: { IdeQuote: ideQuote } });
+    if (!quote) {
+      throw new NotFoundException(`No existe cotización con id "${ideQuote}"`);
+    }
+
+    const uniqueIds = [...new Set(ideAdjustments)];
+    const adjustments = uniqueIds.length
+      ? await this.prisma.sAdjustment.findMany({
+          where: { IdeAdjustment: { in: uniqueIds }, IndAutomatic: false, SState: { CodState: 'ACTIVO' } },
+        })
+      : [];
+    if (adjustments.length !== uniqueIds.length) {
+      throw new ConflictException(
+        'Uno o más recargos/descuentos no existen, están inactivos o son automáticos',
+      );
+    }
+
+    await this.prisma.tQuoteAdjustment.deleteMany({
+      where: { IdeQuote: ideQuote, IdeAdjustment: { notIn: uniqueIds } },
+    });
+    const existing = await this.prisma.tQuoteAdjustment.findMany({
+      where: { IdeQuote: ideQuote },
+      select: { IdeAdjustment: true },
+    });
+    const existingIds = new Set(existing.map((row) => row.IdeAdjustment));
+    const toCreate = adjustments.filter((adjustment) => !existingIds.has(adjustment.IdeAdjustment));
+    if (toCreate.length > 0) {
+      const now = new Date();
+      await this.prisma.tQuoteAdjustment.createMany({
+        data: toCreate.map((adjustment) => ({
+          IdeQuote: ideQuote,
+          IdeAdjustment: adjustment.IdeAdjustment,
+          UsrCreation: actor,
+          TstCreation: now,
+          UsrModification: actor,
+          TstModification: now,
+        })),
+      });
+    }
+
     await this.calculateQuoteCoverageConcepts(quote.IdeProduct, ideQuote, actor);
 
     return this.buildPricingResult(ideQuote);

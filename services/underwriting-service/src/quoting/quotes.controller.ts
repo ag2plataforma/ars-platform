@@ -7,6 +7,7 @@ import { SetQuotePersonDto } from './dto/set-quote-person.dto';
 import { TransitionQuoteStateDto } from './dto/transition-quote-state.dto';
 import { ListQuotesDto } from './dto/list-quotes.dto';
 import { SubmitSocialImpactAnswersDto } from '../social-impact/dto/submit-social-impact-answers.dto';
+import { SetQuoteAdjustmentsDto } from './dto/set-quote-adjustments.dto';
 
 /**
  * Fase 1 del motor de cotización real (ver el comentario de cabecera de
@@ -117,5 +118,21 @@ export class QuotesController {
     @Headers('authorization') authorization: string,
   ) {
     return this.service.submitSocialImpactAnswers(id, dto, actor.code, authorization);
+  }
+
+  /**
+   * Recargos/descuentos genéricos (Fase 2 backlog ítem 7, ver
+   * docs/02-roadmap.md y doc-comment de `AdjustmentsService` en
+   * product-rating-service): reemplaza el set completo de `SAdjustment`
+   * "Manual" aplicados a esta cotización y recalcula el precio, mismo
+   * patrón que `submitSocialImpactAnswers`.
+   */
+  @Patch(':id/adjustments')
+  setAdjustments(
+    @Param('id') id: string,
+    @Body() dto: SetQuoteAdjustmentsDto,
+    @CurrentUser() actor: JwtPayload,
+  ) {
+    return this.service.setQuoteAdjustments(id, dto.ideAdjustments, actor.code);
   }
 }

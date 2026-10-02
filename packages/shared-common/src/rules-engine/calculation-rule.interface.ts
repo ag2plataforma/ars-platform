@@ -175,6 +175,12 @@ export interface RateValueResolver {
 export interface AppliedAdjustment {
   codAdjustment: string;
   pctPrimaAdjustment: number;
+  /** Nombre legible del catálogo genérico `SAdjustment` (Fase 2 backlog
+   *  ítem 7, ver docs/02-roadmap.md) -- ausente para `'SOCIAL_IMPACT'`,
+   *  que no tiene un catálogo con nombre propio (el frontend usa su
+   *  propio mapeo fijo para ese código, ver `appliedAdjustmentLabel` en
+   *  `QuotesComponent`). */
+  desAdjustment?: string;
 }
 
 export interface AdjustmentValueResolver {

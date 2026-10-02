@@ -21,13 +21,15 @@ import { PrismaService } from '../prisma.service';
  *    asi que esta cadena nunca es opcional una vez que existe el
  *    `TFileRisk`.
  *
- * Despues, segun `codAdjustment`, busca el valor ya calculado en la
- * tabla de dominio de esa feature -- hoy solo existe Impacto Social
- * (`SOCIAL_IMPACT` -> `TQuoteSocialImpactAnswer.PctPrimaAdjustment`).
- * Una feature futura de recargos/descuentos se agrega como un nuevo
- * `case`, sin tocar el motor de reglas ni los servicios de
- * cotizacion/contrato -- ver el doc-comment de la interfaz para el por
- * que de este diseño.
+ * Despues, segun `codAdjustment`, busca el valor ya calculado. Impacto
+ * Social (`SOCIAL_IMPACT`) sigue siendo un `case` dedicado porque tiene
+ * su propio calculo externo (`social-impact-service`) y su propia tabla
+ * (`TQuoteSocialImpactAnswer.PctPrimaAdjustment`). Cualquier OTRO
+ * `codAdjustment` (Fase 2 backlog item 7, ver docs/02-roadmap.md) cae en
+ * el `default` y se resuelve contra el catalogo GENERICO
+ * `SAdjustment`/`TQuoteAdjustment` -- un admin lo da de alta desde la
+ * pantalla "Recargos y descuentos" sin que este resolver necesite un
+ * `case` nuevo por cada uno.
  *
  * Igual que el resto de los resolvers del motor: sin dato (cotizacion
  * sin ese paso contestado, o `codAdjustment` desconocido), devuelve `0`
@@ -64,8 +66,21 @@ export class PrismaAdjustmentValueResolver implements AdjustmentValueResolver {
         });
         return answer ? Number(answer.PctPrimaAdjustment) : 0;
       }
-      default:
-        return 0;
+      default: {
+        // Fase 2 backlog ítem 7 (ver docs/02-roadmap.md): cualquier
+        // `codAdjustment` sin `case` dedicado se resuelve contra el
+        // catálogo genérico `SAdjustment`/`TQuoteAdjustment` -- un admin
+        // lo da de alta desde la pantalla "Recargos y descuentos"
+        // (product-rating-service/AdjustmentsService) sin que este
+        // resolver necesite un `case` nuevo por cada uno. `0` si el
+        // código no existe en ningún lado (desconocido) o no está
+        // aplicado a esta cotización.
+        const applied = await db.tQuoteAdjustment.findFirst({
+          where: { IdeQuote: ideQuote, SAdjustment: { CodAdjustment: codAdjustment } },
+          select: { SAdjustment: { select: { PctAdjustment: true } } },
+        });
+        return applied ? Number(applied.SAdjustment.PctAdjustment) : 0;
+      }
     }
   }
 
@@ -109,6 +124,21 @@ export class PrismaAdjustmentValueResolver implements AdjustmentValueResolver {
       applied.push({
         codAdjustment: 'SOCIAL_IMPACT',
         pctPrimaAdjustment: Number(socialImpactAnswer.PctPrimaAdjustment),
+      });
+    }
+
+    // Fase 2 backlog ítem 7: ajustes genéricos aplicados a esta
+    // cotización (`TQuoteAdjustment`), ver doc-comment de
+    // `resolveAdjustmentValue` más arriba.
+    const genericAdjustments = await db.tQuoteAdjustment.findMany({
+      where: { IdeQuote: ideQuote },
+      select: { SAdjustment: { select: { CodAdjustment: true, DesAdjustment: true, PctAdjustment: true } } },
+    });
+    for (const row of genericAdjustments) {
+      applied.push({
+        codAdjustment: row.SAdjustment.CodAdjustment,
+        desAdjustment: row.SAdjustment.DesAdjustment,
+        pctPrimaAdjustment: Number(row.SAdjustment.PctAdjustment),
       });
     }
 

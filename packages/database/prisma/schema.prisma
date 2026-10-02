@@ -1948,6 +1948,7 @@ model SState {
   UsrModification                                  String                         @db.VarChar(60)
   TstModification                                  DateTime                       @db.Timestamp(6)
   SAccessConnection                                SAccessConnection[]
+  SAdjustment                                      SAdjustment[]
   SApplication                                     SApplication[]
   SApplicationRole                                 SApplicationRole[]
   SAttribute                                       SAttribute[]
@@ -3018,6 +3019,7 @@ model TQuote {
   SProduct                 SProduct                  @relation(fields: [IdeProduct], references: [IdeProduct], onDelete: NoAction, onUpdate: NoAction, map: "FK_TQuote_SProduct")
   SState                   SState                    @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_TQuote_SState")
   TPerson                  TPerson?                  @relation(fields: [IdePerson], references: [IdePerson], onDelete: NoAction, onUpdate: NoAction, map: "FK_TQuote_TPerson")
+  TQuoteAdjustment         TQuoteAdjustment[]
   TQuoteOperation          TQuoteOperation[]
   TQuotePerson             TQuotePerson[]
   TQuoteRisk               TQuoteRisk[]
@@ -3460,4 +3462,33 @@ model TBackgroundJobRun {
   SBackgroundJob      SBackgroundJob @relation(fields: [IdeBackgroundJob], references: [IdeBackgroundJob], onDelete: NoAction, onUpdate: NoAction, map: "FK_TBackgroundJobRun_SBackgroundJob")
 
   @@index([IdeBackgroundJob, TstStart(sort: Desc)], map: "IX_TBackgroundJobRun_IdeBackgroundJob_TstStart")
+}
+
+model SAdjustment {
+  IdeAdjustment    String             @id(map: "PK_SAdjustment") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  CodAdjustment    String             @unique(map: "UK_SAdjustment_01") @db.VarChar(60)
+  DesAdjustment    String             @db.VarChar(255)
+  PctAdjustment    Decimal            @db.Decimal(9, 4)
+  IndAutomatic     Boolean            @default(false)
+  IdeState         String             @db.Uuid
+  UsrCreation      String             @db.VarChar(60)
+  TstCreation      DateTime           @db.Timestamp(6)
+  UsrModification  String             @db.VarChar(60)
+  TstModification  DateTime           @db.Timestamp(6)
+  SState           SState             @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_SAdjustment_SState")
+  TQuoteAdjustment TQuoteAdjustment[]
+}
+
+model TQuoteAdjustment {
+  IdeQuoteAdjustment String      @id(map: "PK_TQuoteAdjustment") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  IdeQuote           String      @db.Uuid
+  IdeAdjustment      String      @db.Uuid
+  UsrCreation        String      @db.VarChar(60)
+  TstCreation        DateTime    @db.Timestamp(6)
+  UsrModification    String      @db.VarChar(60)
+  TstModification    DateTime    @db.Timestamp(6)
+  SAdjustment        SAdjustment @relation(fields: [IdeAdjustment], references: [IdeAdjustment], onDelete: NoAction, onUpdate: NoAction, map: "FK_TQuoteAdjustment_SAdjustment")
+  TQuote             TQuote      @relation(fields: [IdeQuote], references: [IdeQuote], onDelete: NoAction, onUpdate: NoAction, map: "FK_TQuoteAdjustment_TQuote")
+
+  @@unique([IdeQuote, IdeAdjustment], map: "UK_TQuoteAdjustment_01")
 }

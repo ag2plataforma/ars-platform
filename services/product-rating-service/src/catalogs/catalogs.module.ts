@@ -17,6 +17,8 @@ import { DeductibleTypesController } from './deductible-types.controller';
 import { DeductibleTypesService } from './deductible-types.service';
 import { LimitTypesController } from './limit-types.controller';
 import { LimitTypesService } from './limit-types.service';
+import { AdjustmentsController } from './adjustments.controller';
+import { AdjustmentsService } from './adjustments.service';
 
 /**
  * Los 8 catálogos "simples" necesarios para poder configurar
@@ -26,6 +28,12 @@ import { LimitTypesService } from './limit-types.service';
  * `SPlanProductRisk`/`SCoverage`/`SCoveragePlan`/`SCalculationRule`
  * (las 7 entidades "reales" del dominio) quedan para una siguiente
  * fase — ver docs/02-roadmap.md.
+ *
+ * `SAdjustment` (recargos/descuentos genéricos, Fase 2 backlog ítem 7,
+ * ver doc-comment de `AdjustmentsService`) se suma acá como noveno
+ * catálogo simple -- mismo molde Cod/Des, sin relaciones a otras
+ * entidades de dominio (a diferencia de `SCalculationRule`, que sí
+ * referencia Producto/CoveragePlan y por eso vive en `DomainModule`).
  */
 @Module({
   imports: [ProductRatingStateMachineModule], // StateMachineService, usado por los 8 *.service.ts
@@ -38,6 +46,7 @@ import { LimitTypesService } from './limit-types.service';
     InsuranceLinesController,
     DeductibleTypesController,
     LimitTypesController,
+    AdjustmentsController,
   ],
   providers: [
     RiskLevelsService,
@@ -48,6 +57,7 @@ import { LimitTypesService } from './limit-types.service';
     InsuranceLinesService,
     DeductibleTypesService,
     LimitTypesService,
+    AdjustmentsService,
   ],
 })
 export class CatalogsModule {}

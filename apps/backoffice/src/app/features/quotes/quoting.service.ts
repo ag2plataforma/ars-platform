@@ -68,6 +68,20 @@ export type SocialImpactInfo =
       pctPrimaAdjustment: number;
     };
 
+/** Fila de `genericAdjustments` en `QuotePricingResult` -- catálogo
+ *  `SAdjustment` "Manual" Activo (Fase 2 backlog ítem 7, ver
+ *  docs/02-roadmap.md), con `applied` indicando si ya está marcado para
+ *  esta cotización puntual. A diferencia de `SocialImpactInfo`, no
+ *  depende del producto -- cualquier cotización ve el mismo catálogo. */
+export interface GenericAdjustmentOption {
+  ideAdjustment: string;
+  codAdjustment: string;
+  desAdjustment: string;
+  /** Negativo = descuento, positivo = recargo. */
+  pctAdjustment: number;
+  applied: boolean;
+}
+
 export interface QuotePricingResult {
   ideQuote: string;
   numQuote: string;
@@ -80,6 +94,7 @@ export interface QuotePricingResult {
   /** No-null solo si ya se generó un contrato para esta cotización. */
   contract: QuoteContractRef | null;
   socialImpact: SocialImpactInfo;
+  genericAdjustments: GenericAdjustmentOption[];
   risks: QuoteRisk[];
 }
 
@@ -186,6 +201,9 @@ export interface QuoteSummaryRisk {
  * `QuotesComponent` para el mapeo a una etiqueta traducida. */
 export interface QuoteSummaryAppliedAdjustment {
   codAdjustment: string;
+  /** Nombre legible del catálogo genérico `SAdjustment` -- ausente para
+   *  `'SOCIAL_IMPACT'` (ver `AppliedAdjustment` en shared-common). */
+  desAdjustment?: string;
   pctPrimaAdjustment: number;
   /** Importe en moneda del ajuste (ya calculado en el backend a partir de
    *  `quotePrime` y `pctPrimaAdjustment` -- ver `QuotesService.getSummary`),
@@ -430,5 +448,13 @@ export class QuotingService {
     return this.http.get(`${this.base}/${ideQuote}/requirements/${ideQuoteRequirement}/file`, {
       responseType: 'blob',
     });
+  }
+
+  /** `PATCH :id/adjustments` -- Fase 2 backlog ítem 7 (ver
+   *  docs/02-roadmap.md): reemplaza el set completo de recargos/
+   *  descuentos "Manual" aplicados a la cotización y devuelve el pricing
+   *  ya recalculado (mismo shape que `price()`/`submitSocialImpactAnswers`). */
+  setAdjustments(ideQuote: string, ideAdjustments: string[]): Observable<QuotePricingResult> {
+    return this.http.patch<QuotePricingResult>(`${this.base}/${ideQuote}/adjustments`, { ideAdjustments });
   }
 }
