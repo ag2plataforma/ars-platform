@@ -1654,6 +1654,12 @@ export class ContractsService {
    * (BENEFICIARIO/ASEGURADO) NO se copian acá a nivel de contrato -- esos
    * son responsabilidad de `TFileRiskPerson`/`TContractFilePerson` a nivel
    * de riesgo/archivo, no de `TContractPerson`.
+   *
+   * `IndLead`/`IndClient` son mutuamente excluyentes -- pedido explícito
+   * del usuario (2026-10-02, al notar una persona con ambas banderas en
+   * `true` tras contratar): esta función también apaga `IndLead` en el
+   * mismo `update`. Corrección de los datos ya afectados antes de este
+   * cambio vía `packages/database/scripts/fix-person-lead-client-flags.js`.
    */
   /**
    * Requisito de negocio agregado explícitamente por el usuario (no
@@ -1735,7 +1741,17 @@ export class ContractsService {
       });
       await tx.tPerson.update({
         where: { IdePerson: quotePerson.IdePerson },
-        data: { IndClient: true, TstRelationshipStart: now, UsrModification: actor, TstModification: now },
+        // `IndLead: false` agregado a pedido explícito del usuario
+        // (2026-10-02): Lead y Cliente son mutuamente excluyentes -- un
+        // prospecto nace `IndLead=true`/`IndClient=false` (ver
+        // `PersonsService.create`) y deja de ser "lead" en el mismo
+        // instante en que se convierte en cliente (este `update`), no
+        // antes. Si más adelante esta misma persona ya cliente genera
+        // una cotización nueva, se queda como cliente (no vuelve a
+        // marcarse `IndLead=true`) -- mismo criterio que cualquier CRM:
+        // un cliente con una cotización en curso sigue siendo cliente,
+        // no "prospecto" otra vez.
+        data: { IndClient: true, IndLead: false, TstRelationshipStart: now, UsrModification: actor, TstModification: now },
       });
     }
   }
