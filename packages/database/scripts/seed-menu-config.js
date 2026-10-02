@@ -261,6 +261,20 @@ const SITE_MAP_ITEMS = [
     path: '/recargos-descuentos',
     icon: 'pi-percentage',
   },
+  {
+    // Pantalla básica de administración de usuarios (`UsersComponent`),
+    // agregada 2026-10-02 junto con los roles nuevos SALES/PORTFOLIO del
+    // dashboard de inicio (sin esta pantalla no había forma de asignarle
+    // un rol a un usuario desde el backoffice -- el backend de
+    // `iam-service` ya tenía el CRUD completo, sin consumidor). Restringir
+    // su visibilidad a ADMIN, si corresponde, se hace desde la pantalla
+    // "Roles y menú" (`SiteMapRolesTabComponent`), no acá.
+    cod: 'USUARIOS',
+    des: 'Usuarios',
+    order: 16,
+    path: '/usuarios',
+    icon: 'pi-user',
+  },
 ];
 
 async function main() {

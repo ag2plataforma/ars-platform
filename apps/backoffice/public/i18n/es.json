@@ -1292,5 +1292,24 @@
     "addressLine2Label": "Dirección (línea 2)",
     "postalCodeLabel": "Código postal",
     "phoneLabel": "Teléfono móvil"
+  },
+  "users": {
+    "listTitle": "Usuarios",
+    "subtitle": "Administración de cuentas de usuario y roles.",
+    "newButton": "Nuevo usuario",
+    "roleLabel": "Rol",
+    "allRolesPlaceholder": "Todos los roles",
+    "codUserColumn": "Usuario",
+    "userNameColumn": "Email",
+    "roleColumn": "Rol",
+    "emptyState": "No hay usuarios registrados.",
+    "createDialogTitle": "Nuevo usuario",
+    "editDialogTitle": "Editar usuario",
+    "codUserLabel": "Código de usuario",
+    "userNameLabel": "Email",
+    "passwordLabel": "Contraseña",
+    "passwordHint": "Mínimo 8 caracteres. El usuario podrá cambiarla luego.",
+    "createdDetail": "Usuario creado correctamente.",
+    "updatedDetail": "Usuario actualizado correctamente."
   }
 }

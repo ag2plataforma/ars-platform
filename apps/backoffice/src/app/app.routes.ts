@@ -99,6 +99,15 @@ export const routes: Routes = [
           import('./features/catalogs/catalogs.component').then((m) => m.CatalogsComponent),
       },
       {
+        // "Usuarios" -- administración de cuentas (`TUser` via
+        // `iam-service`), construida junto con el dashboard de KPIs por
+        // rol (Fase 5) para poder asignar los roles nuevos
+        // `SALES`/`PORTFOLIO` a usuarios reales.
+        path: 'usuarios',
+        loadComponent: () =>
+          import('./features/users/users.component').then((m) => m.UsersComponent),
+      },
+      {
         // Catálogo genérico de recargos/descuentos (docs/02-roadmap.md,
         // Fase 2 backlog ítem 7) -- pantalla bespoke, no el
         // `CatalogsComponent` genérico (ver doc-comment de

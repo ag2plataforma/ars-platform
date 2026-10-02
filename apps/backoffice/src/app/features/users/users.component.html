@@ -1,0 +1,120 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="mx-auto flex max-w-5xl flex-col gap-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-lg font-semibold text-slate-900">{{ 'users.listTitle' | transloco }}</h1>
+      <p class="text-sm text-slate-500">{{ 'users.subtitle' | transloco }}</p>
+    </div>
+    <button pButton type="button" icon="pi pi-plus" [label]="'users.newButton' | transloco" (click)="openCreate()"></button>
+  </div>
+
+  <form [formGroup]="roleFilter" class="flex flex-wrap items-end gap-6 rounded-lg border border-slate-200 p-4">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'users.roleLabel' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codRol"
+        [options]="[{ DesRol: ('users.allRolesPlaceholder' | transloco), CodRol: ANY_ROLE }, ...roles()]"
+        optionLabel="DesRol"
+        optionValue="CodRol"
+        styleClass="w-64"
+      />
+    </div>
+  </form>
+
+  <p-table
+    [value]="items()"
+    [lazy]="true"
+    (onLazyLoad)="load($event)"
+    [paginator]="true"
+    [rows]="20"
+    [totalRecords]="total()"
+    [loading]="loading()"
+    [showCurrentPageReport]="true"
+    currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+    dataKey="IdeUser"
+    styleClass="rounded-lg border border-slate-200"
+  >
+    <ng-template #header>
+      <tr>
+        <th>{{ 'users.codUserColumn' | transloco }}</th>
+        <th>{{ 'users.userNameColumn' | transloco }}</th>
+        <th>{{ 'users.roleColumn' | transloco }}</th>
+        <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+        <th class="w-32">{{ 'catalogs.actionsColumn' | transloco }}</th>
+      </tr>
+    </ng-template>
+    <ng-template #body let-row>
+      <tr>
+        <td>{{ row.CodUser }}</td>
+        <td>{{ row.UserName }}</td>
+        <td>{{ row.TRol?.DesRol }}</td>
+        <td>
+          <p-tag [value]="(isActive(row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isActive(row) ? 'success' : 'danger'" />
+        </td>
+        <td>
+          <div class="flex gap-1">
+            <button pButton type="button" icon="pi pi-pencil" [text]="true" severity="secondary" (click)="openEdit(row)"></button>
+            <button
+              pButton
+              type="button"
+              [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'"
+              [text]="true"
+              [severity]="isActive(row) ? 'danger' : 'success'"
+              (click)="toggleState(row)"
+            ></button>
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="5" class="py-6 text-center text-sm text-slate-500">{{ 'users.emptyState' | transloco }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-dialog
+  [header]="(dialogMode() === 'create' ? 'users.createDialogTitle' : 'users.editDialogTitle') | transloco"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  [style]="{ width: '28rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'users.codUserLabel' | transloco }}</label>
+      <input pInputText type="text" formControlName="codUser" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'users.userNameLabel' | transloco }}</label>
+      <input pInputText type="email" formControlName="userName" autocomplete="off" />
+    </div>
+    @if (dialogMode() === 'create') {
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'users.passwordLabel' | transloco }}</label>
+        <input pInputText type="password" formControlName="password" autocomplete="new-password" />
+        <p class="text-xs text-slate-500">{{ 'users.passwordHint' | transloco }}</p>
+      </div>
+    }
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'users.roleLabel' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codRol"
+        [options]="roles()"
+        optionLabel="DesRol"
+        optionValue="CodRol"
+        styleClass="w-full"
+      />
+    </div>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
+    </div>
+  </form>
+</p-dialog>
