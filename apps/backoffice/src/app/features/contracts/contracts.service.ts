@@ -398,6 +398,23 @@ export interface ChangePersonDataPayload {
   mobilePhone: string;
 }
 
+/** `GET /contracts/stats` -- widget "Cartera" del dashboard de inicio
+ *  (pedido explícito del usuario, 2026-10-02, ver docs/02-roadmap.md:
+ *  "Gráficos en el dashboard de inicio"). Ver el doc-comment de
+ *  `ContractsService.getPortfolioStats` en el backend para el detalle
+ *  del cálculo. */
+export interface ContractStatsByState {
+  codState: string;
+  desState: string;
+  count: number;
+}
+
+export interface PortfolioStats {
+  byState: ContractStatsByState[];
+  totalPrimeInForce: number;
+  renewalsUpcoming: number;
+}
+
 /** Cliente HTTP contra `underwriting-service` (`/underwriting/contracts`,
  *  vía el gateway) -- mismo criterio que `QuotingService`: no reutiliza
  *  `CatalogService` porque estas rutas no siguen su shape Cod/Des
@@ -550,5 +567,10 @@ export class ContractsService {
     return this.http.get(`${environment.apiUrl}/underwriting/contract-requirements/${ideContractRequirement}/file`, {
       responseType: 'blob',
     });
+  }
+
+  /** `GET /contracts/stats` -- ver doc-comment de `PortfolioStats` más arriba. */
+  getPortfolioStats(): Observable<PortfolioStats> {
+    return this.http.get<PortfolioStats>(`${this.base}/stats`);
   }
 }

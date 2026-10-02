@@ -33,6 +33,27 @@
       "activeContracts": "Contratos activos",
       "pendingClaims": "Siniestros pendientes",
       "claimsThisMonth": "Siniestros del mes"
+    },
+    "noSections": "No hay indicadores configurados para tu rol.",
+    "sections": {
+      "comercial": "Comercial",
+      "cartera": "Cartera",
+      "siniestralidad": "Siniestralidad"
+    },
+    "comercial": {
+      "conversionRate": "Tasa de conversión",
+      "evolutionChartTitle": "Evolución mensual de cotizaciones",
+      "byStateChartTitle": "Cotizaciones por estado",
+      "monthlySeries": "Cotizaciones"
+    },
+    "cartera": {
+      "totalPrimeInForce": "Prima total vigente",
+      "renewalsUpcoming": "Renovaciones próximas",
+      "byStateChartTitle": "Contratos por estado"
+    },
+    "siniestralidad": {
+      "indemnifiedThisMonth": "Monto indemnizado del mes",
+      "byStateChartTitle": "Siniestros por estado"
     }
   },
   "catalogsRegistry": {

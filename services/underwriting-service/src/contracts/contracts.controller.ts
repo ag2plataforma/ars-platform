@@ -47,6 +47,16 @@ export class ContractsController {
   }
 
   /**
+   * Estadísticas para el dashboard de inicio (ver doc-comment de
+   * `ContractsService.getPortfolioStats`). Declarado ANTES de `:id` --
+   * mismo motivo que `renewal-candidates` de acá abajo.
+   */
+  @Get('contracts/stats')
+  getPortfolioStats() {
+    return this.service.getPortfolioStats();
+  }
+
+  /**
    * Candidatos a renovar (Etapa 2, pantalla "Renovaciones", ver
    * docs/02-roadmap.md). Declarado ANTES que `:id` -- mismo motivo que
    * `contracts` (plural): si fuera después, Express/Nest tomaría

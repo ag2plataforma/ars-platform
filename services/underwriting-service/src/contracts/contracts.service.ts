@@ -1433,6 +1433,59 @@ export class ContractsService {
   }
 
   /**
+   * Estadísticas para el widget "Cartera" del dashboard de inicio
+   * (backlog propio, no numerado -- ver docs/02-roadmap.md, "Gráficos en
+   * el dashboard de inicio"), pedido explícito del usuario (2026-10-02):
+   * contratos por estado, prima total vigente y renovaciones próximas.
+   * Sin `@Roles(...)` en el controller -- el frontend filtra según el rol
+   * del usuario logueado, no el backend.
+   */
+  async getPortfolioStats() {
+    const ideActivo = await this.stateMachine.getStateByCode('Activo');
+    const now = new Date();
+    const windowDays = Number(process.env.RENEWAL_CANDIDATE_WINDOW_DAYS ?? '60');
+    const windowEnd = addDays(now, windowDays);
+
+    const [byStateRaw, primeAgg, renewalsUpcoming] = await Promise.all([
+      this.prisma.tContract.groupBy({ by: ['IdeState'], _count: true }),
+      // "Prima total vigente" -- suma de `TReceipt.Prime` de los recibos
+      // NO cancelados (`TstCancellation: null`, mismo criterio que usa el
+      // resto de este servicio para distinguir un recibo anulado) cuyo
+      // período de vigencia contiene HOY, de contratos Activos. Un
+      // contrato con más de un recibo solapado (no debería pasar en la
+      // práctica) sumaría de más -- aceptable para una métrica de
+      // dashboard, no un cálculo contable exacto.
+      this.prisma.tReceipt.aggregate({
+        _sum: { Prime: true },
+        where: {
+          TstCancellation: null,
+          TstInitial: { lte: now },
+          TstEnd: { gte: now },
+          TContract: { IdeState: ideActivo },
+        },
+      }),
+      // Mismo criterio exacto que `findRenewalCandidates` (ventana
+      // `RENEWAL_CANDIDATE_WINDOW_DAYS`, sin excluir `IndNoRenovar` --
+      // esos contratos siguen siendo "candidatos" en esa pantalla, el
+      // operador puede desmarcarlos ahí).
+      this.prisma.tContract.count({ where: { IdeState: ideActivo, TstEnd: { gte: now, lte: windowEnd } } }),
+    ]);
+
+    const states = await this.prisma.sState.findMany({ where: { IdeState: { in: byStateRaw.map((r) => r.IdeState) } } });
+    const descById = new Map(states.map((s) => [s.IdeState, { codState: s.CodState, desState: s.DesState }]));
+
+    return {
+      byState: byStateRaw.map((r) => ({
+        codState: descById.get(r.IdeState)?.codState ?? r.IdeState,
+        desState: descById.get(r.IdeState)?.desState ?? r.IdeState,
+        count: r._count,
+      })),
+      totalPrimeInForce: Number(primeAgg._sum.Prime ?? 0),
+      renewalsUpcoming,
+    };
+  }
+
+  /**
    * Marca o desmarca "No renovar" sobre un contrato puntual (Etapa 2,
    * pantalla "Renovaciones") -- decisión del operador de que ESTE
    * contrato en particular no se renueve automáticamente al vencer (ej.

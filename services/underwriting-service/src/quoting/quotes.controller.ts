@@ -42,6 +42,17 @@ export class QuotesController {
     return this.service.findAll(query, actor.code);
   }
 
+  /**
+   * Estadísticas para el dashboard de inicio (ver doc-comment de
+   * `QuotesService.getStats`). Declarado ANTES de `:id` -- mismo motivo
+   * que `ContractsController` con `renewal-candidates`: si fuera
+   * después, Nest tomaría "stats" como el valor de `:id`.
+   */
+  @Get('stats')
+  getStats() {
+    return this.service.getStats();
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.service.buildPricingResult(id);

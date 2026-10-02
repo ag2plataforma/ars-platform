@@ -177,6 +177,22 @@ export interface DeclareClaimRequest {
   ideFileRisks: string[];
 }
 
+/** `GET /claims/stats` -- widget "Siniestralidad" del dashboard de
+ *  inicio (pedido explícito del usuario, 2026-10-02, ver
+ *  docs/02-roadmap.md: "Gráficos en el dashboard de inicio"). Ver el
+ *  doc-comment de `ClaimsService.getStats` en el backend para el
+ *  detalle del cálculo. */
+export interface ClaimStatsByState {
+  codState: string;
+  desState: string;
+  count: number;
+}
+
+export interface ClaimStats {
+  byState: ClaimStatsByState[];
+  indemnifiedThisMonth: number;
+}
+
 /** Cliente HTTP contra `claims-service` (`/claims/*`, vía el gateway) --
  * Fase 4 (Siniestros), Etapa 1, 2026-09-24. Ver el doc-comment de
  * `ClaimsService` en el backend real. */
@@ -253,5 +269,10 @@ export class ClaimsApiService {
       `${environment.apiUrl}/claims/coverage-provisions/${ideCoverageProvision}/guarantee-provisions`,
       dto,
     );
+  }
+
+  /** `GET /claims/stats` -- ver doc-comment de `ClaimStats` más arriba. */
+  getStats(): Observable<ClaimStats> {
+    return this.http.get<ClaimStats>(`${this.base}/stats`);
   }
 }

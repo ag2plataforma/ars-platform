@@ -1,6 +1,183 @@
-<div class="max-w-3xl">
+<div class="max-w-6xl">
   <h1 class="text-2xl font-semibold text-slate-900">{{ 'dashboard.greeting' | transloco: { code: userCode() } }}</h1>
   <p class="mt-2 text-slate-500">
     {{ 'dashboard.intro' | transloco }}
   </p>
+
+  @if (noSections()) {
+    <p class="mt-8 text-sm text-slate-500">{{ 'dashboard.noSections' | transloco }}</p>
+  }
+
+  @if (showComercial()) {
+    <section class="mt-8">
+      <h2 class="text-lg font-semibold text-slate-900">{{ 'dashboard.sections.comercial' | transloco }}</h2>
+
+      <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <button
+          type="button"
+          (click)="goTo('/cotizacion')"
+          class="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-colors hover:border-brand-200 hover:bg-brand-50/40"
+        >
+          <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-50">
+            <i class="pi pi-file-edit text-lg text-brand-600"></i>
+          </span>
+          @if (loadingComercial()) {
+            <div class="h-8 w-16 animate-pulse rounded bg-slate-100"></div>
+          } @else {
+            <span class="text-3xl font-semibold text-slate-900">{{ quotesThisMonth() }}</span>
+          }
+          <span class="text-sm text-slate-500">{{ 'dashboard.kpis.quotesThisMonth' | transloco }}</span>
+        </button>
+
+        <div class="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-50">
+            <i class="pi pi-percentage text-lg text-brand-600"></i>
+          </span>
+          @if (loadingComercial()) {
+            <div class="h-8 w-16 animate-pulse rounded bg-slate-100"></div>
+          } @else {
+            <span class="text-3xl font-semibold text-slate-900">{{ conversionRatePct() }}%</span>
+          }
+          <span class="text-sm text-slate-500">{{ 'dashboard.comercial.conversionRate' | transloco }}</span>
+        </div>
+      </div>
+
+      <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 class="text-sm font-medium text-slate-700">{{ 'dashboard.comercial.evolutionChartTitle' | transloco }}</h3>
+          <div class="mt-3" style="height: 260px">
+            @if (loadingComercial()) {
+              <div class="h-full w-full animate-pulse rounded bg-slate-100"></div>
+            } @else {
+              <p-chart type="line" [data]="quotesEvolutionChart()" [options]="lineChartOptions" height="260px" />
+            }
+          </div>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 class="text-sm font-medium text-slate-700">{{ 'dashboard.comercial.byStateChartTitle' | transloco }}</h3>
+          <div class="mt-3" style="height: 260px">
+            @if (loadingComercial()) {
+              <div class="h-full w-full animate-pulse rounded bg-slate-100"></div>
+            } @else {
+              <p-chart type="bar" [data]="quotesByStateChart()" [options]="barChartOptions" height="260px" />
+            }
+          </div>
+        </div>
+      </div>
+    </section>
+  }
+
+  @if (showCartera()) {
+    <section class="mt-10">
+      <h2 class="text-lg font-semibold text-slate-900">{{ 'dashboard.sections.cartera' | transloco }}</h2>
+
+      <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <button
+          type="button"
+          (click)="goTo('/contratos')"
+          class="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-colors hover:border-teal-200 hover:bg-teal-50/40"
+        >
+          <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-50">
+            <i class="pi pi-verified text-lg text-teal-600"></i>
+          </span>
+          @if (loadingCartera()) {
+            <div class="h-8 w-16 animate-pulse rounded bg-slate-100"></div>
+          } @else {
+            <span class="text-3xl font-semibold text-slate-900">{{ activeContracts() }}</span>
+          }
+          <span class="text-sm text-slate-500">{{ 'dashboard.kpis.activeContracts' | transloco }}</span>
+        </button>
+
+        <div class="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-50">
+            <i class="pi pi-wallet text-lg text-teal-600"></i>
+          </span>
+          @if (loadingCartera()) {
+            <div class="h-8 w-24 animate-pulse rounded bg-slate-100"></div>
+          } @else {
+            <span class="text-3xl font-semibold text-slate-900">{{ totalPrimeInForce() | number: '1.2-2' }}</span>
+          }
+          <span class="text-sm text-slate-500">{{ 'dashboard.cartera.totalPrimeInForce' | transloco }}</span>
+        </div>
+
+        <button
+          type="button"
+          (click)="goTo('/renovaciones')"
+          class="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-colors hover:border-teal-200 hover:bg-teal-50/40"
+        >
+          <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-50">
+            <i class="pi pi-refresh text-lg text-teal-600"></i>
+          </span>
+          @if (loadingCartera()) {
+            <div class="h-8 w-16 animate-pulse rounded bg-slate-100"></div>
+          } @else {
+            <span class="text-3xl font-semibold text-slate-900">{{ renewalsUpcoming() }}</span>
+          }
+          <span class="text-sm text-slate-500">{{ 'dashboard.cartera.renewalsUpcoming' | transloco }}</span>
+        </button>
+      </div>
+
+      <div class="mt-4 grid grid-cols-1 gap-4">
+        <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 class="text-sm font-medium text-slate-700">{{ 'dashboard.cartera.byStateChartTitle' | transloco }}</h3>
+          <div class="mt-3" style="height: 260px">
+            @if (loadingCartera()) {
+              <div class="h-full w-full animate-pulse rounded bg-slate-100"></div>
+            } @else {
+              <p-chart type="bar" [data]="contractsByStateChart()" [options]="barChartOptions" height="260px" />
+            }
+          </div>
+        </div>
+      </div>
+    </section>
+  }
+
+  @if (showSiniestralidad()) {
+    <section class="mt-10">
+      <h2 class="text-lg font-semibold text-slate-900">{{ 'dashboard.sections.siniestralidad' | transloco }}</h2>
+
+      <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <button
+          type="button"
+          (click)="goTo('/siniestros')"
+          class="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-colors hover:border-amber-200 hover:bg-amber-50/40"
+        >
+          <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50">
+            <i class="pi pi-exclamation-circle text-lg text-amber-600"></i>
+          </span>
+          @if (loadingSiniestralidad()) {
+            <div class="h-8 w-16 animate-pulse rounded bg-slate-100"></div>
+          } @else {
+            <span class="text-3xl font-semibold text-slate-900">{{ pendingClaims() }}</span>
+          }
+          <span class="text-sm text-slate-500">{{ 'dashboard.kpis.pendingClaims' | transloco }}</span>
+        </button>
+
+        <div class="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50">
+            <i class="pi pi-money-bill text-lg text-amber-600"></i>
+          </span>
+          @if (loadingSiniestralidad()) {
+            <div class="h-8 w-24 animate-pulse rounded bg-slate-100"></div>
+          } @else {
+            <span class="text-3xl font-semibold text-slate-900">{{ indemnifiedThisMonth() | number: '1.2-2' }}</span>
+          }
+          <span class="text-sm text-slate-500">{{ 'dashboard.siniestralidad.indemnifiedThisMonth' | transloco }}</span>
+        </div>
+      </div>
+
+      <div class="mt-4 grid grid-cols-1 gap-4">
+        <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 class="text-sm font-medium text-slate-700">{{ 'dashboard.siniestralidad.byStateChartTitle' | transloco }}</h3>
+          <div class="mt-3" style="height: 260px">
+            @if (loadingSiniestralidad()) {
+              <div class="h-full w-full animate-pulse rounded bg-slate-100"></div>
+            } @else {
+              <p-chart type="bar" [data]="claimsByStateChart()" [options]="barChartOptions" height="260px" />
+            }
+          </div>
+        </div>
+      </div>
+    </section>
+  }
 </div>

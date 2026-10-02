@@ -226,6 +226,62 @@ export class QuotesService {
     };
   }
 
+  /**
+   * Estadísticas para el widget "Comercial" del dashboard de inicio
+   * (backlog propio, no numerado -- ver docs/02-roadmap.md, "Gráficos en
+   * el dashboard de inicio"), pedido explícito del usuario (2026-10-02):
+   * evolución mensual de cotizaciones (últimos 6 meses), desglose por
+   * estado y tasa de conversión cotización -> contrato. Sin `@Roles(...)`
+   * en el controller -- mismo criterio que el resto de este módulo, lo
+   * filtra el frontend según el rol del usuario logueado, no el backend.
+   */
+  async getStats() {
+    const months = this.lastNMonths(6);
+
+    const [monthly, byStateRaw, totalQuotes, convertedQuotes] = await Promise.all([
+      Promise.all(
+        months.map(async (m) => ({
+          month: m.label,
+          count: await this.prisma.tQuote.count({ where: { TstCreation: { gte: m.from, lt: m.toExclusive } } }),
+        })),
+      ),
+      this.prisma.tQuote.groupBy({ by: ['IdeState'], _count: true }),
+      this.prisma.tQuote.count(),
+      // Relación `TQuote.TContract` -- una cotización "convertida" es la
+      // que tiene al menos un contrato generado (`some: {}`), sin
+      // importar el estado real de ESE contrato (cancelado o no sigue
+      // contando como conversión lograda en su momento).
+      this.prisma.tQuote.count({ where: { TContract: { some: {} } } }),
+    ]);
+
+    const states = await this.prisma.sState.findMany({ where: { IdeState: { in: byStateRaw.map((r) => r.IdeState) } } });
+    const descById = new Map(states.map((s) => [s.IdeState, { codState: s.CodState, desState: s.DesState }]));
+
+    return {
+      monthly,
+      byState: byStateRaw.map((r) => ({
+        codState: descById.get(r.IdeState)?.codState ?? r.IdeState,
+        desState: descById.get(r.IdeState)?.desState ?? r.IdeState,
+        count: r._count,
+      })),
+      conversionRate: totalQuotes > 0 ? convertedQuotes / totalQuotes : 0,
+    };
+  }
+
+  /** Últimos `n` meses calendario, el actual incluido, más viejo primero
+   *  -- mismo criterio de rango `[from, toExclusive)` ya usado en
+   *  `DashboardComponent.currentMonthRange` del frontend. */
+  private lastNMonths(n: number): { from: Date; toExclusive: Date; label: string }[] {
+    const now = new Date();
+    const months: { from: Date; toExclusive: Date; label: string }[] = [];
+    for (let i = n - 1; i >= 0; i--) {
+      const from = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const toExclusive = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+      months.push({ from, toExclusive, label: `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}` });
+    }
+    return months;
+  }
+
   async price(ideQuote: string, actor: string) {
     const quote = await this.prisma.tQuote.findUnique({ where: { IdeQuote: ideQuote } });
     if (!quote) {

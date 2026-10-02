@@ -283,6 +283,27 @@ interface CreateContractResponse {
   NumContract: string;
 }
 
+/** `GET /quotes/stats` -- widget "Comercial" del dashboard de inicio
+ *  (pedido explícito del usuario, 2026-10-02, ver docs/02-roadmap.md:
+ *  "Gráficos en el dashboard de inicio"). Ver el doc-comment de
+ *  `QuotesService.getStats` en el backend para el detalle del cálculo. */
+export interface QuoteStatsByState {
+  codState: string;
+  desState: string;
+  count: number;
+}
+
+export interface QuoteStatsMonth {
+  month: string;
+  count: number;
+}
+
+export interface QuoteStats {
+  monthly: QuoteStatsMonth[];
+  byState: QuoteStatsByState[];
+  conversionRate: number;
+}
+
 /** Cliente HTTP contra `underwriting-service` (`/underwriting/quotes`,
  * vía el gateway) -- no reutiliza `CatalogService` porque estas rutas no
  * siguen su shape (`POST /:id/price`, `PATCH` anidado con múltiples ids
@@ -456,5 +477,10 @@ export class QuotingService {
    *  ya recalculado (mismo shape que `price()`/`submitSocialImpactAnswers`). */
   setAdjustments(ideQuote: string, ideAdjustments: string[]): Observable<QuotePricingResult> {
     return this.http.patch<QuotePricingResult>(`${this.base}/${ideQuote}/adjustments`, { ideAdjustments });
+  }
+
+  /** `GET /quotes/stats` -- ver doc-comment de `QuoteStats` más arriba. */
+  getStats(): Observable<QuoteStats> {
+    return this.http.get<QuoteStats>(`${this.base}/stats`);
   }
 }

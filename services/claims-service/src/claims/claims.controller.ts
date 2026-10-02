@@ -20,6 +20,16 @@ export class ClaimsController {
     return this.service.findAll(filterNumClaim, codState);
   }
 
+  /**
+   * Estadísticas para el dashboard de inicio (ver doc-comment de
+   * `ClaimsService.getStats`). Declarado ANTES de `claims/:id` -- mismo
+   * motivo que en `QuotesController`/`ContractsController` con `stats`.
+   */
+  @Get('claims/stats')
+  getStats() {
+    return this.service.getStats();
+  }
+
   @Get('claims/:id')
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);

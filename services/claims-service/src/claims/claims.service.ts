@@ -334,6 +334,43 @@ export class ClaimsService {
     });
   }
 
+  /**
+   * Estadísticas para el widget "Siniestralidad" del dashboard de inicio
+   * (backlog propio, no numerado -- ver docs/02-roadmap.md, "Gráficos en
+   * el dashboard de inicio"), pedido explícito del usuario (2026-10-02):
+   * carpetas (`TClaimFile`) por estado y monto indemnizado (`TClaimPayment.Amount`)
+   * del mes en curso. Agrupa por `TClaimFile` (la carpeta, que sí tiene
+   * máquina de estados real desde la Etapa 2 de Siniestros) y no por
+   * `TClaim` (la cabecera, que sigue "sin transición" -- ver doc-comment
+   * de `ClaimsService` de más arriba). Sin `@Roles(...)` en el
+   * controller -- el frontend filtra según el rol del usuario logueado.
+   */
+  async getStats() {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const firstDayNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    const [byStateRaw, indemnifiedAgg] = await Promise.all([
+      this.prisma.tClaimFile.groupBy({ by: ['IdeState'], _count: true }),
+      this.prisma.tClaimPayment.aggregate({
+        _sum: { Amount: true },
+        where: { TstPayment: { gte: firstDay, lt: firstDayNextMonth } },
+      }),
+    ]);
+
+    const states = await this.prisma.sState.findMany({ where: { IdeState: { in: byStateRaw.map((r) => r.IdeState) } } });
+    const descById = new Map(states.map((s) => [s.IdeState, { codState: s.CodState, desState: s.DesState }]));
+
+    return {
+      byState: byStateRaw.map((r) => ({
+        codState: descById.get(r.IdeState)?.codState ?? r.IdeState,
+        desState: descById.get(r.IdeState)?.desState ?? r.IdeState,
+        count: r._count,
+      })),
+      indemnifiedThisMonth: Number(indemnifiedAgg._sum.Amount ?? 0),
+    };
+  }
+
   private async resolvePlanProductOf(idePlanProductRisk: string, tx: Prisma.TransactionClient): Promise<string | null> {
     const row = await tx.sPlanProductRisk.findUnique({ where: { IdePlanProductRisk: idePlanProductRisk } });
     return row?.IdePlanProduct ?? null;
