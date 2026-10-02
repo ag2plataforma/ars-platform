@@ -269,6 +269,47 @@
     </div>
   }
 
+  @case ('adjustments') {
+    <div class="mx-auto flex max-w-2xl flex-col gap-6">
+      <div>
+        <h1 class="text-lg font-semibold text-slate-900">{{ 'quotes.adjustmentsTitle' | transloco }}</h1>
+        <p class="text-sm text-slate-500">{{ 'quotes.adjustmentsSubtitle' | transloco }}</p>
+      </div>
+
+      <div class="flex flex-col divide-y divide-slate-200 rounded-lg border border-slate-200">
+        @for (adjustment of pricing()?.genericAdjustments ?? []; track adjustment.ideAdjustment) {
+          <label class="flex cursor-pointer items-center justify-between gap-3 p-3">
+            <div class="flex items-center gap-3">
+              <p-checkbox
+                [binary]="true"
+                [ngModel]="isAdjustmentSelected(adjustment.ideAdjustment)"
+                (ngModelChange)="toggleAdjustment(adjustment.ideAdjustment)"
+                [ngModelOptions]="{ standalone: true }"
+              />
+              <span class="text-sm text-slate-800">{{ adjustment.desAdjustment }}</span>
+            </div>
+            <span class="text-sm font-medium" [class.text-green-600]="adjustment.pctAdjustment < 0" [class.text-amber-600]="adjustment.pctAdjustment > 0">
+              {{ adjustment.pctAdjustment > 0 ? '+' : '' }}{{ adjustment.pctAdjustment }}%
+            </span>
+          </label>
+        }
+      </div>
+
+      <div class="flex justify-between">
+        <button pButton type="button" [label]="'quotes.backButton' | transloco" severity="secondary" [text]="true" (click)="backFromAdjustments()"></button>
+        <button
+          pButton
+          type="button"
+          [label]="adjustmentsContinueLabel()"
+          icon="pi pi-arrow-right"
+          iconPos="right"
+          [loading]="savingAdjustments()"
+          (click)="continueFromAdjustments()"
+        ></button>
+      </div>
+    </div>
+  }
+
   @case ('socialImpact') {
     <div class="mx-auto flex max-w-2xl flex-col gap-6">
       <div class="flex items-center justify-between">
@@ -540,7 +581,7 @@
               <p class="text-xs font-medium uppercase tracking-wide text-slate-500">{{ 'quotes.appliedAdjustmentsTitle' | transloco }}</p>
               @for (adj of s.appliedAdjustments; track adj.codAdjustment) {
                 <div class="flex items-center justify-between text-sm">
-                  <span class="text-slate-500">{{ appliedAdjustmentLabel(adj.codAdjustment) }}</span>
+                  <span class="text-slate-500">{{ appliedAdjustmentLabel(adj) }}</span>
                   <span class="flex flex-col items-end">
                     <span
                       class="font-medium"

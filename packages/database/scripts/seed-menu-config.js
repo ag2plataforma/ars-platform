@@ -251,6 +251,16 @@ const SITE_MAP_ITEMS = [
     path: '/personas',
     icon: 'pi-users',
   },
+  {
+    // Catálogo genérico de recargos/descuentos (docs/02-roadmap.md, Fase
+    // 2 backlog ítem 7) -- pantalla bespoke `AdjustmentsComponent`,
+    // agregado 2026-10-02.
+    cod: 'RECARGOS_DESCUENTOS',
+    des: 'Recargos y descuentos',
+    order: 15,
+    path: '/recargos-descuentos',
+    icon: 'pi-percentage',
+  },
 ];
 
 async function main() {

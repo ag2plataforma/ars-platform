@@ -99,6 +99,15 @@ export const routes: Routes = [
           import('./features/catalogs/catalogs.component').then((m) => m.CatalogsComponent),
       },
       {
+        // Catálogo genérico de recargos/descuentos (docs/02-roadmap.md,
+        // Fase 2 backlog ítem 7) -- pantalla bespoke, no el
+        // `CatalogsComponent` genérico (ver doc-comment de
+        // `AdjustmentsComponent`).
+        path: 'recargos-descuentos',
+        loadComponent: () =>
+          import('./features/adjustments/adjustments.component').then((m) => m.AdjustmentsComponent),
+      },
+      {
         // "Renovaciones" -- Etapa 2 de "Gestión de renovaciones" (ver
         // docs/02-roadmap.md): pantalla de contratos candidatos a
         // renovar + marcar/desmarcar "No renovar".

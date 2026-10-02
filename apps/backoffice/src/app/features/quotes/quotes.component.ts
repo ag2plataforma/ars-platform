@@ -35,7 +35,7 @@ const DISTRIBUTION_CHANNELS_PATH = '/party/distribution-channels';
 const DISTRIBUTION_WAYS_PATH = '/party/distribution-ways';
 const RISK_PRODUCTS_PATH = '/product-rating/risk-products';
 
-type QuoteStep = 'form' | 'plans' | 'socialImpact' | 'persons' | 'requirements' | 'summary' | 'contract';
+type QuoteStep = 'form' | 'plans' | 'adjustments' | 'socialImpact' | 'persons' | 'requirements' | 'summary' | 'contract';
 
 /** Un "slot" de persona a asociar a la cotización (Tomador/Titular --
  * los dos únicos roles que `ContractsService.setContractPersons` copia
@@ -524,18 +524,91 @@ export class QuotesComponent {
     return !!socialImpact && socialImpact.active && !socialImpact.answered;
   }
 
+  /** ¿Hay algún recargo/descuento "Manual" Activo en el catálogo? (Fase
+   *  2 backlog ítem 7, ver docs/02-roadmap.md) -- a diferencia de
+   *  Impacto Social, no depende del producto de esta cotización en
+   *  particular. Si no hay ninguno dado de alta todavía, el paso
+   *  'adjustments' se salta por completo (mismo criterio que Impacto
+   *  Social cuando el producto no participa). */
+  hasGenericAdjustments(): boolean {
+    return (this.pricing()?.genericAdjustments.length ?? 0) > 0;
+  }
+
   plansContinueLabel(): string {
+    if (this.hasGenericAdjustments()) {
+      return this.transloco.translate('quotes.continueToAdjustmentsButton');
+    }
     return this.transloco.translate(
       this.pendingSocialImpact() ? 'quotes.continueToSocialImpactButton' : 'quotes.continueToPersonsButton',
     );
   }
 
   continueFromPlans(): void {
-    if (this.pendingSocialImpact()) {
-      this.step.set('socialImpact');
+    if (this.hasGenericAdjustments()) {
+      this.selectedAdjustmentIds.set(
+        new Set(this.pricing()!.genericAdjustments.filter((a) => a.applied).map((a) => a.ideAdjustment)),
+      );
+      this.step.set('adjustments');
       return;
     }
-    this.goToPersons();
+    this.continueFromAdjustments();
+  }
+
+  // --- Etapa 2.4: Recargos y descuentos (Fase 2 backlog ítem 7) ---
+
+  readonly selectedAdjustmentIds = signal<Set<string>>(new Set());
+
+  isAdjustmentSelected(ideAdjustment: string): boolean {
+    return this.selectedAdjustmentIds().has(ideAdjustment);
+  }
+
+  toggleAdjustment(ideAdjustment: string): void {
+    const next = new Set(this.selectedAdjustmentIds());
+    if (next.has(ideAdjustment)) {
+      next.delete(ideAdjustment);
+    } else {
+      next.add(ideAdjustment);
+    }
+    this.selectedAdjustmentIds.set(next);
+  }
+
+  readonly savingAdjustments = signal(false);
+
+  /** Label del botón "Continuar" DENTRO del paso 'adjustments' --
+   *  `plansContinueLabel()` no sirve acá porque siempre devolvería
+   *  "Continuar a Recargos y descuentos" (ya estando en ese paso). */
+  adjustmentsContinueLabel(): string {
+    return this.transloco.translate(
+      this.pendingSocialImpact() ? 'quotes.continueToSocialImpactButton' : 'quotes.continueToPersonsButton',
+    );
+  }
+
+  /** Guarda la selección (puede ser vacía -- el operador puede no
+   *  aplicar ninguno) y continúa con la misma lógica que antes tenía
+   *  `continueFromPlans` directamente: 'socialImpact' si pendiente, si
+   *  no 'persons'. */
+  continueFromAdjustments(): void {
+    if (!this.ideQuote) return;
+    this.savingAdjustments.set(true);
+    this.quoting.setAdjustments(this.ideQuote, [...this.selectedAdjustmentIds()]).subscribe({
+      next: (result) => {
+        this.pricing.set(result);
+        this.savingAdjustments.set(false);
+        if (this.pendingSocialImpact()) {
+          this.step.set('socialImpact');
+          return;
+        }
+        this.goToPersons();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.savingAdjustments.set(false);
+        this.showError(err);
+      },
+    });
+  }
+
+  backFromAdjustments(): void {
+    this.step.set('plans');
   }
 
   goToPersons(): void {
@@ -545,14 +618,22 @@ export class QuotesComponent {
 
   /** Vuelve un paso atrás desde 'persons' -- a 'socialImpact' si el
    *  producto participa (se haya contestado o no, para poder revisar el
-   *  resultado), o directo a 'plans' si no participa. */
+   *  resultado), a 'adjustments' si hay catálogo pero el producto no
+   *  participa de Impacto Social, o directo a 'plans' si ninguno aplica. */
   backFromPersons(): void {
     const socialImpact = this.pricing()?.socialImpact;
-    this.step.set(socialImpact?.active ? 'socialImpact' : 'plans');
+    if (socialImpact?.active) {
+      this.step.set('socialImpact');
+      return;
+    }
+    this.step.set(this.hasGenericAdjustments() ? 'adjustments' : 'plans');
   }
 
+  /** Botón "atrás" del paso 'socialImpact' -- a 'adjustments' si hay
+   *  catálogo (antes de 'socialImpact' en el flujo, ver
+   *  `continueFromPlans`), si no directo a 'plans'. */
   backToPlans(): void {
-    this.step.set('plans');
+    this.step.set(this.hasGenericAdjustments() ? 'adjustments' : 'plans');
   }
 
   // --- Etapa 2.5: Impacto Social ---
@@ -581,23 +662,24 @@ export class QuotesComponent {
     return this.transloco.translate('quotes.socialImpactNoAdjustmentDetail');
   }
 
-  /** Etiqueta traducida para un `codAdjustment` del Resumen
-   *  (`s.appliedAdjustments`, ver `QuotesService.getSummary` ->
-   *  `AdjustmentValueResolver.listAppliedAdjustments`) -- mapeo
-   *  explícito código -> clave de traducción, no una interpolación
-   *  directa del código, para no exponer el identificador técnico en
-   *  pantalla. Un futuro `codAdjustment` (fidelidad, multi-póliza) se
-   *  agrega acá como un `case` más, mismo criterio que
-   *  `PrismaAdjustmentValueResolver` en el backend. `codAdjustment`
-   *  desconocido: se muestra tal cual, mejor eso que una pantalla en
-   *  blanco si el backend agrega un ajuste nuevo antes que el frontend.
-   */
-  appliedAdjustmentLabel(codAdjustment: string): string {
-    switch (codAdjustment) {
+  /** Etiqueta traducida para un ajuste del Resumen (`s.appliedAdjustments`,
+   *  ver `QuotesService.getSummary` -> `AdjustmentValueResolver.listAppliedAdjustments`).
+   *  `'SOCIAL_IMPACT'` sigue con su propia clave de traducción fija (no
+   *  tiene un catálogo con nombre propio); cualquier otro ajuste (Fase 2
+   *  backlog ítem 7 -- fidelidad, multi-póliza, etc.) ya trae su nombre
+   *  legible desde el catálogo genérico `SAdjustment` (`desAdjustment`),
+   *  sin necesitar un `case` nuevo acá por cada uno -- el código crudo es
+   *  solo el último recurso si no vino. */
+  appliedAdjustmentLabel(adj: { codAdjustment: string; desAdjustment?: string }): string {
+    switch (adj.codAdjustment) {
       case 'SOCIAL_IMPACT':
         return this.transloco.translate('quotes.adjustmentLabelSocialImpact');
       default:
-        return codAdjustment;
+        // Recargos/descuentos genéricos (Fase 2 backlog ítem 7, ver
+        // docs/02-roadmap.md) ya traen su propio nombre legible
+        // (`SAdjustment.DesAdjustment`) -- el código crudo queda solo
+        // como último recurso si por algún motivo no vino.
+        return adj.desAdjustment ?? adj.codAdjustment;
     }
   }
 

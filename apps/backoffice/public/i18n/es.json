@@ -532,6 +532,9 @@
     "selectThisPlanButton": "Seleccionar este plan",
     "continueToPersonsButton": "Continuar a Personas",
     "continueToSocialImpactButton": "Continuar a Impacto Social",
+    "continueToAdjustmentsButton": "Continuar a Recargos y descuentos",
+    "adjustmentsTitle": "Recargos y descuentos",
+    "adjustmentsSubtitle": "Si corresponde, marcá los recargos o descuentos que aplican a esta cotización.",
     "socialImpactTitle": "Impacto Social",
     "socialImpactSubtitle": "Contanos un poco sobre tus hábitos para calcular tu huella de carbono y tu impacto social, y acceder a un ajuste en tu prima.",
     "socialImpactCarFuelLabel": "Tipo de combustible de tu auto",
@@ -1226,6 +1229,19 @@
     "dateColumn": "Fecha",
     "emptyState": "Todavía no se generó ningún documento para este contrato.",
     "generated": "Documento generado correctamente."
+  },
+  "adjustments": {
+    "title": "Recargos y descuentos",
+    "subtitle": "Catálogo de recargos/descuentos disponibles para aplicar a una cotización (docs/02-roadmap.md, ítem 7).",
+    "newButton": "Nuevo recargo/descuento",
+    "percentageColumn": "Porcentaje",
+    "percentageHint": "Negativo para un descuento (ej. -5), positivo para un recargo (ej. 3).",
+    "automaticColumn": "Automático",
+    "automaticHint": "Por ahora es solo informativo -- ningún recargo/descuento automático se aplica solo todavía.",
+    "emptyState": "Todavía no se dio de alta ningún recargo/descuento.",
+    "createDialogTitle": "Nuevo recargo/descuento",
+    "editDialogTitle": "Editar recargo/descuento",
+    "loadErrorDetail": "No se pudieron cargar los recargos/descuentos."
   },
   "personsList": {
     "title": "Personas",

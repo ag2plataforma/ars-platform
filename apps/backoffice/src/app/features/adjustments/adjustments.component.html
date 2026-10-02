@@ -1,0 +1,119 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="mx-auto flex max-w-4xl flex-col gap-4">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-lg font-semibold text-slate-900">{{ 'adjustments.title' | transloco }}</h1>
+      <p class="text-sm text-slate-500">{{ 'adjustments.subtitle' | transloco }}</p>
+    </div>
+    <button pButton type="button" icon="pi pi-plus" [label]="'adjustments.newButton' | transloco" (click)="openCreate()"></button>
+  </div>
+
+  <p-table
+    [value]="rows()"
+    [loading]="loading()"
+    dataKey="IdeAdjustment"
+    [paginator]="true"
+    [rows]="10"
+    [rowsPerPageOptions]="[10, 25, 50]"
+    [showCurrentPageReport]="true"
+    currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+    styleClass="p-datatable-sm rounded-lg border border-slate-200"
+  >
+    <ng-template #header>
+      <tr>
+        <th>{{ 'catalogs.codeColumn' | transloco }}</th>
+        <th>{{ 'catalogs.descriptionColumn' | transloco }}</th>
+        <th>{{ 'adjustments.percentageColumn' | transloco }}</th>
+        <th>{{ 'adjustments.automaticColumn' | transloco }}</th>
+        <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+        <th class="w-32">{{ 'catalogs.actionsColumn' | transloco }}</th>
+      </tr>
+    </ng-template>
+    <ng-template #body let-row>
+      <tr>
+        <td>{{ row.CodAdjustment }}</td>
+        <td>{{ row.DesAdjustment }}</td>
+        <td>{{ row.PctAdjustment > 0 ? '+' : '' }}{{ row.PctAdjustment }}%</td>
+        <td>
+          <p-tag [value]="(row.IndAutomatic ? 'common.yes' : 'common.no') | transloco" [severity]="row.IndAutomatic ? 'info' : 'secondary'" />
+        </td>
+        <td>
+          <p-tag [value]="(isActive(row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isActive(row) ? 'success' : 'danger'" />
+        </td>
+        <td>
+          <div class="flex gap-1">
+            <button
+              pButton
+              type="button"
+              icon="pi pi-pencil"
+              [text]="true"
+              severity="secondary"
+              [pTooltip]="'locations.editTooltip' | transloco"
+              tooltipPosition="top"
+              (click)="openEdit(row)"
+            ></button>
+            <button
+              pButton
+              type="button"
+              [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'"
+              [text]="true"
+              [severity]="isActive(row) ? 'danger' : 'success'"
+              [pTooltip]="(isActive(row) ? 'catalogs.deactivateHeader' : 'catalogs.activateHeader') | transloco"
+              tooltipPosition="top"
+              (click)="toggleState(row)"
+            ></button>
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="6" class="py-6 text-center text-sm text-slate-500">{{ 'adjustments.emptyState' | transloco }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-dialog
+  [header]="(dialogMode() === 'create' ? 'adjustments.createDialogTitle' : 'adjustments.editDialogTitle') | transloco"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  [style]="{ width: '28rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'catalogs.codeColumn' | transloco }}</label>
+      <input pInputText formControlName="codAdjustment" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'catalogs.descriptionColumn' | transloco }}</label>
+      <input pInputText formControlName="desAdjustment" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'adjustments.percentageColumn' | transloco }}</label>
+      <p-inputNumber
+        formControlName="pctAdjustment"
+        mode="decimal"
+        [minFractionDigits]="0"
+        [maxFractionDigits]="4"
+        suffix="%"
+        [style]="{ width: '100%' }"
+        inputStyleClass="w-full"
+      />
+      <p class="text-xs text-slate-500">{{ 'adjustments.percentageHint' | transloco }}</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <p-checkbox formControlName="indAutomatic" [binary]="true" inputId="indAutomatic" />
+      <label for="indAutomatic" class="text-sm text-slate-700">{{ 'adjustments.automaticColumn' | transloco }}</label>
+    </div>
+    <p class="text-xs text-slate-500">{{ 'adjustments.automaticHint' | transloco }}</p>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
+    </div>
+  </form>
+</p-dialog>
