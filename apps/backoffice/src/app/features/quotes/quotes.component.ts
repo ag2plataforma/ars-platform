@@ -27,6 +27,7 @@ import {
   SubmitSocialImpactAnswersPayload,
 } from './quoting.service';
 import { MOBILE_PHONE_CONTACT_CLASS, Person, PersonsService } from '../../core/party/persons.service';
+import { downloadBlob } from '../../core/files/file.util';
 import { RiskAttributeField, RiskAttributesService, STEP_CODE_CUSTOM_ATTRIBUTES } from './risk-attributes.service';
 
 const PRODUCTS_PATH = '/product-rating/products';
@@ -850,13 +851,33 @@ export class QuotesComponent {
     this.step.set('persons');
   }
 
-  toggleRequirementDelivered(row: QuoteRequirementRow): void {
-    if (!this.ideQuote) return;
-    const nextDelivered = !row.Data?.indDelivered;
-    this.quoting.setRequirementDelivered(this.ideQuote, row.IdeQuoteRequirement, nextDelivered).subscribe({
-      next: (updated) => {
+  /** Subida real de archivo (Etapa 2, ver docs/02-roadmap.md ítem 4) --
+   *  reemplaza al toggle manual "Entregado" de la Etapa 1: un documento
+   *  real adjunto ES la entrega. */
+  onRequirementFileSelected(row: QuoteRequirementRow, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || !this.ideQuote) return;
+    this.quoting.uploadRequirementFile(this.ideQuote, row.IdeQuoteRequirement, file).then(
+      (updated) => {
         this.requirementRows.set(this.requirementRows().map((r) => (r.IdeQuoteRequirement === updated.IdeQuoteRequirement ? updated : r)));
       },
+      () => {
+        this.messages.add({
+          severity: 'error',
+          summary: this.transloco.translate('common.error'),
+          detail: this.transloco.translate('requirements.wizardStep.updateErrorDetail'),
+        });
+      },
+    );
+  }
+
+  downloadRequirementFile(row: QuoteRequirementRow): void {
+    if (!this.ideQuote || !row.DesFileName) return;
+    const fileName = row.DesFileName;
+    this.quoting.downloadRequirementFile(this.ideQuote, row.IdeQuoteRequirement).subscribe({
+      next: (blob) => downloadBlob(blob, fileName),
       error: () => {
         this.messages.add({
           severity: 'error',

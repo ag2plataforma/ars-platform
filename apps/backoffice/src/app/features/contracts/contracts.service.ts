@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { fileToBase64 } from '../../core/files/file.util';
 
 /** Una fila de `GET /contracts` (plural) -- deliberadamente liviana
  *  (sin riesgos/coberturas/facturación, que solo hacen falta al abrir
@@ -201,6 +202,9 @@ export interface ContractCoverage {
 export interface ContractRequirement {
   IdeContractRequirement: string;
   Data: unknown;
+  /** Nombre del archivo subido (Etapa 2, ver docs/02-roadmap.md ítem 4) --
+   *  `null` significa que todavía no se subió nada para este requisito. */
+  DesFileName: string | null;
   SState: ContractStateRef;
   SProductRequirement: {
     DesShort: string | null;
@@ -522,5 +526,29 @@ export class ContractsService {
    *  deja que el caller recargue el detalle. */
   changePersonData(ideContract: string, payload: ChangePersonDataPayload): Observable<ContractDetail> {
     return this.http.post<ContractDetail>(`${this.base}/${ideContract}/change-person-data`, payload);
+  }
+
+  /** `PATCH /contract-requirements/:id/file` -- Etapa 2 de "Requisitos"
+   *  (ver docs/02-roadmap.md ítem 4). Ruta plana, sin `:ideContract` en
+   *  el path (`IdeContractRequirement` ya es la PK) -- ver doc-comment de
+   *  `ContractRequirementsController` en el backend. Sube el archivo y
+   *  queda marcado como entregado en el mismo paso. */
+  async uploadRequirementFile(ideContractRequirement: string, file: File): Promise<ContractRequirement> {
+    const fileBase64 = await fileToBase64(file);
+    return new Promise((resolve, reject) => {
+      this.http
+        .patch<ContractRequirement>(`${environment.apiUrl}/underwriting/contract-requirements/${ideContractRequirement}/file`, {
+          fileName: file.name,
+          fileBase64,
+        })
+        .subscribe({ next: resolve, error: reject });
+    });
+  }
+
+  /** `GET /contract-requirements/:id/file` -- descarga el archivo ya subido. */
+  downloadRequirementFile(ideContractRequirement: string): Observable<Blob> {
+    return this.http.get(`${environment.apiUrl}/underwriting/contract-requirements/${ideContractRequirement}/file`, {
+      responseType: 'blob',
+    });
   }
 }

@@ -465,22 +465,36 @@
       } @else {
         <div class="flex flex-col divide-y divide-slate-200 rounded-lg border border-slate-200">
           @for (row of requirementRows(); track row.IdeQuoteRequirement) {
-            <div class="flex items-center justify-between gap-3 p-3">
-              <div class="flex items-center gap-3">
-                <p-checkbox
-                  [binary]="true"
-                  [ngModel]="!!row.Data?.indDelivered"
-                  (onChange)="toggleRequirementDelivered(row)"
-                  [inputId]="'req-' + row.IdeQuoteRequirement"
-                />
-                <label [for]="'req-' + row.IdeQuoteRequirement" class="text-sm text-slate-800">
+            <div class="flex flex-col gap-2 p-3">
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-sm text-slate-800">
                   {{ row.SProductRequirement.DesShort ?? row.SProductRequirement.SRequirement.DesRequirement }}
-                </label>
+                </span>
+                <div class="flex items-center gap-2">
+                  <p-tag
+                    [value]="(row.DesFileName ? 'requirements.wizardStep.deliveredTag' : 'requirements.wizardStep.pendingTag') | transloco"
+                    [severity]="row.DesFileName ? 'success' : 'secondary'"
+                  />
+                  <p-tag
+                    [value]="(row.SProductRequirement.IndMandatory ? 'requirements.wizardStep.mandatoryTag' : 'requirements.wizardStep.optionalTag') | transloco"
+                    [severity]="row.SProductRequirement.IndMandatory ? 'warn' : 'secondary'"
+                  />
+                </div>
               </div>
-              <p-tag
-                [value]="(row.SProductRequirement.IndMandatory ? 'requirements.wizardStep.mandatoryTag' : 'requirements.wizardStep.optionalTag') | transloco"
-                [severity]="row.SProductRequirement.IndMandatory ? 'warn' : 'secondary'"
-              />
+              <div class="flex flex-wrap items-center gap-3">
+                @if (row.DesFileName) {
+                  <button
+                    pButton
+                    type="button"
+                    size="small"
+                    [text]="true"
+                    icon="pi pi-download"
+                    [label]="row.DesFileName"
+                    (click)="downloadRequirementFile(row)"
+                  ></button>
+                }
+                <input type="file" class="text-sm" (change)="onRequirementFileSelected(row, $event)" />
+              </div>
             </div>
           }
         </div>

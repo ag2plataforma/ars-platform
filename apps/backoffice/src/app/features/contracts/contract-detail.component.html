@@ -435,6 +435,8 @@
                 <th pSortableColumn="requirement.SProductRequirement.DesShort"><span class="ars-th-flex">{{ 'contractDetail.requirementColumn' | transloco }} <p-sortIcon field="requirement.SProductRequirement.DesShort" /> <p-columnFilter type="text" field="requirement.SProductRequirement.DesShort" display="menu" /></span></th>
                 <th pSortableColumn="requirement.SProductRequirement.IndMandatory"><span class="ars-th-flex">{{ 'contractDetail.mandatoryColumn' | transloco }} <p-sortIcon field="requirement.SProductRequirement.IndMandatory" /></span></th>
                 <th pSortableColumn="requirement.SState.DesState"><span class="ars-th-flex">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="requirement.SState.DesState" /></span></th>
+                <th>{{ 'requirements.wizardStep.deliveredTag' | transloco }}</th>
+                <th>{{ 'contractDetail.fileColumn' | transloco }}</th>
               </tr>
             </ng-template>
             <ng-template pTemplate="body" let-row>
@@ -443,11 +445,33 @@
                 <td>{{ row.requirement.SProductRequirement.DesShort ?? row.requirement.SProductRequirement.SRequirement.DesRequirement }}</td>
                 <td>{{ (row.requirement.SProductRequirement.IndMandatory ? 'common.yes' : 'common.no') | transloco }}</td>
                 <td><p-tag [value]="row.requirement.SState.DesState" [severity]="stateSeverity(row.requirement.SState.CodState)" /></td>
+                <td>
+                  <p-tag
+                    [value]="(row.requirement.DesFileName ? 'requirements.wizardStep.deliveredTag' : 'requirements.wizardStep.pendingTag') | transloco"
+                    [severity]="row.requirement.DesFileName ? 'success' : 'secondary'"
+                  />
+                </td>
+                <td>
+                  <div class="flex flex-wrap items-center gap-2">
+                    @if (row.requirement.DesFileName) {
+                      <button
+                        pButton
+                        type="button"
+                        size="small"
+                        [text]="true"
+                        icon="pi pi-download"
+                        [label]="row.requirement.DesFileName"
+                        (click)="downloadRequirementFile(row)"
+                      ></button>
+                    }
+                    <input type="file" class="text-sm" (change)="onRequirementFileSelected(row, $event)" />
+                  </div>
+                </td>
               </tr>
             </ng-template>
             <ng-template pTemplate="emptymessage">
               <tr>
-                <td colspan="4" class="py-6 text-center text-sm text-slate-500">{{ 'contractDetail.requirementsEmpty' | transloco }}</td>
+                <td colspan="6" class="py-6 text-center text-sm text-slate-500">{{ 'contractDetail.requirementsEmpty' | transloco }}</td>
               </tr>
             </ng-template>
           </p-table>

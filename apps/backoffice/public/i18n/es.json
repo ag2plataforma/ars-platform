@@ -725,6 +725,7 @@
     "requirementColumn": "Requisito",
     "mandatoryColumn": "Obligatorio",
     "requirementsEmpty": "Sin requisitos asociados.",
+    "fileColumn": "Archivo",
     "cancelDialog": {
       "button": "Anular contrato",
       "title": "Anular contrato",
@@ -1032,7 +1033,7 @@
       "coveragePlanHint": "Solo se puede elegir una cobertura específica cuando el riesgo y el plan están fijados (no en \"cualquiera\").",
       "reviewableLabel": "Revisable",
       "applyOcrLabel": "Aplicar OCR",
-      "applyOcrHint": "Reservado para una etapa futura -- por ahora se guarda pero no ejecuta ningún reconocimiento automático (no existe subida de archivos todavía).",
+      "applyOcrHint": "Reservado para una etapa futura -- por ahora se guarda pero no ejecuta ningún reconocimiento automático (ya se puede subir el archivo real del requisito, pero todavía no se procesa con OCR).",
       "requirementTypeLabel": "Tipo de requisito",
       "documentTypeLabel": "Tipo de documento",
       "orderLabel": "Orden",
@@ -1046,13 +1047,15 @@
     },
     "wizardStep": {
       "title": "Requisitos",
-      "subtitle": "Documentos que se deben presentar para continuar. Márcalos como entregados a medida que los recibas.",
+      "subtitle": "Documentos que se deben presentar para continuar. Subí el archivo a medida que lo recibas.",
       "mandatoryTag": "Obligatorio",
       "optionalTag": "Opcional",
       "deliveredLabel": "Entregado",
       "emptyState": "Este producto no exige documentos para esta cotización.",
       "loadErrorDetail": "No se pudieron cargar los requisitos de la cotización.",
-      "updateErrorDetail": "No se pudo actualizar el requisito."
+      "updateErrorDetail": "No se pudo actualizar el requisito.",
+      "deliveredTag": "Entregado",
+      "pendingTag": "Pendiente"
     }
   },
   "claims": {

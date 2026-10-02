@@ -31,6 +31,7 @@ import {
   ContractsService,
 } from './contracts.service';
 import { ContractDocumentsComponent } from '../documents/contract-documents.component';
+import { downloadBlob } from '../../core/files/file.util';
 
 const PRODUCT_ENDORSEMENTS_PATH = '/product-rating/product-endorsements';
 const COVERAGE_PLANS_PATH = '/product-rating/coverage-plans';
@@ -496,6 +497,48 @@ export class ContractDetailComponent implements OnInit {
         ? String((err.error as { message: unknown }).message)
         : null) ?? this.transloco.translate<string>('common.unexpectedError');
     this.messages.add({ severity: 'error', summary: this.transloco.translate('common.error'), detail });
+  }
+
+  // --- Requisitos (Etapa 2: subida real de archivo -- ver doc-comment
+  // de `RequirementsService` en underwriting-service) ---
+
+  /** Sube (o reemplaza) el archivo de un requisito del contrato --
+   *  mismo patrón que `QuotesComponent.onRequirementFileSelected`, pero
+   *  acá `requirementRows` es un `computed` derivado de `contract()`
+   *  (árbol anidado, no una lista plana independiente), así que tras
+   *  subir se recarga el contrato completo en lugar de parchear una
+   *  fila suelta. */
+  onRequirementFileSelected(row: RequirementRow, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    const ideContract = this.contract()?.IdeContract;
+    if (!file || !ideContract) return;
+    this.contracts.uploadRequirementFile(row.requirement.IdeContractRequirement, file).then(
+      () => this.load(ideContract),
+      () => {
+        this.messages.add({
+          severity: 'error',
+          summary: this.transloco.translate('common.error'),
+          detail: this.transloco.translate('requirements.wizardStep.updateErrorDetail'),
+        });
+      },
+    );
+  }
+
+  downloadRequirementFile(row: RequirementRow): void {
+    if (!row.requirement.DesFileName) return;
+    const fileName = row.requirement.DesFileName;
+    this.contracts.downloadRequirementFile(row.requirement.IdeContractRequirement).subscribe({
+      next: (blob) => downloadBlob(blob, fileName),
+      error: () => {
+        this.messages.add({
+          severity: 'error',
+          summary: this.transloco.translate('common.error'),
+          detail: this.transloco.translate('requirements.wizardStep.updateErrorDetail'),
+        });
+      },
+    });
   }
 
   onFileSelect(event: TableRowSelectEvent): void {
