@@ -1,0 +1,31 @@
+<div class="flex flex-col gap-4">
+  <div>
+    <h1 class="text-lg font-semibold text-slate-900">{{ 'stateMachine.title' | transloco }}</h1>
+    <p class="text-sm text-slate-500">{{ 'stateMachine.subtitle' | transloco }}</p>
+  </div>
+
+  <p-message severity="warn" [text]="'stateMachine.warning' | transloco" />
+
+  <p-tabs [value]="activeTab()" (valueChange)="activeTab.set($event ?? 'rules')">
+    <p-tablist>
+      <p-tab value="rules">{{ 'stateMachine.rulesTab' | transloco }}</p-tab>
+      <p-tab value="states">{{ 'stateMachine.statesTab' | transloco }}</p-tab>
+      <p-tab value="entities">{{ 'stateMachine.entitiesTab' | transloco }}</p-tab>
+      <p-tab value="diagnostics">{{ 'stateMachine.diagnosticsTab' | transloco }}</p-tab>
+    </p-tablist>
+    <p-tabpanels>
+      <p-tabpanel value="rules">
+        <app-state-rules-tab [entityId]="selectedEntityId()" [refreshToken]="refreshToken()" (changed)="bumpRefresh()" />
+      </p-tabpanel>
+      <p-tabpanel value="states">
+        <app-states-tab (changed)="bumpRefresh()" />
+      </p-tabpanel>
+      <p-tabpanel value="entities">
+        <app-entities-tab [refreshToken]="refreshToken()" (changed)="bumpRefresh()" (openRules)="openRules($event)" />
+      </p-tabpanel>
+      <p-tabpanel value="diagnostics">
+        <app-diagnostics-tab [refreshToken]="refreshToken()" />
+      </p-tabpanel>
+    </p-tabpanels>
+  </p-tabs>
+</div>

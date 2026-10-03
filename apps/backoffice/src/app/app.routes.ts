@@ -204,6 +204,11 @@ export const routes: Routes = [
           import('./features/menu-config/menu-config.component').then((m) => m.MenuConfigComponent),
       },
       {
+        path: 'configuracion-estados',
+        loadComponent: () =>
+          import('./features/state-machine/state-machine.component').then((m) => m.StateMachineComponent),
+      },
+      {
         path: 'comisiones',
         loadComponent: () =>
           import('./features/commissions/commissions.component').then((m) => m.CommissionsComponent),

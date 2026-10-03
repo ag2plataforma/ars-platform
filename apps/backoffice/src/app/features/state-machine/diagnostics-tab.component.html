@@ -1,0 +1,36 @@
+<p-toast />
+
+<div class="flex flex-col gap-4">
+  <div class="flex items-center justify-between">
+    <p class="text-sm text-slate-500">{{ 'stateMachine.diagnostics.subtitle' | transloco }}</p>
+    <button pButton type="button" icon="pi pi-refresh" [label]="'stateMachine.diagnostics.runButton' | transloco" [loading]="loading()" (click)="run()"></button>
+  </div>
+
+  @if (result(); as r) {
+    <p class="text-sm text-slate-600">
+      {{ 'stateMachine.diagnostics.summary' | transloco: { entities: r.entitiesChecked, rules: r.rulesChecked, without: r.entitiesWithoutRules } }}
+    </p>
+    @if (r.problems.length === 0) {
+      <p-message severity="success" [text]="'stateMachine.diagnostics.allGood' | transloco" />
+    } @else {
+      <p-table [value]="r.problems" styleClass="p-datatable-sm">
+        <ng-template #header>
+          <tr>
+            <th class="w-28">{{ 'stateMachine.diagnostics.severityColumn' | transloco }}</th>
+            <th class="w-48">{{ 'stateMachine.diagnostics.entityColumn' | transloco }}</th>
+            <th>{{ 'stateMachine.diagnostics.problemColumn' | transloco }}</th>
+          </tr>
+        </ng-template>
+        <ng-template #body let-p>
+          <tr>
+            <td>
+              <p-tag [severity]="p.severity === 'error' ? 'danger' : 'warn'" [value]="('stateMachine.diagnostics.severity.' + p.severity) | transloco" />
+            </td>
+            <td class="font-medium">{{ p.codEntity }}</td>
+            <td>{{ p.message }}</td>
+          </tr>
+        </ng-template>
+      </p-table>
+    }
+  }
+</div>

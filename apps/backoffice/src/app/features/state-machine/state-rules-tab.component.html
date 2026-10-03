@@ -1,0 +1,132 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex flex-col gap-4">
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <div class="flex w-full max-w-xl flex-col gap-1">
+      <label class="text-sm font-medium text-slate-700">{{ 'stateMachine.rules.entityLabel' | transloco }}</label>
+      <p-select
+        [options]="entities()"
+        optionValue="ideEntity"
+        [ngModel]="selectedEntity()"
+        (ngModelChange)="onEntityChange($event)"
+        [filter]="true"
+        filterBy="codEntity,desEntity"
+        [placeholder]="'stateMachine.rules.entityPlaceholder' | transloco"
+        styleClass="w-full"
+      >
+        <ng-template #selectedItem let-e>{{ entityLabel(e) }}</ng-template>
+        <ng-template #item let-e>
+          <div class="flex items-center gap-2">
+            <span>{{ entityLabel(e) }}</span>
+            @if (!e.hasInitialRule && e.ruleCount > 0) {
+              <p-tag severity="danger" [value]="'stateMachine.rules.noInitialTag' | transloco" />
+            }
+          </div>
+        </ng-template>
+      </p-select>
+    </div>
+    @if (selectedEntity()) {
+      <button pButton type="button" icon="pi pi-plus" [label]="'stateMachine.rules.newButton' | transloco" (click)="openCreate()"></button>
+    }
+  </div>
+
+  @if (!selectedEntity()) {
+    <p class="text-sm text-slate-500">{{ 'stateMachine.rules.pickEntityHint' | transloco }}</p>
+  } @else {
+    @if (data(); as d) {
+      @if (!d.hasTable) {
+        <p class="text-xs text-slate-500">{{ 'stateMachine.rules.noTableHint' | transloco }}</p>
+      }
+      <p-table [value]="d.rules" [loading]="loading()" dataKey="ideStateRule" styleClass="p-datatable-sm">
+        <ng-template #header>
+          <tr>
+            <th>{{ 'stateMachine.rules.fromColumn' | transloco }}</th>
+            <th>{{ 'stateMachine.rules.operationColumn' | transloco }}</th>
+            <th>{{ 'stateMachine.rules.toColumn' | transloco }}</th>
+            <th>{{ 'stateMachine.rules.initialColumn' | transloco }}</th>
+            <th>{{ 'stateMachine.rules.rowsColumn' | transloco }}</th>
+            <th class="w-28">{{ 'catalogs.actionsColumn' | transloco }}</th>
+          </tr>
+        </ng-template>
+        <ng-template #body let-rule>
+          <tr>
+            <td>
+              <span class="font-medium">{{ rule.codStateFrom }}</span>
+              <span class="ml-1 text-xs text-slate-500">{{ rule.desStateFrom }}</span>
+            </td>
+            <td>
+              @if (rule.desOperativeCode && rule.desOperativeCode !== '-') {
+                <code class="rounded bg-slate-100 px-1.5 py-0.5 text-xs">{{ rule.desOperativeCode }}</code>
+              } @else {
+                <span class="text-slate-400">{{ 'common.dash' | transloco }}</span>
+              }
+            </td>
+            <td>
+              <span class="font-medium">{{ rule.codStateTo }}</span>
+              <span class="ml-1 text-xs text-slate-500">{{ rule.desStateTo }}</span>
+            </td>
+            <td>
+              @if (rule.indInitialState) {
+                <p-tag severity="info" [value]="'stateMachine.rules.initialTag' | transloco" />
+              }
+            </td>
+            <td>{{ rule.rowsInFromState ?? ('common.dash' | transloco) }}</td>
+            <td>
+              <div class="flex gap-1">
+                <button pButton type="button" icon="pi pi-pencil" [text]="true" severity="secondary" [pTooltip]="'locations.editTooltip' | transloco" tooltipPosition="top" (click)="openEdit(rule)"></button>
+                <button pButton type="button" icon="pi pi-trash" [text]="true" severity="danger" [pTooltip]="'stateMachine.rules.deleteTooltip' | transloco" tooltipPosition="top" (click)="remove(rule)"></button>
+              </div>
+            </td>
+          </tr>
+        </ng-template>
+        <ng-template #emptymessage>
+          <tr>
+            <td colspan="6" class="text-center text-slate-500">{{ 'stateMachine.rules.emptyState' | transloco }}</td>
+          </tr>
+        </ng-template>
+      </p-table>
+    }
+  }
+</div>
+
+<p-dialog
+  [header]="(dialogMode() === 'create' ? 'stateMachine.rules.createTitle' : 'stateMachine.rules.editTitle') | transloco"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  [style]="{ width: '30rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'stateMachine.rules.fromColumn' | transloco }}</label>
+      <p-select [options]="states()" optionValue="ideState" formControlName="ideStateFrom" [filter]="true" filterBy="codState,desState" appendTo="body" styleClass="w-full">
+        <ng-template #selectedItem let-s>{{ stateLabel(s) }}</ng-template>
+        <ng-template #item let-s>{{ stateLabel(s) }}</ng-template>
+      </p-select>
+    </div>
+    <div class="flex flex-col gap-2">
+      <label for="rule-op" class="text-sm font-medium text-slate-700">{{ 'stateMachine.rules.operationColumn' | transloco }}</label>
+      <input pInputText id="rule-op" formControlName="desOperativeCode" maxlength="30" class="w-full" />
+      <small class="text-slate-500">{{ 'stateMachine.rules.operationHint' | transloco }}</small>
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'stateMachine.rules.toColumn' | transloco }}</label>
+      <p-select [options]="states()" optionValue="ideState" formControlName="ideStateTo" [filter]="true" filterBy="codState,desState" appendTo="body" styleClass="w-full">
+        <ng-template #selectedItem let-s>{{ stateLabel(s) }}</ng-template>
+        <ng-template #item let-s>{{ stateLabel(s) }}</ng-template>
+      </p-select>
+    </div>
+    <div class="flex items-start gap-2">
+      <p-checkbox formControlName="indInitialState" [binary]="true" inputId="rule-initial" />
+      <div class="flex flex-col">
+        <label for="rule-initial" class="text-sm font-medium text-slate-700">{{ 'stateMachine.rules.initialLabel' | transloco }}</label>
+        <small class="text-slate-500">{{ 'stateMachine.rules.initialHint' | transloco }}</small>
+      </div>
+    </div>
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco" [loading]="saving()"></button>
+    </div>
+  </form>
+</p-dialog>

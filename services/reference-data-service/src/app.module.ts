@@ -10,6 +10,7 @@ import { CommonCatalogsModule } from './common-catalogs/common-catalogs.module';
 import { RequirementsModule } from './requirements/requirements.module';
 import { I18nModule } from './i18n/i18n.module';
 import { SetupModule } from './setup/setup.module';
+import { StateMachineAdminModule } from './state-machine-admin/state-machine-admin.module';
 
 /**
  * Módulos de negocio reales de este servicio: `FieldCatalogModule`
@@ -36,6 +37,7 @@ import { SetupModule } from './setup/setup.module';
     RequirementsModule,
     I18nModule,
     SetupModule,
+    StateMachineAdminModule,
   ],
   controllers: [HealthController],
 })

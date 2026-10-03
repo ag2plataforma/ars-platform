@@ -99,6 +99,16 @@ const SITE_MAP_ITEMS = [
     icon: 'pi-sitemap',
   },
   {
+    // "Máquina de estados" -- administración de SState/SEntity/SStateRule
+    // (2026-10-03). Configuración global y delicada: conviene concederla
+    // solo a ADMIN desde "Configuración de menú".
+    cod: 'MAQUINA_ESTADOS',
+    des: 'Máquina de estados',
+    order: 17,
+    path: '/configuracion-estados',
+    icon: 'pi-share-alt',
+  },
+  {
     cod: 'CONFIG_PRODUCTOS',
     des: 'Configuración de productos',
     order: 8,
