@@ -188,7 +188,7 @@
         <input pInputText type="number" formControlName="numApplyUse" [placeholder]="'products.coverageGuarantees.numApplyUseHint' | transloco" class="w-full" />
       </div>
       <div class="flex items-center gap-2 pt-6">
-        <input type="checkbox" id="indCoverageAccumulate" formControlName="indCoverageAccumulate" />
+        <p-checkbox formControlName="indCoverageAccumulate" [binary]="true" inputId="indCoverageAccumulate" />
         <label for="indCoverageAccumulate" class="text-sm text-slate-700">{{ 'products.coverageGuarantees.accumulateLabel' | transloco }}</label>
       </div>
     </div>

@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { SelectModule } from 'primeng/select';
+import { CheckboxModule } from 'primeng/checkbox';
 import { TableModule } from 'primeng/table';
 import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
@@ -38,7 +39,7 @@ interface MatrixRow {
 @Component({
   selector: 'app-site-map-roles-tab',
   standalone: true,
-  imports: [CommonModule, FormsModule, SelectModule, TableModule, ToastModule, TranslocoPipe],
+  imports: [CommonModule, FormsModule, SelectModule, CheckboxModule, TableModule, ToastModule, TranslocoPipe],
   providers: [MessageService],
   templateUrl: './site-map-roles-tab.component.html',
 })

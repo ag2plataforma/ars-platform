@@ -164,7 +164,7 @@
 
     <div class="grid grid-cols-3 gap-4">
       <div class="flex items-center gap-2">
-        <input type="checkbox" id="indFixedAmount" formControlName="indFixedAmount" />
+        <p-checkbox formControlName="indFixedAmount" [binary]="true" inputId="indFixedAmount" />
         <label for="indFixedAmount" class="text-sm text-slate-700">{{ 'products.coveragePlans.fixedAmountLabel' | transloco }}</label>
       </div>
       <div class="flex flex-col gap-1">
@@ -179,7 +179,7 @@
 
     <div class="grid grid-cols-3 gap-4">
       <div class="flex items-center gap-2">
-        <input type="checkbox" id="indFixedRate" formControlName="indFixedRate" />
+        <p-checkbox formControlName="indFixedRate" [binary]="true" inputId="indFixedRate" />
         <label for="indFixedRate" class="text-sm text-slate-700">{{ 'products.coveragePlans.fixedRateLabel' | transloco }}</label>
       </div>
       <div class="flex flex-col gap-1">
@@ -194,7 +194,7 @@
 
     <div class="grid grid-cols-3 gap-4">
       <div class="flex items-center gap-2">
-        <input type="checkbox" id="indFixedPrime" formControlName="indFixedPrime" />
+        <p-checkbox formControlName="indFixedPrime" [binary]="true" inputId="indFixedPrime" />
         <label for="indFixedPrime" class="text-sm text-slate-700">{{ 'products.coveragePlans.fixedPrimeLabel' | transloco }}</label>
       </div>
       <div class="flex flex-col gap-1">
@@ -209,31 +209,31 @@
 
     <div class="grid grid-cols-2 gap-x-4 gap-y-2">
       <div class="flex items-center gap-2">
-        <input type="checkbox" id="indMandatory" formControlName="indMandatory" />
+        <p-checkbox formControlName="indMandatory" [binary]="true" inputId="indMandatory" />
         <label for="indMandatory" class="text-sm text-slate-700">{{ 'products.coveragePlans.mandatoryLabel' | transloco }}</label>
       </div>
       <div class="flex items-center gap-2">
-        <input type="checkbox" id="indSplitPayment" formControlName="indSplitPayment" />
+        <p-checkbox formControlName="indSplitPayment" [binary]="true" inputId="indSplitPayment" />
         <label for="indSplitPayment" class="text-sm text-slate-700">{{ 'products.coveragePlans.splitPaymentLabel' | transloco }}</label>
       </div>
       <div class="flex items-center gap-2">
-        <input type="checkbox" id="getPrime" formControlName="getPrime" />
+        <p-checkbox formControlName="getPrime" [binary]="true" inputId="getPrime" />
         <label for="getPrime" class="text-sm text-slate-700">{{ 'products.coveragePlans.getPrimeLabel' | transloco }}</label>
       </div>
       <div class="flex items-center gap-2">
-        <input type="checkbox" id="indPayPerUse" formControlName="indPayPerUse" />
+        <p-checkbox formControlName="indPayPerUse" [binary]="true" inputId="indPayPerUse" />
         <label for="indPayPerUse" class="text-sm text-slate-700">{{ 'products.coveragePlans.payPerUseLabel' | transloco }}</label>
       </div>
       <div class="flex items-center gap-2">
-        <input type="checkbox" id="refundPrime" formControlName="refundPrime" />
+        <p-checkbox formControlName="refundPrime" [binary]="true" inputId="refundPrime" />
         <label for="refundPrime" class="text-sm text-slate-700">{{ 'products.coveragePlans.refundPrimeLabel' | transloco }}</label>
       </div>
       <div class="flex items-center gap-2">
-        <input type="checkbox" id="proratedGetPrime" formControlName="proratedGetPrime" />
+        <p-checkbox formControlName="proratedGetPrime" [binary]="true" inputId="proratedGetPrime" />
         <label for="proratedGetPrime" class="text-sm text-slate-700">{{ 'products.coveragePlans.proratedGetPrimeLabel' | transloco }}</label>
       </div>
       <div class="flex items-center gap-2">
-        <input type="checkbox" id="proratedRefundPrime" formControlName="proratedRefundPrime" />
+        <p-checkbox formControlName="proratedRefundPrime" [binary]="true" inputId="proratedRefundPrime" />
         <label for="proratedRefundPrime" class="text-sm text-slate-700">{{ 'products.coveragePlans.proratedRefundPrimeLabel' | transloco }}</label>
       </div>
     </div>

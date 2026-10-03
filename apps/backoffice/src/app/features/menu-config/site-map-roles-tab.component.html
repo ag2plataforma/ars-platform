@@ -38,7 +38,7 @@
             {{ row.level > 1 ? '↳ ' : '' }}{{ row.siteMap.DesSiteMap }}
           </td>
           <td class="text-center">
-            <input type="checkbox" [checked]="row.granted" (change)="toggle(row)" />
+            <p-checkbox [binary]="true" [ngModel]="row.granted" (onChange)="toggle(row)" />
           </td>
         </tr>
       </ng-template>

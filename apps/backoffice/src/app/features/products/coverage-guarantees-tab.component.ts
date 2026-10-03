@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
+import { CheckboxModule } from 'primeng/checkbox';
 import { TableModule } from 'primeng/table';
 import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
@@ -39,6 +40,7 @@ const LIMIT_TYPES_PATH = '/product-rating/limit-types';
     FormsModule,
     ReactiveFormsModule,
     ButtonModule,
+    CheckboxModule,
     TableModule,
     DialogModule,
     InputTextModule,
