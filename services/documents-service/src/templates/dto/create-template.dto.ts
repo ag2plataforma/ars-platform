@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Min, MinLength } from 'class-validator';
 
 /** Tipos de documento soportados en esta primera versión (alcance
  *  acordado con el usuario: arrancar por "Póliza/Contrato emitido",
@@ -34,11 +34,7 @@ export class CreateTemplateDto {
 
 /** Reemplaza el archivo de una plantilla ya creada (ej. corregir un
  *  typo en el Word) sin tener que borrar y volver a cargar toda la fila
- *  -- deliberadamente sin activar/desactivar en esta primera versión
- *  (ver doc-comment de TemplatesService: no hay forma confirmada todavía
- *  de saber qué código de `SState` usar para "Inactivo" en esta tabla
- *  nueva, así que se deja fuera de alcance en vez de adivinar uno que
- *  podría no existir y romper en producción). */
+ *  (el activar/desactivar va aparte, ver `SetTemplateStateDto`). */
 export class ReplaceTemplateFileDto {
   @IsString()
   @MinLength(1)
@@ -52,4 +48,10 @@ export class ReplaceTemplateFileDto {
   @IsInt()
   @Min(1)
   numOrder?: number;
+}
+
+/** Activa (`true`) o desactiva (`false`) una plantilla. */
+export class SetTemplateStateDto {
+  @IsBoolean()
+  active!: boolean;
 }

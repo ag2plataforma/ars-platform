@@ -28,6 +28,7 @@ import {
 } from './quoting.service';
 import { MOBILE_PHONE_CONTACT_CLASS, Person, PersonsService } from '../../core/party/persons.service';
 import { downloadBlob } from '../../core/files/file.util';
+import { DocumentTemplatesService } from '../documents/document-templates.service';
 import { RiskAttributeField, RiskAttributesService, STEP_CODE_CUSTOM_ATTRIBUTES } from './risk-attributes.service';
 
 const PRODUCTS_PATH = '/product-rating/products';
@@ -193,6 +194,7 @@ export class QuotesComponent {
   private readonly quoting = inject(QuotingService);
   private readonly persons = inject(PersonsService);
   private readonly riskAttributes = inject(RiskAttributesService);
+  private readonly documentTemplates = inject(DocumentTemplatesService);
   private readonly messages = inject(MessageService);
   private readonly transloco = inject(TranslocoService);
   private readonly route = inject(ActivatedRoute);
@@ -968,6 +970,65 @@ export class QuotesComponent {
         });
       },
     });
+  }
+
+  readonly downloadingQuotePdf = signal(false);
+
+  /** "Descargar cotización en PDF" -- se genera al vuelo con la plantilla
+   *  COTIZACION del producto (rol Tomador), sin guardar nada. */
+  downloadQuotePdf(): void {
+    if (!this.ideQuote) return;
+    const ideQuote = this.ideQuote;
+    this.downloadingQuotePdf.set(true);
+    this.documentTemplates.listPersonRoles().subscribe({
+      next: (roles) => {
+        const tomador = roles.find((r) => r.codPersonRol === 'TOMADOR');
+        if (!tomador) {
+          this.downloadingQuotePdf.set(false);
+          this.messages.add({
+            severity: 'error',
+            summary: this.transloco.translate('common.error'),
+            detail: this.transloco.translate('quotes.quotePdfNoTomadorRole'),
+          });
+          return;
+        }
+        this.documentTemplates.downloadQuotePdf(ideQuote, tomador.idePersonRol).subscribe({
+          next: (blob) => {
+            this.downloadingQuotePdf.set(false);
+            downloadBlob(blob, 'cotizacion.pdf');
+          },
+          error: (err: HttpErrorResponse) => {
+            this.downloadingQuotePdf.set(false);
+            this.showBlobError(err);
+          },
+        });
+      },
+      error: (err: HttpErrorResponse) => {
+        this.downloadingQuotePdf.set(false);
+        this.showError(err);
+      },
+    });
+  }
+
+  /** Con `responseType: 'blob'` el cuerpo del error también llega como
+   *  Blob -- hay que leerlo para mostrar el mensaje real del backend
+   *  (ej. "No hay una plantilla configurada de tipo COTIZACION..."). */
+  private showBlobError(err: HttpErrorResponse): void {
+    const body = err.error;
+    if (body instanceof Blob) {
+      body.text().then((text) => {
+        let detail = this.transloco.translate<string>('common.unexpectedError');
+        try {
+          const parsed = JSON.parse(text) as { message?: unknown };
+          if (parsed.message) detail = String(parsed.message);
+        } catch {
+          // cuerpo no-JSON -- queda el mensaje genérico
+        }
+        this.messages.add({ severity: 'error', summary: this.transloco.translate('common.error'), detail });
+      });
+      return;
+    }
+    this.showError(err);
   }
 
   backToPersons(): void {

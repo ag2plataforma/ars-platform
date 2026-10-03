@@ -12,17 +12,15 @@ import { CreateTemplateDto, ReplaceTemplateFileDto } from './dto/create-template
  * `TemplateContent` (ya existía, requerido) se reusa para el nombre de
  * archivo original, solo a fin de mostrarlo en la pantalla.
  *
- * Deliberadamente SIN activar/desactivar en esta primera versión: no hay
- * ningún uso previo de esta tabla en el código (es la primera pantalla
- * que la toca) para confirmar con qué código de `SState` se seedeó acá
- * "Inactivo" -- otras partes del proyecto usan casings distintos para
- * sus propios estados ('Activo' en underwriting-service, 'ACTIVO' en los
- * catálogos genéricos de product-rating-service), así que adivinar uno
- * podría tirar un `NotFoundException` recién al probar en pantalla. Para
- * reemplazar una plantilla por ahora: `replaceFile` (sin pasar por
- * `IdeState`). Activar/desactivar queda para cuando se confirme el
- * código real.
+ * Activar/desactivar (`setState`): en `SState` conviven 'ACTIVO' y
+ * 'Activo' con casings distintos según quién los sembró, así que
+ * "inactiva" se define SOLO por el código 'INACTIVO' (el mismo que usan
+ * los catálogos genéricos, usuarios e impacto social) y cualquier otro
+ * estado cuenta como activa -- ver `INACTIVE_STATE_CODE`.
  */
+/** Único código de `SState` que marca una plantilla como desactivada. */
+const INACTIVE_STATE_CODE = 'INACTIVO';
+
 @Injectable()
 export class TemplatesService {
   constructor(
@@ -33,7 +31,10 @@ export class TemplatesService {
   async findByOperationProduct(ideOperationProduct: string) {
     const rows = await this.prisma.sOperationProductTemplate.findMany({
       where: { IdeOperationProduct: ideOperationProduct },
-      include: { SPersonRol: { select: { DesPersonRol: true } } },
+      include: {
+        SPersonRol: { select: { DesPersonRol: true } },
+        SState: { select: { CodState: true } },
+      },
       orderBy: { NumOrder: 'asc' },
     });
     return rows.map((row) => ({
@@ -44,6 +45,7 @@ export class TemplatesService {
       desPersonRol: row.SPersonRol.DesPersonRol,
       numOrder: row.NumOrder,
       hasFile: row.TemplateFile !== null,
+      isActive: row.SState?.CodState !== INACTIVE_STATE_CODE,
     }));
   }
 
@@ -88,19 +90,45 @@ export class TemplatesService {
     return { ideOperationProductTemplate };
   }
 
+  /** Activa/desactiva una plantilla. `active=false` usa el código
+   *  'INACTIVO'; `active=true` vuelve a 'Activo' (el mismo que asigna
+   *  `create`, garantizado a existir). */
+  async setState(ideOperationProductTemplate: string, active: boolean, actor: string) {
+    const existing = await this.prisma.sOperationProductTemplate.findUnique({
+      where: { IdeOperationProductTemplate: ideOperationProductTemplate },
+    });
+    if (!existing) {
+      throw new NotFoundException(`No existe la plantilla "${ideOperationProductTemplate}"`);
+    }
+    const ideState = await this.stateMachine.getStateByCode(active ? 'Activo' : INACTIVE_STATE_CODE);
+    await this.prisma.sOperationProductTemplate.update({
+      where: { IdeOperationProductTemplate: ideOperationProductTemplate },
+      data: { IdeState: ideState, UsrModification: actor, TstModification: new Date() },
+    });
+    return { ideOperationProductTemplate, isActive: active };
+  }
+
   /** Resuelve la plantilla a usar para generar un documento (ver
-   *  GenerationService): la primera que matchee producto+operación+
-   *  tipo+rol, por `NumOrder` -- sin filtrar por `IdeState` todavía
-   *  (ver doc-comment de la clase: no hay activar/desactivar en esta
-   *  primera versión, toda plantilla creada queda utilizable). */
-  async resolveForGeneration(ideOperationProduct: string, codTemplateType: string, idePersonRol: string) {
+   *  GenerationService): la primera ACTIVA que matchee producto+
+   *  operación+tipo+rol, por `NumOrder` (las desactivadas con
+   *  'INACTIVO' se saltean). */
+  async resolveForGeneration(
+    ideOperationProduct: string | string[],
+    codTemplateType: string,
+    idePersonRol: string,
+  ) {
     const template = await this.prisma.sOperationProductTemplate.findFirst({
-      where: { IdeOperationProduct: ideOperationProduct, CodTemplateType: codTemplateType, IdePersonRol: idePersonRol },
+      where: {
+        IdeOperationProduct: Array.isArray(ideOperationProduct) ? { in: ideOperationProduct } : ideOperationProduct,
+        CodTemplateType: codTemplateType,
+        IdePersonRol: idePersonRol,
+        SState: { CodState: { not: INACTIVE_STATE_CODE } },
+      },
       orderBy: { NumOrder: 'asc' },
     });
     if (!template || !template.TemplateFile) {
       throw new ConflictException(
-        `No hay una plantilla configurada de tipo "${codTemplateType}" para ese producto/operación/rol`,
+        `No hay una plantilla configurada de tipo "${codTemplateType}" para ese producto/operación/rol (o están todas desactivadas)`,
       );
     }
     return template;

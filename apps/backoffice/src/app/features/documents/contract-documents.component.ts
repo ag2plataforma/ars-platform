@@ -6,16 +6,18 @@ import { ButtonModule } from 'primeng/button';
 import { TableModule } from 'primeng/table';
 import { DialogModule } from 'primeng/dialog';
 import { SelectModule } from 'primeng/select';
+import { TextareaModule } from 'primeng/textarea';
 import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { environment } from '../../../environments/environment';
-import { DocumentTemplatesService, PersonRoleOption } from './document-templates.service';
+import { ContractReceiptOption, DocumentTemplatesService, PersonRoleOption } from './document-templates.service';
 
+/** `COTIZACION` no se genera desde un contrato: sale de la cotización
+ *  ("Descargar cotización en PDF" en el resumen de Cotización). */
 const TEMPLATE_TYPES = [
   { value: 'CONTRATO', label: 'Póliza / Contrato' },
   { value: 'RECIBO', label: 'Recibo de pago' },
-  { value: 'COTIZACION', label: 'Cotización' },
   { value: 'COMUNICADO', label: 'Comunicado' },
 ];
 
@@ -49,6 +51,7 @@ interface GeneratedDocument {
     TableModule,
     DialogModule,
     SelectModule,
+    TextareaModule,
     ToastModule,
     TranslocoPipe,
   ],
@@ -71,13 +74,32 @@ export class ContractDocumentsComponent implements OnChanges {
   readonly generating = signal(false);
   readonly generateDialogVisible = signal(false);
 
+  readonly receipts = signal<ContractReceiptOption[]>([]);
+
   readonly generateForm = this.fb.nonNullable.group({
     codTemplateType: ['CONTRATO', Validators.required],
     idePersonRol: ['', Validators.required],
+    ideReceipt: [''],
+    mensaje: [''],
   });
 
   constructor() {
     this.templatesService.listPersonRoles().subscribe({ next: (rows) => this.personRoles.set(rows) });
+    // RECIBO exige elegir un recibo (obligatorio solo para ese tipo).
+    this.generateForm.controls.codTemplateType.valueChanges.subscribe((type) => {
+      const receiptControl = this.generateForm.controls.ideReceipt;
+      if (type === 'RECIBO') {
+        receiptControl.addValidators(Validators.required);
+      } else {
+        receiptControl.clearValidators();
+        receiptControl.setValue('');
+      }
+      receiptControl.updateValueAndValidity();
+    });
+  }
+
+  get selectedType(): string {
+    return this.generateForm.controls.codTemplateType.value;
   }
 
   ngOnChanges(): void {
@@ -98,7 +120,9 @@ export class ContractDocumentsComponent implements OnChanges {
   }
 
   openGenerate(): void {
-    this.generateForm.reset({ codTemplateType: 'CONTRATO', idePersonRol: '' });
+    this.generateForm.reset({ codTemplateType: 'CONTRATO', idePersonRol: '', ideReceipt: '', mensaje: '' });
+    this.receipts.set([]);
+    this.templatesService.listContractReceipts(this.ideContract).subscribe({ next: (rows) => this.receipts.set(rows) });
     this.generateDialogVisible.set(true);
   }
 
@@ -110,8 +134,14 @@ export class ContractDocumentsComponent implements OnChanges {
     if (this.generateForm.invalid) return;
     this.generating.set(true);
     const raw = this.generateForm.getRawValue();
+    const payload = {
+      codTemplateType: raw.codTemplateType,
+      idePersonRol: raw.idePersonRol,
+      ...(raw.codTemplateType === 'RECIBO' ? { ideReceipt: raw.ideReceipt } : {}),
+      ...(raw.codTemplateType === 'COMUNICADO' && raw.mensaje.trim() ? { mensaje: raw.mensaje.trim() } : {}),
+    };
     this.http
-      .post(`${environment.apiUrl}/documents/generation/contracts/${this.ideContract}`, raw)
+      .post(`${environment.apiUrl}/documents/generation/contracts/${this.ideContract}`, payload)
       .subscribe({
         next: () => {
           this.generating.set(false);

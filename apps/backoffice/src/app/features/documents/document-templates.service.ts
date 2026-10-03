@@ -30,6 +30,16 @@ export interface DocumentTemplate {
   desPersonRol: string;
   numOrder: number;
   hasFile: boolean;
+  isActive: boolean;
+}
+
+export interface ContractReceiptOption {
+  ideReceipt: string;
+  numReceipt: string;
+  tstInitial: string;
+  tstEnd: string;
+  prime: number;
+  desState: string;
 }
 
 export interface CreateTemplatePayload {
@@ -76,6 +86,29 @@ export class DocumentTemplatesService {
 
   createTemplate(payload: CreateTemplatePayload): Observable<{ ideOperationProductTemplate: string }> {
     return this.http.post<{ ideOperationProductTemplate: string }>(`${BASE}/templates`, payload);
+  }
+
+  /** Recibos del contrato -- para elegir cuál generar (tipo RECIBO). */
+  listContractReceipts(ideContract: string): Observable<ContractReceiptOption[]> {
+    return this.http.get<ContractReceiptOption[]>(`${BASE}/generation/contracts/${ideContract}/receipts`);
+  }
+
+  /** Cotización en PDF al vuelo (no se guarda nada en el backend). */
+  downloadQuotePdf(ideQuote: string, idePersonRol: string): Observable<Blob> {
+    return this.http.get(`${BASE}/generation/quotes/${ideQuote}/pdf`, {
+      params: { idePersonRol },
+      responseType: 'blob',
+    });
+  }
+
+  setTemplateState(
+    ideOperationProductTemplate: string,
+    active: boolean,
+  ): Observable<{ ideOperationProductTemplate: string; isActive: boolean }> {
+    return this.http.patch<{ ideOperationProductTemplate: string; isActive: boolean }>(
+      `${BASE}/templates/${ideOperationProductTemplate}/state`,
+      { active },
+    );
   }
 
   replaceTemplateFile(

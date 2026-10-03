@@ -34,7 +34,7 @@
   [visible]="generateDialogVisible()"
   (visibleChange)="!$event && closeGenerate()"
   [modal]="true"
-  [style]="{ width: '22rem' }"
+  [style]="{ width: '26rem' }"
   [header]="'contractDocuments.generateDialogTitle' | transloco"
 >
   <form [formGroup]="generateForm" class="flex flex-col gap-3">
@@ -46,6 +46,38 @@
       <label class="text-sm text-slate-600">{{ 'documentTemplates.roleLabel' | transloco }}</label>
       <p-select [options]="personRoles()" optionLabel="desPersonRol" optionValue="idePersonRol" formControlName="idePersonRol" appendTo="body" />
     </div>
+
+    @if (selectedType === 'RECIBO') {
+      <div class="flex flex-col gap-1">
+        <label class="text-sm text-slate-600">{{ 'contractDocuments.receiptLabel' | transloco }}</label>
+        <p-select
+          [options]="receipts()"
+          optionValue="ideReceipt"
+          formControlName="ideReceipt"
+          appendTo="body"
+          [placeholder]="'contractDocuments.receiptPlaceholder' | transloco"
+        >
+          <ng-template #selectedItem let-r>{{ r.numReceipt }} · {{ r.tstInitial | date: 'dd/MM/yyyy' }} - {{ r.tstEnd | date: 'dd/MM/yyyy' }}</ng-template>
+          <ng-template #item let-r>
+            <div class="flex flex-col">
+              <span>{{ r.numReceipt }} · {{ r.tstInitial | date: 'dd/MM/yyyy' }} - {{ r.tstEnd | date: 'dd/MM/yyyy' }}</span>
+              <span class="text-xs text-slate-500">{{ r.prime | number: '1.2-2' }} · {{ r.desState }}</span>
+            </div>
+          </ng-template>
+        </p-select>
+        @if (receipts().length === 0) {
+          <p class="text-xs text-slate-500">{{ 'contractDocuments.noReceipts' | transloco }}</p>
+        }
+      </div>
+    }
+
+    @if (selectedType === 'COMUNICADO') {
+      <div class="flex flex-col gap-1">
+        <label class="text-sm text-slate-600">{{ 'contractDocuments.messageLabel' | transloco }}</label>
+        <textarea pTextarea rows="5" maxlength="4000" formControlName="mensaje" class="w-full"></textarea>
+        <p class="text-xs text-slate-500">{{ 'contractDocuments.messageHint' | transloco }}</p>
+      </div>
+    }
   </form>
 
   <ng-template pTemplate="footer">

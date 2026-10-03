@@ -581,6 +581,8 @@
     "adjustmentLabelSocialImpact": "Impacto Social",
     "personsTitle": "Personas",
     "personsSubtitle": "Asociá el Tomador y el Titular de la cotización.",
+    "downloadQuotePdfButton": "Descargar cotización en PDF",
+    "quotePdfNoTomadorRole": "No existe el rol de persona Tomador -- no se puede resolver la plantilla de cotización.",
     "personSlotTomador": "Tomador",
     "personSlotTitular": "Titular",
     "changeButton": "Cambiar",
@@ -1249,7 +1251,12 @@
     "fileColumn": "Archivo",
     "dateColumn": "Fecha",
     "emptyState": "Todavía no se generó ningún documento para este contrato.",
-    "generated": "Documento generado correctamente."
+    "generated": "Documento generado correctamente.",
+    "receiptLabel": "Recibo",
+    "receiptPlaceholder": "Elegí el recibo",
+    "noReceipts": "Este contrato todavía no tiene recibos.",
+    "messageLabel": "Mensaje (opcional)",
+    "messageHint": "Texto libre que se inserta en la plantilla en el lugar de la etiqueta «mensaje» (entre llaves dobles)."
   },
   "adjustments": {
     "title": "Recargos y descuentos",
@@ -1277,6 +1284,8 @@
     "emailColumn": "Email",
     "conditionColumn": "Condición",
     "createdColumn": "Alta",
+    "activateButton": "Activar",
+    "deactivateButton": "Desactivar",
     "leadTag": "Lead",
     "clientTag": "Cliente",
     "openButton": "Ver",

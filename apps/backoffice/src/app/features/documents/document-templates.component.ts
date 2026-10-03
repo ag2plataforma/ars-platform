@@ -8,7 +8,9 @@ import { DialogModule } from 'primeng/dialog';
 import { SelectModule } from 'primeng/select';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { ToastModule } from 'primeng/toast';
-import { MessageService } from 'primeng/api';
+import { TagModule } from 'primeng/tag';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { MessageService, ConfirmationService } from 'primeng/api';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import {
   DocumentTemplatesService,
@@ -51,15 +53,18 @@ const TEMPLATE_TYPES = [
     SelectModule,
     InputNumberModule,
     ToastModule,
+    TagModule,
+    ConfirmDialogModule,
     TranslocoPipe,
   ],
-  providers: [MessageService],
+  providers: [MessageService, ConfirmationService],
   templateUrl: './document-templates.component.html',
 })
 export class DocumentTemplatesComponent {
   private readonly service = inject(DocumentTemplatesService);
   private readonly fb = inject(FormBuilder);
   private readonly messageService = inject(MessageService);
+  private readonly confirm = inject(ConfirmationService);
   private readonly transloco = inject(TranslocoService);
 
   readonly templateTypes = TEMPLATE_TYPES;
@@ -240,5 +245,29 @@ export class DocumentTemplatesComponent {
         detail: this.transloco.translate<string>('documentTemplates.uploadError'),
       });
     }
+  }
+
+  /** Activar/desactivar -- una plantilla desactivada deja de resolverse
+   *  al generar documentos (ver `TemplatesService.resolveForGeneration`),
+   *  pero conserva su archivo y se puede volver a activar. */
+  toggleState(row: DocumentTemplate): void {
+    const ideOperationProduct = this.selectedOperationProduct();
+    if (!ideOperationProduct) return;
+    const activate = !row.isActive;
+    this.confirm.confirm({
+      header: this.transloco.translate(activate ? 'catalogs.activateHeader' : 'catalogs.deactivateHeader'),
+      message: this.transloco.translate('catalogs.toggleConfirm', {
+        action: this.transloco.translate(activate ? 'catalogs.toggleActivateAction' : 'catalogs.toggleDeactivateAction'),
+        item: `${row.codTemplateType} · ${row.desFileName}`,
+      }),
+      icon: 'pi pi-exclamation-triangle',
+      accept: () => {
+        this.service.setTemplateState(row.ideOperationProductTemplate, activate).subscribe({
+          next: () => this.loadTemplates(ideOperationProduct),
+          error: (err: HttpErrorResponse) =>
+            this.messageService.add({ severity: 'error', detail: err.error?.message ?? err.message }),
+        });
+      },
+    });
   }
 }

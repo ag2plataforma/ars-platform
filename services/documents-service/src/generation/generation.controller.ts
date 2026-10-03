@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Body, Res } from '@nestjs/common';
+import { Controller, Get, Param, Post, Body, ParseUUIDPipe, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { CurrentUser, JwtPayload } from '@ars-platform/shared-common';
 import { GenerationService } from './generation.service';
@@ -29,7 +29,15 @@ export class GenerationController {
     @Body() dto: GenerateContractDocumentDto,
     @CurrentUser() actor: JwtPayload,
   ) {
-    return this.service.generateContractDocument(ideContract, dto.codTemplateType, dto.idePersonRol, actor.code);
+    return this.service.generateContractDocument(ideContract, dto.codTemplateType, dto.idePersonRol, actor.code, {
+      ideReceipt: dto.ideReceipt,
+      mensaje: dto.mensaje,
+    });
+  }
+
+  @Get(':ideContract/receipts')
+  listReceipts(@Param('ideContract') ideContract: string) {
+    return this.service.listReceipts(ideContract);
   }
 
   @Get(':ideContract')
@@ -43,5 +51,25 @@ export class GenerationController {
   @Post(':ideContract/welcome-email')
   sendWelcomeEmail(@Param('ideContract') ideContract: string, @CurrentUser() actor: JwtPayload) {
     return this.service.generateWelcomeEmail(ideContract, actor.code);
+  }
+}
+
+/** Cotización en PDF al vuelo -- no se guarda nada (ver
+ *  `GenerationService.generateQuotePdf`). `GET` + descarga directa, mismo
+ *  patrón que `documents/:id/download`. */
+@Controller('generation/quotes')
+export class GenerationQuotesController {
+  constructor(private readonly service: GenerationService) {}
+
+  @Get(':ideQuote/pdf')
+  async quotePdf(
+    @Param('ideQuote') ideQuote: string,
+    @Query('idePersonRol', new ParseUUIDPipe()) idePersonRol: string,
+    @Res() res: Response,
+  ) {
+    const { bytes, desFileName } = await this.service.generateQuotePdf(ideQuote, idePersonRol);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${desFileName}"`);
+    res.send(bytes);
   }
 }

@@ -627,7 +627,18 @@
 
       <div class="flex justify-between">
         <button pButton type="button" [label]="'quotes.backButton' | transloco" severity="secondary" [text]="true" (click)="backToPersons()"></button>
-        <button pButton type="button" [label]="'quotes.continueButton' | transloco" icon="pi pi-arrow-right" iconPos="right" (click)="goToContractStep()"></button>
+        <div class="flex gap-2">
+          <button
+            pButton
+            type="button"
+            icon="pi pi-file-pdf"
+            severity="secondary"
+            [label]="'quotes.downloadQuotePdfButton' | transloco"
+            [loading]="downloadingQuotePdf()"
+            (click)="downloadQuotePdf()"
+          ></button>
+          <button pButton type="button" [label]="'quotes.continueButton' | transloco" icon="pi pi-arrow-right" iconPos="right" (click)="goToContractStep()"></button>
+        </div>
       </div>
     </div>
   }
