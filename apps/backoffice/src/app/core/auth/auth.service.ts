@@ -24,7 +24,21 @@ export class AuthService {
     return token ? decodeJwtPayload(token) : null;
   });
 
-  readonly isAuthenticated = computed(() => this.payload() !== null);
+  /** Pedido explícito del usuario (2026-09-27): antes solo miraba que
+   *  hubiera un token guardado, sin fijarse si ya venció (`exp`, en
+   *  segundos epoch) -- así que un token vencido dejaba pasar el
+   *  `authGuard` igual y recién fallaba (sin redirigir a ningún lado) en
+   *  el primer request real que hiciera esa pantalla. Ahora un token
+   *  vencido cuenta como no autenticado, así que `authGuard` redirige al
+   *  login al navegar. Para el caso de que venza a mitad de sesión
+   *  (usuario ya en una pantalla, sin navegar) ver `authInterceptor`,
+   *  que fuerza el mismo `logout()` ante cualquier 401 del backend. */
+  readonly isAuthenticated = computed(() => {
+    const payload = this.payload();
+    if (!payload) return false;
+    if (payload.exp !== undefined && payload.exp * 1000 <= Date.now()) return false;
+    return true;
+  });
 
   constructor(
     private readonly http: HttpClient,
