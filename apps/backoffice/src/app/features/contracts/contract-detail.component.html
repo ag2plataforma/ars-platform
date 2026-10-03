@@ -374,7 +374,7 @@
         </p-tabpanel>
 
         <p-tabpanel value="documentos">
-          <app-contract-documents [ideContract]="c.IdeContract" />
+          <app-contract-documents [ideContract]="c.IdeContract" [refreshKey]="c.SState.CodState + '|' + activeTab()" />
         </p-tabpanel>
 
         <!-- ============================== Canales de distribución ============================== -->

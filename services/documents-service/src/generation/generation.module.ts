@@ -8,5 +8,6 @@ import { GenerationService } from './generation.service';
   imports: [DocumentsStateMachineModule, TemplatesModule],
   controllers: [GenerationController, GenerationQuotesController],
   providers: [GenerationService],
+  exports: [GenerationService],
 })
 export class GenerationModule {}

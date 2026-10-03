@@ -1,9 +1,8 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, PrismaService } from '@ars-platform/database';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Prisma, PrismaService, TaskQueueRepository } from '@ars-platform/database';
 import { RulesEngineService, StateMachineService } from '@ars-platform/shared-common';
 import { QuotesService } from '../quoting/quotes.service';
 import { RequirementsService } from '../requirements/requirements.service';
-import { DocumentsHttpClient } from '../documents/documents-http.client';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { CancelContractDto } from './dto/cancel-contract.dto';
 import { ChangeInsuredAmountDto } from './dto/change-insured-amount.dto';
@@ -120,13 +119,15 @@ const MANUAL_RENEWAL_WINDOW_DAYS = 30;
  */
 @Injectable()
 export class ContractsService {
+  private readonly logger = new Logger(ContractsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly stateMachine: StateMachineService,
     private readonly rulesEngine: RulesEngineService,
     private readonly quotesService: QuotesService,
     private readonly requirementsService: RequirementsService,
-    private readonly documentsHttpClient: DocumentsHttpClient,
+    private readonly taskQueue: TaskQueueRepository,
   ) {}
 
   /**
@@ -225,7 +226,7 @@ export class ContractsService {
    * `applyStateCascade`) -- quedan en su estado inicial, comportamiento
    * preexistente, no algo que este método deba corregir.
    */
-  async activate(ideContract: string, actor: string, authorization?: string) {
+  async activate(ideContract: string, actor: string) {
     const existing = await this.prisma.tContract.findUnique({ where: { IdeContract: ideContract } });
     if (!existing) {
       throw new NotFoundException(`No existe contrato con id "${ideContract}"`);
@@ -244,15 +245,17 @@ export class ContractsService {
       { timeout: CREATE_TRANSACTION_TIMEOUT_MS, maxWait: 10_000 },
     );
 
-    // Correo de bienvenida con la póliza adjunta (ver docs/02-roadmap.md,
-    // pedido explícito del usuario 2026-10-01) -- DESPUÉS de que la
-    // transacción de activación ya confirmó, y sin bloquear la respuesta
-    // de este endpoint si falla (ver doc-comment de `DocumentsHttpClient`:
-    // ese cliente nunca lanza, solo loguea). Si no llega `authorization`
-    // (llamador interno sin JWT de usuario, ej. un futuro job automático),
-    // se salta en silencio en vez de llamar con un header inválido.
-    if (authorization) {
-      await this.documentsHttpClient.sendWelcomeEmail(ideContract, authorization);
+    // Correo de bienvenida con la póliza adjunta (ver docs/02-roadmap.md):
+    // se ENCOLA en `TBackgroundTask` (tipo WELCOME_EMAIL) y lo procesa el
+    // worker de `documents-service` -- con reintentos y sin bloquear esta
+    // respuesta. Reemplaza la llamada HTTP directa anterior
+    // (`DocumentsHttpClient`, que además dependía del JWT del usuario).
+    // Si ni siquiera se puede encolar, se loguea y se sigue: la activación
+    // ya se confirmó y un correo de cortesía nunca debe tumbarla.
+    try {
+      await this.taskQueue.enqueue({ codTaskType: 'WELCOME_EMAIL', ideEntity: ideContract, actor });
+    } catch (err) {
+      this.logger.error(`No se pudo encolar el correo de bienvenida del contrato "${ideContract}": ${(err as Error).message}`);
     }
 
     return this.findOne(ideContract);

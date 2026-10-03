@@ -1291,6 +1291,18 @@
     "openButton": "Ver",
     "emptyState": "No se encontraron personas."
   },
+    "queued": "Generación en curso: el documento aparecerá en la lista en unos segundos.",
+    "tasksTitle": "Tareas en segundo plano",
+    "taskWelcomeEmail": "Correo de bienvenida",
+    "taskGenerate": "Generar documento: {{type}}",
+    "retrying": "Intento {{n}} de {{max}}. ",
+    "retryButton": "Reintentar",
+    "status": {
+      "PENDIENTE": "En espera",
+      "EN_PROCESO": "Procesando",
+      "COMPLETADA": "Completada",
+      "FALLIDA": "Falló"
+    },
   "personDetail": {
     "title": "Detalle de persona",
     "subtitle": "Datos, cotizaciones y contratos vinculados.",

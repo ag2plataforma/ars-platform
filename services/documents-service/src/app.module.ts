@@ -7,6 +7,7 @@ import { HealthController } from './health/health.controller';
 import { OperationProductsModule } from './operation-products/operation-products.module';
 import { TemplatesModule } from './templates/templates.module';
 import { GenerationModule } from './generation/generation.module';
+import { QueueModule } from './queue/queue.module';
 
 /**
  * Servicio nuevo (2026-10-01): "Gestión de plantillas de documentos
@@ -36,6 +37,7 @@ import { GenerationModule } from './generation/generation.module';
     OperationProductsModule,
     TemplatesModule,
     GenerationModule,
+    QueueModule, // cola de tareas en segundo plano (correo de bienvenida, generación de documentos)
   ],
   controllers: [HealthController],
 })

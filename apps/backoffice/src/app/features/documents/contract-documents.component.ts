@@ -1,4 +1,4 @@
-import { Component, Input, OnChanges, inject, signal } from '@angular/core';
+import { Component, Input, OnChanges, OnDestroy, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -6,6 +6,7 @@ import { ButtonModule } from 'primeng/button';
 import { TableModule } from 'primeng/table';
 import { DialogModule } from 'primeng/dialog';
 import { SelectModule } from 'primeng/select';
+import { TagModule } from 'primeng/tag';
 import { TextareaModule } from 'primeng/textarea';
 import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
@@ -20,6 +21,24 @@ const TEMPLATE_TYPES = [
   { value: 'RECIBO', label: 'Recibo de pago' },
   { value: 'COMUNICADO', label: 'Comunicado' },
 ];
+
+/** Tarea de la cola en segundo plano (`TBackgroundTask`, ver `TasksController`
+ *  en documents-service). */
+interface BackgroundTask {
+  ideBackgroundTask: string;
+  codTaskType: string;
+  codStatus: 'PENDIENTE' | 'EN_PROCESO' | 'COMPLETADA' | 'FALLIDA';
+  numAttempts: number;
+  numMaxAttempts: number;
+  tstNextAttempt: string;
+  desError: string | null;
+  tstCreation: string;
+  codTemplateType: string | null;
+}
+
+const ACTIVE_STATUSES = ['PENDIENTE', 'EN_PROCESO'];
+const POLL_MS = 3000;
+const MAX_TASKS_SHOWN = 10;
 
 interface GeneratedDocument {
   ideContractOperationDocument: string;
@@ -51,6 +70,7 @@ interface GeneratedDocument {
     TableModule,
     DialogModule,
     SelectModule,
+    TagModule,
     TextareaModule,
     ToastModule,
     TranslocoPipe,
@@ -58,8 +78,14 @@ interface GeneratedDocument {
   providers: [MessageService],
   templateUrl: './contract-documents.component.html',
 })
-export class ContractDocumentsComponent implements OnChanges {
+export class ContractDocumentsComponent implements OnChanges, OnDestroy {
   @Input({ required: true }) ideContract!: string;
+  /** Cualquier cambio de este valor recarga documentos y tareas. El
+   *  detalle de contrato lo cambia al cambiar de estado (ej. "Activar"
+   *  encola el correo de bienvenida) y al entrar a la pestaña: los
+   *  paneles de PrimeNG ya están creados desde que carga el contrato, así
+   *  que sin esto la lista quedaba con lo que había al abrir la página. */
+  @Input() refreshKey = '';
 
   private readonly http = inject(HttpClient);
   private readonly templatesService = inject(DocumentTemplatesService);
@@ -75,6 +101,8 @@ export class ContractDocumentsComponent implements OnChanges {
   readonly generateDialogVisible = signal(false);
 
   readonly receipts = signal<ContractReceiptOption[]>([]);
+  readonly tasks = signal<BackgroundTask[]>([]);
+  private pollTimer?: ReturnType<typeof setTimeout>;
 
   readonly generateForm = this.fb.nonNullable.group({
     codTemplateType: ['CONTRATO', Validators.required],
@@ -103,11 +131,19 @@ export class ContractDocumentsComponent implements OnChanges {
   }
 
   ngOnChanges(): void {
-    if (this.ideContract) this.loadDocuments();
+    if (this.ideContract) this.loadAll(true);
   }
 
-  private loadDocuments(): void {
-    this.loading.set(true);
+  ngOnDestroy(): void {
+    clearTimeout(this.pollTimer);
+  }
+
+  /** Documentos + tareas de la cola. Mientras haya una tarea PENDIENTE/
+   *  EN_PROCESO vuelve a consultar cada `POLL_MS` (así el PDF aparece solo
+   *  cuando el worker lo termina); se detiene al no quedar ninguna activa. */
+  private loadAll(showSpinner = false): void {
+    clearTimeout(this.pollTimer);
+    if (showSpinner) this.loading.set(true);
     this.http
       .get<GeneratedDocument[]>(`${environment.apiUrl}/documents/generation/contracts/${this.ideContract}`)
       .subscribe({
@@ -116,6 +152,39 @@ export class ContractDocumentsComponent implements OnChanges {
           this.loading.set(false);
         },
         error: () => this.loading.set(false),
+      });
+    this.http.get<BackgroundTask[]>(`${environment.apiUrl}/documents/tasks/contracts/${this.ideContract}`).subscribe({
+      next: (rows) => {
+        this.tasks.set(rows.slice(0, MAX_TASKS_SHOWN));
+        if (rows.some((t) => ACTIVE_STATUSES.includes(t.codStatus))) {
+          this.pollTimer = setTimeout(() => this.loadAll(), POLL_MS);
+        }
+      },
+    });
+  }
+
+  taskSeverity(status: BackgroundTask['codStatus']): 'success' | 'danger' | 'info' | 'warn' {
+    return { COMPLETADA: 'success', FALLIDA: 'danger', EN_PROCESO: 'info', PENDIENTE: 'warn' }[status] as
+      | 'success'
+      | 'danger'
+      | 'info'
+      | 'warn';
+  }
+
+  taskTypeLabel(task: BackgroundTask): string {
+    if (task.codTaskType === 'WELCOME_EMAIL') return this.transloco.translate<string>('contractDocuments.taskWelcomeEmail');
+    const type = TEMPLATE_TYPES.find((t) => t.value === task.codTemplateType)?.label ?? task.codTemplateType ?? '';
+    return this.transloco.translate<string>('contractDocuments.taskGenerate', { type });
+  }
+
+  retryTask(task: BackgroundTask): void {
+    this.http
+      .post(`${environment.apiUrl}/documents/tasks/${task.ideBackgroundTask}/retry`, {})
+      .subscribe({
+        next: () => this.loadAll(),
+        error: (err: HttpErrorResponse) => {
+          this.messageService.add({ severity: 'error', detail: err.error?.message ?? err.message });
+        },
       });
   }
 
@@ -141,16 +210,16 @@ export class ContractDocumentsComponent implements OnChanges {
       ...(raw.codTemplateType === 'COMUNICADO' && raw.mensaje.trim() ? { mensaje: raw.mensaje.trim() } : {}),
     };
     this.http
-      .post(`${environment.apiUrl}/documents/generation/contracts/${this.ideContract}`, payload)
+      .post(`${environment.apiUrl}/documents/tasks/contracts/${this.ideContract}/documents`, payload)
       .subscribe({
         next: () => {
           this.generating.set(false);
           this.generateDialogVisible.set(false);
           this.messageService.add({
             severity: 'success',
-            detail: this.transloco.translate<string>('contractDocuments.generated'),
+            detail: this.transloco.translate<string>('contractDocuments.queued'),
           });
-          this.loadDocuments();
+          this.loadAll();
         },
         error: (err: HttpErrorResponse) => {
           this.generating.set(false);

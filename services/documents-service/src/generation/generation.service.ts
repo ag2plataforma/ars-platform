@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { PermanentTaskError } from '../queue/task-handler';
 import { Prisma, PrismaService } from '@ars-platform/database';
 import { EMAIL_SENDER, EmailSender, StateMachineService } from '@ars-platform/shared-common';
 import { TemplatesService } from '../templates/templates.service';
@@ -513,75 +514,85 @@ export class GenerationService {
   }
 
   /**
-   * Correo de bienvenida con la póliza en PDF adjunta -- disparado por
-   * `underwriting-service` justo después de "Activar contrato"
-   * (`ContractsService.activate`, ver `DocumentsHttpClient` ahí), vía
-   * llamada HTTP real entre servicios (mismo patrón ya establecido con
-   * `social-impact-service`: `fetch` nativo, reenvía el `Authorization`
-   * del usuario, sin credencial service-to-service aparte).
+   * Correo de bienvenida con la póliza en PDF adjunta -- lo ejecuta el
+   * worker de la cola (`WelcomeEmailHandler`) para la tarea que encola
+   * `ContractsService.activate()` en underwriting-service (ya no hay
+   * llamada HTTP entre servicios: la activación solo inserta la tarea).
    *
    * Reusa `generateContractDocument` tal cual (mismo documento
-   * "Póliza/Contrato emitido" que ya se puede generar a mano desde la
-   * pestaña Documentos) -- el rol destinatario es SIEMPRE el Titular acá
-   * (es quien recibe el correo), resuelto por código (`SPersonRol.
-   * CodPersonRol==='TITULAR'`) en vez de pedirlo como parámetro.
+   * "Póliza/Contrato emitido" que se puede generar a mano desde la
+   * pestaña Documentos) -- el rol destinatario es SIEMPRE el Titular
+   * (resuelto por código, `SPersonRol.CodPersonRol==='TITULAR'`).
    *
-   * Deliberadamente NO lanza si algo falla (plantilla todavía no
-   * configurada para este producto, LibreOffice no disponible, Brevo mal
-   * configurado, Titular sin email) -- "Activar contrato" no debe
-   * quedar bloqueado por un correo de cortesía. Se loguea el motivo y
-   * `DocumentsHttpClient` del otro lado también ignora el resultado,
-   * mismo criterio de "degradación elegante" ya usado en
-   * `EmissionsDevClient`.
+   * A diferencia de la versión HTTP anterior, ACÁ SÍ LANZA: el worker
+   * distingue entre error permanente (`PermanentTaskError`, o los 404/409
+   * de `generateContractDocument` por plantilla/operación sin configurar
+   * -> la tarea queda FALLIDA y se puede reintentar a mano al arreglarlo)
+   * y transitorio (LibreOffice, Brevo, base -> reintento automático con
+   * espera creciente). La activación del contrato nunca queda bloqueada
+   * porque ya terminó antes de encolar.
+   *
+   * Idempotencia ante reintentos: si en un intento previo el PDF ya se
+   * generó (`previousDocumentId`, guardado vía `onDocumentGenerated`) se
+   * reusa en vez de crear otro documento duplicado.
    */
-  async generateWelcomeEmail(ideContract: string, actor: string): Promise<{ sent: boolean; reason?: string }> {
-    try {
-      const titularRole = await this.prisma.sPersonRol.findFirst({ where: { CodPersonRol: 'TITULAR' } });
-      if (!titularRole) {
-        return { sent: false, reason: 'No existe el rol TITULAR en SPersonRol' };
-      }
+  async sendWelcomeEmail(
+    ideContract: string,
+    actor: string,
+    opts: {
+      previousDocumentId?: string;
+      onDocumentGenerated?: (ideContractOperationDocument: string) => Promise<void>;
+    } = {},
+  ): Promise<{ ideContractOperationDocument: string; sentTo: string }> {
+    const titularRole = await this.prisma.sPersonRol.findFirst({ where: { CodPersonRol: 'TITULAR' } });
+    if (!titularRole) {
+      throw new PermanentTaskError('No existe el rol TITULAR en SPersonRol');
+    }
 
-      const titularPerson = await this.prisma.tContractPerson.findFirst({
-        where: { IdeContract: ideContract, SPersonRol: { CodPersonRol: 'TITULAR' } },
-        include: { TPerson: true },
-      });
-      if (!titularPerson?.TPerson.DesEmail) {
-        return { sent: false, reason: 'El contrato no tiene Titular con email resuelto' };
-      }
+    const titularPerson = await this.prisma.tContractPerson.findFirst({
+      where: { IdeContract: ideContract, SPersonRol: { CodPersonRol: 'TITULAR' } },
+      include: { TPerson: true },
+    });
+    if (!titularPerson?.TPerson.DesEmail) {
+      throw new PermanentTaskError('El contrato no tiene Titular con email resuelto');
+    }
 
-      const { ideContractOperationDocument } = await this.generateContractDocument(
+    let ideContractOperationDocument = opts.previousDocumentId;
+    let file: { bytes: Buffer; desFileName: string } | null = null;
+    if (ideContractOperationDocument) {
+      file = await this.getFile(ideContractOperationDocument).catch(() => null);
+    }
+    if (!file) {
+      ({ ideContractOperationDocument } = await this.generateContractDocument(
         ideContract,
         'CONTRATO',
         titularRole.IdePersonRol,
         actor,
-      );
-      const { bytes, desFileName } = await this.getFile(ideContractOperationDocument);
-      const contract = await this.prisma.tContract.findUniqueOrThrow({
-        where: { IdeContract: ideContract },
-        select: { NumContract: true },
-      });
-
-      const desTitular = [titularPerson.TPerson.DesFirstName, titularPerson.TPerson.DesLastName1]
-        .filter(Boolean)
-        .join(' ');
-
-      await this.emailSender.send({
-        to: titularPerson.TPerson.DesEmail,
-        subject: `¡Bienvenido a ARS! Tu póliza ${contract.NumContract} ya está activa`,
-        html: `
-          <p>Hola ${desTitular || 'cliente'},</p>
-          <p>Tu póliza <strong>${contract.NumContract}</strong> ya está activa. Te adjuntamos el documento con las condiciones particulares.</p>
-          <p>¡Gracias por confiar en nosotros!</p>
-        `,
-        attachments: [{ name: desFileName, contentBase64: bytes.toString('base64') }],
-      });
-
-      return { sent: true };
-    } catch (err) {
-      const reason = (err as Error).message;
-      this.logger.error(`No se pudo enviar el correo de bienvenida del contrato "${ideContract}": ${reason}`);
-      return { sent: false, reason };
+      ));
+      await opts.onDocumentGenerated?.(ideContractOperationDocument);
+      file = await this.getFile(ideContractOperationDocument);
     }
+
+    const contract = await this.prisma.tContract.findUniqueOrThrow({
+      where: { IdeContract: ideContract },
+      select: { NumContract: true },
+    });
+    const desTitular = [titularPerson.TPerson.DesFirstName, titularPerson.TPerson.DesLastName1]
+      .filter(Boolean)
+      .join(' ');
+
+    await this.emailSender.send({
+      to: titularPerson.TPerson.DesEmail,
+      subject: `¡Bienvenido a ARS! Tu póliza ${contract.NumContract} ya está activa`,
+      html: `
+        <p>Hola ${desTitular || 'cliente'},</p>
+        <p>Tu póliza <strong>${contract.NumContract}</strong> ya está activa. Te adjuntamos el documento con las condiciones particulares.</p>
+        <p>¡Gracias por confiar en nosotros!</p>
+      `,
+      attachments: [{ name: file.desFileName, contentBase64: file.bytes.toString('base64') }],
+    });
+
+    return { ideContractOperationDocument: ideContractOperationDocument!, sentTo: titularPerson.TPerson.DesEmail };
   }
 
   async listForContract(ideContract: string) {

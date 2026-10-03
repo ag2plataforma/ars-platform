@@ -5,6 +5,41 @@
     <p-button [label]="'contractDocuments.generateButton' | transloco" icon="pi pi-file-pdf" (onClick)="openGenerate()" />
   </div>
 
+  @if (tasks().length > 0) {
+    <div class="flex flex-col gap-1">
+      <h3 class="text-sm font-semibold text-slate-700">{{ 'contractDocuments.tasksTitle' | transloco }}</h3>
+      <p-table [value]="tasks()" styleClass="rounded-lg border border-slate-200 text-sm">
+        <ng-template pTemplate="body" let-task>
+          <tr>
+            <td>{{ taskTypeLabel(task) }}</td>
+            <td>{{ task.tstCreation | date: 'dd/MM/yyyy HH:mm' }}</td>
+            <td>
+              <p-tag [severity]="taskSeverity(task.codStatus)" [value]="'contractDocuments.status.' + task.codStatus | transloco" />
+            </td>
+            <td class="text-xs text-slate-500">
+              @if (task.codStatus === 'PENDIENTE' && task.numAttempts > 0) {
+                {{ 'contractDocuments.retrying' | transloco: { n: task.numAttempts, max: task.numMaxAttempts } }}
+              }
+              @if (task.desError && task.codStatus !== 'COMPLETADA') {
+                {{ task.desError }}
+              }
+            </td>
+            <td>
+              @if (task.codStatus === 'FALLIDA') {
+                <p-button
+                  icon="pi pi-refresh"
+                  [text]="true"
+                  [label]="'contractDocuments.retryButton' | transloco"
+                  (onClick)="retryTask(task)"
+                />
+              }
+            </td>
+          </tr>
+        </ng-template>
+      </p-table>
+    </div>
+  }
+
   <p-table [value]="documents()" [loading]="loading()" styleClass="rounded-lg border border-slate-200 text-sm">
     <ng-template pTemplate="header">
       <tr>

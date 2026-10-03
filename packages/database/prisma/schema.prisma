@@ -3492,3 +3492,26 @@ model TQuoteAdjustment {
 
   @@unique([IdeQuote, IdeAdjustment], map: "UK_TQuoteAdjustment_01")
 }
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model TBackgroundTask {
+  IdeBackgroundTask String    @id(map: "PK_TBackgroundTask") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  CodTaskType       String    @db.VarChar(50)
+  IdeEntity         String?   @db.Uuid
+  DesPayload        Json      @default("{}")
+  DesResult         Json?
+  CodStatus         String    @default("PENDIENTE") @db.VarChar(20)
+  NumAttempts       Int       @default(0)
+  NumMaxAttempts    Int       @default(5)
+  TstNextAttempt    DateTime  @db.Timestamp(6)
+  TstStarted        DateTime? @db.Timestamp(6)
+  TstFinished       DateTime? @db.Timestamp(6)
+  DesError          String?   @db.VarChar
+  UsrCreation       String    @db.VarChar(60)
+  TstCreation       DateTime  @db.Timestamp(6)
+  UsrModification   String    @db.VarChar(60)
+  TstModification   DateTime  @db.Timestamp(6)
+
+  @@index([IdeEntity, TstCreation(sort: Desc)], map: "IX_TBackgroundTask_IdeEntity")
+  @@index([CodStatus, TstNextAttempt], map: "IX_TBackgroundTask_Status_NextAttempt")
+}
