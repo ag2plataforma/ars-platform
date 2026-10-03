@@ -1,22 +1,24 @@
 <div class="flex h-screen bg-slate-50">
-  <aside class="flex w-64 shrink-0 flex-col bg-slate-900">
-    <!-- Logo real del usuario (public/brand/logo.png), ahora con
-         transparencia real -- ver conversión en docs/02-roadmap.md.
-         Barra a h-28 (antes h-20) para que el logo entre más grande
-         (96px, casi el doble del anterior de 56px) sin quedar apretado
-         -- misma altura que la barra del header (ver
-         header.component.html) para que la línea entre ambas quede
-         alineada. -->
+  <!-- Sidebar en blanco con línea divisoria de 1px (border-r) en vez del
+       antiguo fondo oscuro -- pedido explícito del usuario (2026-09-27,
+       "probar" un look más moderno): texto e íconos oscuros/morados sobre
+       blanco, ver `sidebar-nav-item.component.ts` para el detalle de
+       colores. La altura de esta barra del logo (h-28, agrandada
+       recientemente para el logo real) ya NO está atada a la altura del
+       header (ver `header.component.html`) -- esa alineación forzaba un
+       header desproporcionadamente alto; ahora cada uno tiene su propia
+       altura. -->
+  <aside class="flex w-64 shrink-0 flex-col border-r border-slate-200 bg-white">
     <div class="flex h-28 items-center gap-3 px-4">
       <img src="/brand/logo.png" alt="ARS" class="h-24 w-24" />
       <div class="flex flex-col leading-tight">
-        <span class="text-2xl font-bold tracking-tight text-white">ARS</span>
-        <span class="text-sm font-medium uppercase tracking-wider text-slate-500">{{ 'shell.backofficeLabel' | transloco }}</span>
+        <span class="text-2xl font-bold tracking-tight text-slate-900">ARS</span>
+        <span class="text-sm font-medium uppercase tracking-wider text-slate-400">{{ 'shell.backofficeLabel' | transloco }}</span>
       </div>
     </div>
     <app-sidebar class="flex-1 overflow-y-auto" />
-    <div class="border-t border-slate-800 px-6 py-3">
-      <span class="text-xs text-slate-600">v{{ appVersion }}</span>
+    <div class="border-t border-slate-100 px-6 py-3">
+      <span class="text-xs text-slate-400">v{{ appVersion }}</span>
     </div>
   </aside>
   <div class="flex min-w-0 flex-1 flex-col">
