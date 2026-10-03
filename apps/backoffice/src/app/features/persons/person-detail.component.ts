@@ -69,7 +69,7 @@ export class PersonDetailComponent implements OnInit {
 
   /** Códigos de `TQuote.SState` que ya pasaron a contrato -- ver
    *  doc-comment de la clase. */
-  private static readonly CONTRACTED_QUOTE_STATES = new Set(['CONTRATADO', 'SEED_CONTRATADO']);
+  private static readonly CONTRACTED_QUOTE_STATES = new Set(['CONTRATADO']);
 
   readonly quoteStateFilter = signal<'pending' | 'contracted' | 'all'>('pending');
 
@@ -164,12 +164,10 @@ export class PersonDetailComponent implements OnInit {
     switch (codState) {
       case 'ACTIVO':
       case 'CONTRATADO':
-      case 'SEED_CONTRATADO':
         return 'success';
       case 'ACEPTADO':
         return 'warn';
       case 'BORRADOR':
-      case 'SEED_BORRADOR':
         return 'info';
       default:
         return 'secondary';

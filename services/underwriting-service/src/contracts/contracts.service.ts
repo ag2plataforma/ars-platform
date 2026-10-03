@@ -215,7 +215,7 @@ export class ContractsService {
    * que el usuario descubrió al probar "Activar contrato" en pantalla
    * (2026-09-29). Requiere haber corrido una vez
    * `packages/database/scripts/seed-activate-contract-person-transition.js`
-   * (agrega la transición `SEED_BORRADOR -> ACTIVO` vía `'Activar'` para
+   * (agrega la transición `BORRADOR -> ACTIVO` vía `'Activar'` para
    * `TContractPerson`, que el seed original nunca configuró; sin esa fila,
    * `activateContractPersons` fallaría con 404 de transición no
    * configurada). Solo se puede activar un contrato que esté todavía en su

@@ -32,10 +32,8 @@ const PRODUCTS_PATH = '/product-rating/products';
  *
  * Filtro por producto incluido (reutiliza el mismo catálogo que ya
  * carga `QuotesComponent`); filtro por estado/rango de fechas quedan
- * soportados en el backend (`ListQuotesDto`) pero sin UI todavía -- los
- * estados hoy son códigos de prueba (`SEED_BORRADOR`/`ACEPTADO`/
- * `SEED_CONTRATADO`, ver docs/02-roadmap.md) y no hay ningún
- * `p-datepicker`/`p-calendar` usado en el resto del frontend todavía
+ * soportados en el backend (`ListQuotesDto`) pero sin UI todavía -- no
+ * hay ningún `p-datepicker`/`p-calendar` usado en el resto del frontend todavía
  * como para introducir ese patrón acá sin más contexto/decisión.
  */
 @Component({
@@ -135,19 +133,15 @@ export class QuotesListComponent implements OnInit {
   }
 
   /** Color del `p-tag` de estado -- `BORRADOR`/`ACEPTADO`/`CONTRATADO` son
-   *  los códigos reales que usan las cotizaciones hoy; los `SEED_*` quedan
-   *  como fallback por si queda algún dato viejo de los fixtures de
-   *  prueba. Cualquier otro código cae en el `default` neutro, sin
-   *  romper. */
+   *  los códigos reales de la cotización (mismos que el legado). Cualquier
+   *  otro código cae en el `default` neutro, sin romper. */
   stateSeverity(codState: string): 'info' | 'warn' | 'success' | 'secondary' {
     switch (codState) {
       case 'BORRADOR':
-      case 'SEED_BORRADOR':
         return 'info';
       case 'ACEPTADO':
         return 'warn';
       case 'CONTRATADO':
-      case 'SEED_CONTRATADO':
         return 'success';
       default:
         return 'secondary';

@@ -58,7 +58,7 @@ const CLAIM_INCLUDE = {
  * BD real, lo corre el usuario).
  *
  * `TClaim`/`TClaimFile`/`TClaimRisk`/`TCoverageProvision` nacen en el
- * mismo estado "sin transición" (`SEED_BORRADOR`) que usan
+ * mismo estado "sin transición" (`BORRADOR`) que usan
  * `TContractRequirement`/`TQuoteRequirement` -- agregadas a
  * `NO_TRANSITION_ENTITIES` en `seed-contract-testing-fixtures.js` (correr
  * de nuevo ese script, es idempotente). No hay máquina de estados real

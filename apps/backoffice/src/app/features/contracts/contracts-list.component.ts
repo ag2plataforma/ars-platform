@@ -131,16 +131,18 @@ export class ContractsListComponent implements OnInit {
     });
   }
 
-  /** Color del `p-tag` de estado -- los códigos de prueba de hoy (ver
-   *  docs/02-roadmap.md, misma máquina de estados `SEED_` simplificada
-   *  que `TQuote`) mapeados a algo razonable; cualquier otro código cae
-   *  en el `default` neutro. */
+  /** Color del `p-tag` de estado -- los códigos reales de la máquina de
+   *  estados del contrato; cualquier otro código cae en el `default`
+   *  neutro. */
   stateSeverity(codState: string): 'info' | 'warn' | 'success' | 'secondary' {
     switch (codState) {
       case 'ACTIVO':
         return 'success';
-      case 'SEED_ANULADO':
+      case 'ANULADO':
+      case 'MODIFICADO':
         return 'warn';
+      case 'BORRADOR':
+        return 'info';
       default:
         return 'secondary';
     }

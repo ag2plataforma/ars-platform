@@ -215,12 +215,11 @@ export class QuotesService {
       items: rows.map((row) => {
         const tomador = row.TQuotePerson[0]?.TPerson;
         // Pedido explícito del usuario (2026-09-27): desde el listado, una
-        // cotización que ya se contrató (`SEED_CONTRATADO`, ver
-        // docs/02-roadmap.md) debe poder abrir directo el detalle del
+        // cotización que ya se contrató (`CONTRATADO`) debe poder abrir directo el detalle del
         // contrato en vez del wizard de cotización. Se expone acá el
         // mismo shape que ya usa `GET /quotes/:id` (`QuoteContractRef`)
         // en vez de un booleano, así el frontend no necesita conocer el
-        // código de estado de prueba para decidir el destino.
+        // código de estado para decidir el destino.
         const contract = row.TContract[0];
         return {
           ideQuote: row.IdeQuote,

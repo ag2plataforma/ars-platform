@@ -20,10 +20,8 @@ export class ListQuotesDto {
   @IsString()
   codProduct?: string;
 
-  /** `SState.CodState` de `TQuote` -- hoy son los códigos de prueba
-   *  `SEED_BORRADOR`/`ACEPTADO`/`SEED_CONTRATADO` (ver
-   *  `seed-contract-testing-fixtures.js`), no los del legado -- punto
-   *  abierto ya documentado en el roadmap, no bloquea este filtro. */
+  /** `SState.CodState` de `TQuote`: `BORRADOR`/`ACEPTADO`/`CONTRATADO`/
+   *  `VENCIDO` (los del legado). */
   @IsOptional()
   @IsString()
   codState?: string;

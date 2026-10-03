@@ -146,21 +146,13 @@ type RiskFieldsState = ReturnType<typeof buildRiskFieldsState>;
  * investigación anterior había encontrado la BD real sin ninguna fila
  * de esa configuración -- confirmado contra la BD real (ver
  * `packages/database/scripts/investigate-state-machine-config.js`) que
- * eso ya NO es así: existen 20 `SEntity`/50 `SStateRule` reales, pero
- * son los del fixture de prueba (`seed-contract-testing-fixtures.js`),
- * con estados propios prefijados `SEED_` (`SEED_BORRADOR`,
- * `SEED_CONTRATADO`, etc.) -- deliberadamente simplificados, NO los
- * estados reales del legado (ver el propio comentario de cabecera de
- * ese script). `SState`/`SStateRule`/`SEntity` NO están particionados
- * por producto (no hay `IdeProduct` en `SStateRule`): es una máquina de
- * estados GLOBAL, así que esta configuración de prueba ya alcanza para
- * que "Aceptar cotización"/"Generar contrato" funcionen contra
- * CUALQUIER producto, incluido uno real -- confirmado en la práctica,
- * el usuario cotizó y contrató de punta a punta con éxito. Punto
- * abierto, sin resolver todavía (ver `docs/02-roadmap.md`): si estos
- * estados `SEED_` quedan como la configuración definitiva, o si en
- * algún momento se investigan y migran los estados reales del legado
- * para mayor fidelidad -- no bloquea nada de lo que sigue.
+ * eso ya NO es así: existen `SEntity`/`SStateRule` reales. Historia: nacieron
+ * del fixture de prueba con estados `SEED_*`; el 2026-10-03 se normalizaron
+ * a los estados reales del legado (`normalize-state-machine.js`).
+ * `SState`/`SStateRule`/`SEntity` NO están particionados por producto
+ * (no hay `IdeProduct` en `SStateRule`): es una máquina de estados
+ * GLOBAL, así que alcanza para que "Aceptar cotización"/"Generar
+ * contrato" funcionen contra CUALQUIER producto.
  *
  * Sin pantalla de "listado de cotizaciones": `underwriting-service` hoy
  * solo expone `GET /quotes/:id` (una por id), no un `GET /quotes` que
