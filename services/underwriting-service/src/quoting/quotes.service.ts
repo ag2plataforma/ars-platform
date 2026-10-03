@@ -198,6 +198,11 @@ export class QuotesService {
           SProduct: true,
           SState: true,
           TQuotePerson: { where: { SPersonRol: { CodPersonRol: 'TOMADOR' } }, include: { TPerson: true } },
+          // Ver el doc-comment de más abajo (`contract` en el item mapeado)
+          // -- `take: 1` porque en la práctica una cotización genera un
+          // único contrato, aunque el esquema no lo fuerce con un
+          // `@unique` en `TContract.IdeQuote`.
+          TContract: { select: { IdeContract: true, NumContract: true }, take: 1 },
         },
         orderBy: this.resolveOrderBy(query),
         skip: (query.page - 1) * query.limit,
@@ -209,6 +214,14 @@ export class QuotesService {
     return {
       items: rows.map((row) => {
         const tomador = row.TQuotePerson[0]?.TPerson;
+        // Pedido explícito del usuario (2026-09-27): desde el listado, una
+        // cotización que ya se contrató (`SEED_CONTRATADO`, ver
+        // docs/02-roadmap.md) debe poder abrir directo el detalle del
+        // contrato en vez del wizard de cotización. Se expone acá el
+        // mismo shape que ya usa `GET /quotes/:id` (`QuoteContractRef`)
+        // en vez de un booleano, así el frontend no necesita conocer el
+        // código de estado de prueba para decidir el destino.
+        const contract = row.TContract[0];
         return {
           ideQuote: row.IdeQuote,
           numQuote: row.NumQuote,
@@ -218,6 +231,7 @@ export class QuotesService {
           tstCreation: row.TstCreation,
           usrCreation: row.UsrCreation,
           tomador: tomador ? { name: tomador.DesFirstName, lastname: tomador.DesLastName1 } : null,
+          contract: contract ? { ideContract: contract.IdeContract, numContract: contract.NumContract } : null,
         };
       }),
       total,

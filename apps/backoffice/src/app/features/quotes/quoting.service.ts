@@ -126,6 +126,10 @@ export interface QuoteListItem {
   tstCreation: string;
   usrCreation: string;
   tomador: { name: string; lastname: string | null } | null;
+  /** No-null solo si esta cotización ya generó un contrato -- mismo shape
+   *  que `QuotePricingResult.contract` (`QuoteContractRef`), para poder
+   *  abrir el detalle del contrato directo desde el listado. */
+  contract: QuoteContractRef | null;
 }
 
 export interface QuoteListResponse {
