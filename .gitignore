@@ -37,3 +37,7 @@ coverage/
 id_rsa*
 id_ed25519*
 oci_retry*
+
+# Salidas descartables de scripts de investigación/migración (no se versionan)
+packages/database/scripts/*.out.txt
+packages/database/scripts/*.backup.json

@@ -83,6 +83,17 @@
  *
  * Uso: node packages/database/scripts/seed-cancelcontract-fixtures.js
  */
+
+// ─────────────────────────────────────────────────────────────────────────
+// DESACTIVADO (2026-10-03): este script crea los estados de prueba SEED_*
+// (SEED_BORRADOR/SEED_CONTRATADO/SEED_MODIFICADO/SEED_ANULADO), que
+// `normalize-state-machine.js` eliminó a propósito para alinear la máquina de
+// estados con la del legado. Volver a correrlo los resucitaría. Se conserva
+// solo como referencia histórica; si hace falta un fixture nuevo, hay que
+// reescribirlo contra los estados reales (BORRADOR/ACTIVO/MODIFICADO/ANULADO...).
+console.error('Script desactivado: ver el comentario al inicio del archivo (normalize-state-machine.js).');
+process.exit(1);
+// ─────────────────────────────────────────────────────────────────────────
 const fs = require('fs');
 const path = require('path');
 const { PrismaClient } = require('@prisma/client');
