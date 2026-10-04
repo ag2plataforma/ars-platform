@@ -265,9 +265,12 @@ export class CatalogsComponent {
     const config = this.selected();
     const raw = this.form.getRawValue();
     const extra: Record<string, unknown> = {};
+    const numberKeys = new Set(
+      (config.extraFields ?? []).filter((field) => field.type === 'number').map((field) => field.key),
+    );
     for (const [key, value] of Object.entries(raw.extra)) {
       if (value === '' || value === null || value === undefined) continue;
-      extra[key] = value;
+      extra[key] = numberKeys.has(key) ? Number(value) : value;
     }
 
     if (this.dialogMode() === 'create') {

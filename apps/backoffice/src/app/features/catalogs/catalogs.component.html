@@ -138,6 +138,8 @@
         <label class="text-sm font-medium text-slate-700">{{ field.label | transloco }}</label>
         @if (field.type === 'text') {
           <input pInputText [formControl]="getExtraControl(field.key)" class="w-full" />
+        } @else if (field.type === 'number') {
+          <input pInputText type="number" step="1" min="0" [formControl]="getExtraControl(field.key)" class="w-full" />
         } @else if (field.type === 'textarea') {
           <textarea pTextarea rows="3" [formControl]="getExtraControl(field.key)" class="w-full"></textarea>
         } @else {

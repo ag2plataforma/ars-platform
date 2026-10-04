@@ -19,6 +19,8 @@ import { LimitTypesController } from './limit-types.controller';
 import { LimitTypesService } from './limit-types.service';
 import { AdjustmentsController } from './adjustments.controller';
 import { AdjustmentsService } from './adjustments.service';
+import { PaymentFractionsController } from './payment-fractions.controller';
+import { PaymentFractionsService } from './payment-fractions.service';
 
 /**
  * Los 8 catálogos "simples" necesarios para poder configurar
@@ -47,6 +49,7 @@ import { AdjustmentsService } from './adjustments.service';
     DeductibleTypesController,
     LimitTypesController,
     AdjustmentsController,
+    PaymentFractionsController,
   ],
   providers: [
     RiskLevelsService,
@@ -58,6 +61,7 @@ import { AdjustmentsService } from './adjustments.service';
     DeductibleTypesService,
     LimitTypesService,
     AdjustmentsService,
+    PaymentFractionsService,
   ],
 })
 export class CatalogsModule {}

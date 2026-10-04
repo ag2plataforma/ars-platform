@@ -113,6 +113,10 @@
       "label": "Monedas",
       "singular": "moneda"
     },
+    "payment-fractions": {
+      "label": "Fracciones de pago",
+      "singular": "fracción de pago"
+    },
     "insurance-areas": {
       "label": "Ramos de seguro",
       "singular": "ramo de seguro"
@@ -209,7 +213,9 @@
     "symbolCurrency": "Símbolo",
     "codConceptType": "Tipo de concepto",
     "codChannelType": "Tipo de canal",
-    "codClaimType": "Tipo de siniestro"
+    "codClaimType": "Tipo de siniestro",
+    "numFraction": "Cantidad de cuotas",
+    "numOrder": "Orden (la menor es la de por defecto)"
   },
   "common": {
     "error": "Error",
@@ -515,6 +521,7 @@
       "operationLabel": "Operación",
       "operationPlaceholder": "Elegí una operación",
       "processLabel": "Proceso",
+    "paymentFractionsTab": "Fracciones de pago",
       "processPlaceholder": "Elegí un proceso",
       "refundSectionTitle": "Devoluciones",
       "refundPremiumLabel": "Devuelve prima",
@@ -536,6 +543,24 @@
     "distributionWayPlaceholder": "Elegí una vía",
     "risksToQuoteLabel": "Riesgos a cotizar",
     "chooseProductFirst": "Elegí primero un producto para ver sus riesgos disponibles.",
+    "productPaymentFractions": {
+      "subtitle": "Formas de pago que se ofrecen al contratar este producto. En la cotización solo aparecen las activas y vigentes hoy; la de menor orden queda elegida por defecto.",
+      "newButton": "Agregar fracción",
+      "loadErrorDetail": "No se pudieron cargar las fracciones de pago del producto.",
+      "fractionColumn": "Fracción",
+      "installmentsColumn": "Cuotas",
+      "surchargeColumn": "Recargo",
+      "fromColumn": "Vigencia desde",
+      "toColumn": "Vigencia hasta",
+      "emptyState": "Este producto todavía no ofrece ninguna fracción de pago: no se puede contratar hasta agregar al menos una.",
+      "createDialogTitle": "Agregar fracción de pago",
+      "editDialogTitle": "Editar fracción de pago",
+      "fractionPlaceholder": "Elegí una fracción",
+      "surchargeHint": "Porcentaje que se suma a la prima por fraccionar el pago (0 = sin recargo).",
+      "rangeError": "La vigencia hasta no puede ser anterior a la vigencia desde.",
+      "createdDetail": "Fracción de pago agregada al producto.",
+      "updatedDetail": "Fracción de pago actualizada."
+    },
     "riskPlaceholder": "Elegí un riesgo",
     "addButton": "Agregar",
     "loadingRiskData": "Cargando datos del riesgo...",

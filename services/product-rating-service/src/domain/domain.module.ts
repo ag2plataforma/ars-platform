@@ -19,6 +19,8 @@ import { CoverageGuaranteesController } from './coverage-guarantees.controller';
 import { CoverageGuaranteesService } from './coverage-guarantees.service';
 import { ProductEndorsementsController } from './product-endorsements.controller';
 import { ProductEndorsementsService } from './product-endorsements.service';
+import { ProductPaymentFractionsController } from './product-payment-fractions.controller';
+import { ProductPaymentFractionsService } from './product-payment-fractions.service';
 
 /**
  * Las 7 entidades "de dominio" (a diferencia de los 8 catálogos de
@@ -49,6 +51,7 @@ import { ProductEndorsementsService } from './product-endorsements.service';
     CalculationRulesController,
     CoverageGuaranteesController,
     ProductEndorsementsController,
+    ProductPaymentFractionsController,
   ],
   providers: [
     ProductsService,
@@ -60,6 +63,7 @@ import { ProductEndorsementsService } from './product-endorsements.service';
     CalculationRulesService,
     CoverageGuaranteesService,
     ProductEndorsementsService,
+    ProductPaymentFractionsService,
   ],
 })
 export class DomainModule {}

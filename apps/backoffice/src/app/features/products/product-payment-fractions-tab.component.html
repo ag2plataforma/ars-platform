@@ -1,0 +1,110 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex flex-col gap-4">
+  <div class="flex items-center justify-between">
+    <p class="text-sm text-slate-500">{{ 'products.productPaymentFractions.subtitle' | transloco }}</p>
+    <button pButton type="button" icon="pi pi-plus" [label]="'products.productPaymentFractions.newButton' | transloco" (click)="openCreate()"></button>
+  </div>
+
+  <p-table [value]="rows()" [loading]="loading()" dataKey="IdeProductPaymentFraction" styleClass="p-datatable-sm">
+    <ng-template #header>
+      <tr>
+        <th>{{ 'products.productPaymentFractions.fractionColumn' | transloco }}</th>
+        <th>{{ 'products.productPaymentFractions.installmentsColumn' | transloco }}</th>
+        <th>{{ 'products.productPaymentFractions.surchargeColumn' | transloco }}</th>
+        <th>{{ 'products.productPaymentFractions.fromColumn' | transloco }}</th>
+        <th>{{ 'products.productPaymentFractions.toColumn' | transloco }}</th>
+        <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+        <th class="w-32">{{ 'catalogs.actionsColumn' | transloco }}</th>
+      </tr>
+    </ng-template>
+    <ng-template #body let-row>
+      <tr>
+        <td>{{ fractionName(row) }}</td>
+        <td>{{ fractionCount(row) }}</td>
+        <td>{{ row.PorSurCharge }}%</td>
+        <td>{{ row.TstInitial | date: 'dd/MM/yyyy' : 'UTC' }}</td>
+        <td>{{ row.TstEnd | date: 'dd/MM/yyyy' : 'UTC' }}</td>
+        <td>
+          <p-tag [value]="(isActive(row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isActive(row) ? 'success' : 'danger'" />
+        </td>
+        <td>
+          <div class="flex gap-1">
+            <button pButton type="button" icon="pi pi-pencil" [text]="true" severity="secondary" (click)="openEdit(row)"></button>
+            <button
+              pButton
+              type="button"
+              [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'"
+              [text]="true"
+              [severity]="isActive(row) ? 'danger' : 'success'"
+              (click)="toggleState(row)"
+            ></button>
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="7" class="text-center text-slate-500">{{ 'products.productPaymentFractions.emptyState' | transloco }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-dialog
+  [header]="(dialogMode() === 'create' ? 'products.productPaymentFractions.createDialogTitle' : 'products.productPaymentFractions.editDialogTitle') | transloco"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  [style]="{ width: '28rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'products.productPaymentFractions.fractionColumn' | transloco }}</label>
+      @if (dialogMode() === 'create') {
+        <p-select
+          appendTo="body"
+          formControlName="codPaymentFraction"
+          [options]="availableFractions()"
+          optionLabel="DesPaymentFraction"
+          optionValue="CodPaymentFraction"
+          [placeholder]="'products.productPaymentFractions.fractionPlaceholder' | transloco"
+          styleClass="w-full"
+        />
+      } @else {
+        <input pInputText [value]="fractionName(editingRowForDisplay())" disabled class="w-full" />
+      }
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'products.productPaymentFractions.surchargeColumn' | transloco }}</label>
+      <p-inputNumber
+        formControlName="porSurCharge"
+        mode="decimal"
+        [minFractionDigits]="0"
+        [maxFractionDigits]="4"
+        [min]="0"
+        [max]="100"
+        suffix="%"
+        [style]="{ width: '100%' }"
+        inputStyleClass="w-full"
+      />
+      <p class="text-xs text-slate-500">{{ 'products.productPaymentFractions.surchargeHint' | transloco }}</p>
+    </div>
+    <div class="flex gap-4">
+      <div class="flex flex-1 flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.productPaymentFractions.fromColumn' | transloco }}</label>
+        <input pInputText type="date" formControlName="tstInitial" class="w-full" />
+      </div>
+      <div class="flex flex-1 flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.productPaymentFractions.toColumn' | transloco }}</label>
+        <input pInputText type="date" formControlName="tstEnd" class="w-full" />
+      </div>
+    </div>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
+    </div>
+  </form>
+</p-dialog>
