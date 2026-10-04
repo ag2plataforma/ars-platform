@@ -2,7 +2,13 @@ import { Module } from '@nestjs/common';
 import { GenerationModule } from '../generation/generation.module';
 import { GenerateDocumentHandler } from './handlers/generate-document.handler';
 import { WelcomeEmailHandler } from './handlers/welcome-email.handler';
-import { TASK_HANDLERS } from './task-handler';
+import {
+  RenewalNoticeEmailHandler,
+  RenewalNoticeSmsHandler,
+  WelcomeSmsHandler,
+} from './handlers/notification.handlers';
+import { NotificationsService } from '../notifications/notifications.service';
+import { TASK_HANDLERS, TaskHandler } from './task-handler';
 import { TaskWorkerService } from './task-worker.service';
 import { TasksController } from './tasks.controller';
 
@@ -16,12 +22,22 @@ import { TasksController } from './tasks.controller';
   imports: [GenerationModule],
   controllers: [TasksController],
   providers: [
+    NotificationsService,
     WelcomeEmailHandler,
     GenerateDocumentHandler,
+    WelcomeSmsHandler,
+    RenewalNoticeEmailHandler,
+    RenewalNoticeSmsHandler,
     {
       provide: TASK_HANDLERS,
-      useFactory: (welcome: WelcomeEmailHandler, generate: GenerateDocumentHandler) => [welcome, generate],
-      inject: [WelcomeEmailHandler, GenerateDocumentHandler],
+      useFactory: (...handlers: TaskHandler[]) => handlers,
+      inject: [
+        WelcomeEmailHandler,
+        GenerateDocumentHandler,
+        WelcomeSmsHandler,
+        RenewalNoticeEmailHandler,
+        RenewalNoticeSmsHandler,
+      ],
     },
     TaskWorkerService,
   ],

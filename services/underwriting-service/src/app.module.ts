@@ -36,7 +36,7 @@ import { RenewalsModule } from './renewals/renewals.module';
     ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule, // guard JWT global — mismo JWT_SECRET que iam-service, este servicio solo VERIFICA tokens
-    EmailModule, // EMAIL_SENDER (Brevo) -- usado por RenewalNoticeJobHandler para el aviso de renovación
+    EmailModule, // EMAIL_SENDER (Brevo) -- el aviso de renovación ya no lo usa (va por la cola de documents-service); se deja disponible para otros envíos
     QuotingModule,
     ContractsModule,
     BackgroundJobsModule,

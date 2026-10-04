@@ -254,11 +254,33 @@ export class ContractsService {
     // ya se confirmó y un correo de cortesía nunca debe tumbarla.
     try {
       await this.taskQueue.enqueue({ codTaskType: 'WELCOME_EMAIL', ideEntity: ideContract, actor });
+      // SMS de bienvenida: solo si el Titular tiene celular principal activo
+      // (el contrato exige celular al emitirse, pero se verifica igual).
+      if (await this.titularHasMobile(ideContract)) {
+        await this.taskQueue.enqueue({ codTaskType: 'WELCOME_SMS', ideEntity: ideContract, actor });
+      }
     } catch (err) {
-      this.logger.error(`No se pudo encolar el correo de bienvenida del contrato "${ideContract}": ${(err as Error).message}`);
+      this.logger.error(`No se pudo encolar la bienvenida del contrato "${ideContract}": ${(err as Error).message}`);
     }
 
     return this.findOne(ideContract);
+  }
+
+  private async titularHasMobile(ideContract: string): Promise<boolean> {
+    const titular = await this.prisma.tContractPerson.findFirst({
+      where: { IdeContract: ideContract, SPersonRol: { CodPersonRol: 'TITULAR' } },
+      select: { IdePerson: true },
+    });
+    if (!titular) return false;
+    const mobile = await this.prisma.tContactData.count({
+      where: {
+        IdePerson: titular.IdePerson,
+        IndMain: true,
+        SState: { CodState: 'ACTIVO' },
+        SContactClass: { CodContactClass: 'MOBILE_PHONE' },
+      },
+    });
+    return mobile > 0;
   }
 
   /**
