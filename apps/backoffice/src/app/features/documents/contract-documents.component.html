@@ -23,6 +23,9 @@
               @if (task.desError && task.codStatus !== 'COMPLETADA') {
                 {{ task.desError }}
               }
+              @if (task.codStatus === 'COMPLETADA' && task.desSkipReason) {
+                {{ task.desSkipReason }}
+              }
             </td>
             <td>
               @if (task.codStatus === 'FALLIDA') {

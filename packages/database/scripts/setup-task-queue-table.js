@@ -17,7 +17,8 @@
  *  - `DesPayload` (jsonb): parámetros de la tarea.
  *  - `DesResult` (jsonb): resultado/progreso (ej. id del documento ya
  *    generado, para no duplicarlo si el correo se reintenta).
- *  - `CodStatus`: PENDIENTE -> EN_PROCESO -> COMPLETADA | FALLIDA
+ *  - `CodStatus`: PENDIENTE -> EN_PROCESO -> COMPLETADA | FALLIDA (o
+ *    CANCELADA, solo desde PENDIENTE, a mano desde la vista global)
  *    (columna simple con CHECK, no la máquina de estados SState: los
  *    estados de una cola son internos de infraestructura, no del negocio).
  *  - `NumAttempts`/`NumMaxAttempts`/`TstNextAttempt`: reintentos con
@@ -69,8 +70,14 @@ async function main() {
       "TstModification" timestamp(6) NOT NULL,
       CONSTRAINT "PK_TBackgroundTask" PRIMARY KEY ("IdeBackgroundTask"),
       CONSTRAINT "CK_TBackgroundTask_CodStatus"
-        CHECK ("CodStatus" IN ('PENDIENTE', 'EN_PROCESO', 'COMPLETADA', 'FALLIDA'))
+        CHECK ("CodStatus" IN ('PENDIENTE', 'EN_PROCESO', 'COMPLETADA', 'FALLIDA', 'CANCELADA'))
     )
+  `);
+  // Tablas creadas antes de agregar CANCELADA (2026-10-03): ampliar el CHECK.
+  await client.query(`ALTER TABLE ars_platform."TBackgroundTask" DROP CONSTRAINT IF EXISTS "CK_TBackgroundTask_CodStatus"`);
+  await client.query(`
+    ALTER TABLE ars_platform."TBackgroundTask" ADD CONSTRAINT "CK_TBackgroundTask_CodStatus"
+      CHECK ("CodStatus" IN ('PENDIENTE', 'EN_PROCESO', 'COMPLETADA', 'FALLIDA', 'CANCELADA'))
   `);
   await client.query(`
     CREATE INDEX IF NOT EXISTS "IX_TBackgroundTask_Status_NextAttempt"

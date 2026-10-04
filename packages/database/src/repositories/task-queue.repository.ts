@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 
-export type TaskStatus = 'PENDIENTE' | 'EN_PROCESO' | 'COMPLETADA' | 'FALLIDA';
+export type TaskStatus = 'PENDIENTE' | 'EN_PROCESO' | 'COMPLETADA' | 'FALLIDA' | 'CANCELADA';
 
 export interface QueuedTask {
   ideBackgroundTask: string;
@@ -18,6 +18,15 @@ export interface QueuedTask {
   desError: string | null;
   usrCreation: string;
   tstCreation: Date;
+  /** Solo en `listPage`: número del contrato cuando `IdeEntity` es un contrato. */
+  numContract?: string | null;
+}
+
+export interface TaskListFilter {
+  status?: TaskStatus;
+  codTaskType?: string;
+  page: number;
+  limit: number;
 }
 
 export interface EnqueueTaskInput {
@@ -43,6 +52,7 @@ interface TaskRow {
   DesError: string | null;
   UsrCreation: string;
   TstCreation: Date;
+  NumContract?: string | null;
 }
 
 const COLUMNS = `"IdeBackgroundTask", "CodTaskType", "IdeEntity", "DesPayload", "DesResult", "CodStatus",
@@ -65,6 +75,7 @@ function toTask(row: TaskRow): QueuedTask {
     desError: row.DesError,
     usrCreation: row.UsrCreation,
     tstCreation: row.TstCreation,
+    ...(row.NumContract !== undefined ? { numContract: row.NumContract } : {}),
   };
 }
 
@@ -215,6 +226,66 @@ export class TaskQueueRepository {
               "NumMaxAttempts" = GREATEST("NumMaxAttempts", "NumAttempts" + 1),
               "TstModification" = $2, "UsrModification" = $3
         WHERE "IdeBackgroundTask" = $1::uuid AND "CodStatus" = 'FALLIDA'`,
+      ide,
+      now,
+      actor,
+    );
+    return affected > 0;
+  }
+
+  /** Listado global paginado (más nuevas primero) con filtros opcionales; trae el número de contrato. */
+  async listPage(filter: TaskListFilter): Promise<{ items: QueuedTask[]; total: number }> {
+    const where: string[] = [];
+    const params: unknown[] = [];
+    if (filter.status) {
+      params.push(filter.status);
+      where.push(`t."CodStatus" = $${params.length}`);
+    }
+    if (filter.codTaskType) {
+      params.push(filter.codTaskType);
+      where.push(`t."CodTaskType" = $${params.length}`);
+    }
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const total = await this.prisma.$queryRawUnsafe<Array<{ n: number }>>(
+      `SELECT count(*)::int AS n FROM ars_platform."TBackgroundTask" t ${whereSql}`,
+      ...params,
+    );
+    const rows = await this.prisma.$queryRawUnsafe<TaskRow[]>(
+      `SELECT ${COLUMNS.split(',').map((c) => `t.${c.trim()}`).join(', ')}, c."NumContract" AS "NumContract"
+         FROM ars_platform."TBackgroundTask" t
+         LEFT JOIN ars_platform."TContract" c ON c."IdeContract" = t."IdeEntity"
+         ${whereSql}
+        ORDER BY t."TstCreation" DESC
+        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      ...params,
+      filter.limit,
+      (filter.page - 1) * filter.limit,
+    );
+    return { items: rows.map(toTask), total: total[0]?.n ?? 0 };
+  }
+
+  /** Conteo por estado y por tipo (para los contadores de la vista global). */
+  async summary(): Promise<{ byStatus: Record<string, number>; byType: Record<string, number> }> {
+    const status = await this.prisma.$queryRawUnsafe<Array<{ k: string; n: number }>>(
+      `SELECT "CodStatus" AS k, count(*)::int AS n FROM ars_platform."TBackgroundTask" GROUP BY "CodStatus"`,
+    );
+    const type = await this.prisma.$queryRawUnsafe<Array<{ k: string; n: number }>>(
+      `SELECT "CodTaskType" AS k, count(*)::int AS n FROM ars_platform."TBackgroundTask" GROUP BY "CodTaskType"`,
+    );
+    return {
+      byStatus: Object.fromEntries(status.map((r) => [r.k, r.n])),
+      byType: Object.fromEntries(type.map((r) => [r.k, r.n])),
+    };
+  }
+
+  /** Cancela una tarea PENDIENTE (no toca las que ya están en proceso). `false` si no estaba pendiente. */
+  async cancel(ide: string, actor: string): Promise<boolean> {
+    const now = new Date();
+    const affected = await this.prisma.$executeRawUnsafe(
+      `UPDATE ars_platform."TBackgroundTask"
+          SET "CodStatus" = 'CANCELADA', "TstFinished" = $2, "DesError" = 'Cancelada por ' || $3,
+              "TstModification" = $2, "UsrModification" = $3
+        WHERE "IdeBackgroundTask" = $1::uuid AND "CodStatus" = 'PENDIENTE'`,
       ide,
       now,
       actor,

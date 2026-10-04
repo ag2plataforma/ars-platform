@@ -27,13 +27,14 @@ const TEMPLATE_TYPES = [
 interface BackgroundTask {
   ideBackgroundTask: string;
   codTaskType: string;
-  codStatus: 'PENDIENTE' | 'EN_PROCESO' | 'COMPLETADA' | 'FALLIDA';
+  codStatus: 'PENDIENTE' | 'EN_PROCESO' | 'COMPLETADA' | 'FALLIDA' | 'CANCELADA';
   numAttempts: number;
   numMaxAttempts: number;
   tstNextAttempt: string;
   desError: string | null;
   tstCreation: string;
   codTemplateType: string | null;
+  desSkipReason: string | null;
 }
 
 const ACTIVE_STATUSES = ['PENDIENTE', 'EN_PROCESO'];
@@ -163,16 +164,18 @@ export class ContractDocumentsComponent implements OnChanges, OnDestroy {
     });
   }
 
-  taskSeverity(status: BackgroundTask['codStatus']): 'success' | 'danger' | 'info' | 'warn' {
-    return { COMPLETADA: 'success', FALLIDA: 'danger', EN_PROCESO: 'info', PENDIENTE: 'warn' }[status] as
-      | 'success'
-      | 'danger'
-      | 'info'
-      | 'warn';
+  taskSeverity(status: BackgroundTask['codStatus']): 'success' | 'danger' | 'info' | 'warn' | 'secondary' {
+    return { COMPLETADA: 'success', FALLIDA: 'danger', EN_PROCESO: 'info', PENDIENTE: 'warn', CANCELADA: 'secondary' }[
+      status
+    ] as 'success' | 'danger' | 'info' | 'warn' | 'secondary';
   }
 
   taskTypeLabel(task: BackgroundTask): string {
-    if (task.codTaskType === 'WELCOME_EMAIL') return this.transloco.translate<string>('contractDocuments.taskWelcomeEmail');
+    if (task.codTaskType !== 'GENERATE_DOCUMENT') {
+      const key = `taskQueue.types.${task.codTaskType}`;
+      const label = this.transloco.translate<string>(key);
+      return label === key ? task.codTaskType : label;
+    }
     const type = TEMPLATE_TYPES.find((t) => t.value === task.codTemplateType)?.label ?? task.codTemplateType ?? '';
     return this.transloco.translate<string>('contractDocuments.taskGenerate', { type });
   }

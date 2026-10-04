@@ -1,0 +1,173 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex flex-col gap-4">
+  <div class="flex items-start justify-between gap-4">
+    <div>
+      <h1 class="text-lg font-semibold text-slate-900">{{ 'taskQueue.title' | transloco }}</h1>
+      <p class="text-sm text-slate-500">{{ 'taskQueue.subtitle' | transloco }}</p>
+    </div>
+    <div class="flex items-center gap-4">
+      <div class="flex items-center gap-2">
+        <p-checkbox [ngModel]="autoRefresh()" (ngModelChange)="toggleAutoRefresh($event)" [binary]="true" inputId="autoRefresh" />
+        <label for="autoRefresh" class="text-sm text-slate-700">{{ 'taskQueue.autoRefresh' | transloco }}</label>
+      </div>
+      <p-button icon="pi pi-refresh" [outlined]="true" [label]="'taskQueue.refresh' | transloco" (onClick)="reload()" />
+    </div>
+  </div>
+
+  <div class="flex flex-wrap gap-3">
+    @for (s of statuses; track s) {
+      <button
+        type="button"
+        class="flex min-w-32 flex-col items-start rounded-lg border px-4 py-2 text-left transition hover:bg-slate-50"
+        [class.border-slate-200]="statusFilter() !== s"
+        [class.border-slate-900]="statusFilter() === s"
+        (click)="setStatusFilter(statusFilter() === s ? '' : s)"
+      >
+        <span class="text-2xl font-semibold text-slate-900">{{ count(s) }}</span>
+        <span class="text-xs text-slate-500">{{ 'taskQueue.status.' + s | transloco }}</span>
+      </button>
+    }
+  </div>
+
+  <div class="flex flex-wrap items-end gap-4 rounded-lg border border-slate-200 p-4">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'taskQueue.statusFilter' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        [ngModel]="statusFilter()"
+        (ngModelChange)="setStatusFilter($event)"
+        [options]="statuses"
+        [showClear]="true"
+        [placeholder]="'taskQueue.all' | transloco"
+        styleClass="w-52"
+      >
+        <ng-template #selectedItem let-s>{{ 'taskQueue.status.' + s | transloco }}</ng-template>
+        <ng-template #item let-s>{{ 'taskQueue.status.' + s | transloco }}</ng-template>
+      </p-select>
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'taskQueue.typeFilter' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        [ngModel]="typeFilter()"
+        (ngModelChange)="setTypeFilter($event)"
+        [options]="typeOptions()"
+        optionLabel="label"
+        optionValue="code"
+        [showClear]="true"
+        [placeholder]="'taskQueue.all' | transloco"
+        styleClass="w-72"
+      />
+    </div>
+  </div>
+
+  <p-table
+    [value]="items()"
+    [lazy]="true"
+    (onLazyLoad)="load($event)"
+    [paginator]="true"
+    [rows]="25"
+    [rowsPerPageOptions]="[25, 50, 100]"
+    [totalRecords]="total()"
+    [loading]="loading()"
+    [showCurrentPageReport]="true"
+    currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+    dataKey="ideBackgroundTask"
+    styleClass="rounded-lg border border-slate-200 text-sm"
+  >
+    <ng-template pTemplate="header">
+      <tr>
+        <th>{{ 'taskQueue.createdColumn' | transloco }}</th>
+        <th>{{ 'taskQueue.typeColumn' | transloco }}</th>
+        <th>{{ 'taskQueue.contractColumn' | transloco }}</th>
+        <th>{{ 'taskQueue.statusColumn' | transloco }}</th>
+        <th>{{ 'taskQueue.attemptsColumn' | transloco }}</th>
+        <th>{{ 'taskQueue.nextAttemptColumn' | transloco }}</th>
+        <th>{{ 'taskQueue.noteColumn' | transloco }}</th>
+        <th></th>
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="body" let-task>
+      <tr>
+        <td class="whitespace-nowrap">{{ task.tstCreation | date: 'dd/MM/yyyy HH:mm:ss' }}</td>
+        <td>{{ taskLabel(task) }}</td>
+        <td>
+          @if (task.ideEntity) {
+            <a [routerLink]="['/contratos', task.ideEntity]" class="text-sky-700 hover:underline">{{ task.numContract || ('common.dash' | transloco) }}</a>
+          } @else {
+            {{ 'common.dash' | transloco }}
+          }
+        </td>
+        <td><p-tag [severity]="statusSeverity(task.codStatus)" [value]="'taskQueue.status.' + task.codStatus | transloco" /></td>
+        <td>{{ task.numAttempts }} / {{ task.numMaxAttempts }}</td>
+        <td class="whitespace-nowrap">
+          @if (task.codStatus === 'PENDIENTE') {
+            {{ task.tstNextAttempt | date: 'dd/MM/yyyy HH:mm:ss' }}
+          } @else {
+            {{ 'common.dash' | transloco }}
+          }
+        </td>
+        <td class="max-w-80 truncate text-xs text-slate-600" [pTooltip]="note(task)">{{ note(task) }}</td>
+        <td class="whitespace-nowrap text-right">
+          <p-button icon="pi pi-search" [text]="true" [pTooltip]="'taskQueue.detailButton' | transloco" (onClick)="openDetail(task)" />
+          @if (task.codStatus === 'FALLIDA') {
+            <p-button icon="pi pi-refresh" [text]="true" [pTooltip]="'taskQueue.retryButton' | transloco" (onClick)="retry(task)" />
+          }
+          @if (task.codStatus === 'PENDIENTE' && isAdmin()) {
+            <p-button icon="pi pi-times" severity="danger" [text]="true" [pTooltip]="'taskQueue.cancelButton' | transloco" (onClick)="cancel(task)" />
+          }
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="emptymessage">
+      <tr>
+        <td colspan="8" class="py-6 text-center text-sm text-slate-500">{{ 'taskQueue.emptyState' | transloco }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-dialog
+  [visible]="detailVisible()"
+  (visibleChange)="!$event && detailVisible.set(false)"
+  [modal]="true"
+  [style]="{ width: '40rem' }"
+  [header]="'taskQueue.detailTitle' | transloco"
+>
+  @if (detail(); as d) {
+    <div class="flex flex-col gap-3 text-sm">
+      <div class="grid grid-cols-2 gap-2">
+        <div><span class="text-slate-500">{{ 'taskQueue.typeColumn' | transloco }}:</span> {{ taskLabel(d) }}</div>
+        <div><span class="text-slate-500">{{ 'taskQueue.statusColumn' | transloco }}:</span> {{ 'taskQueue.status.' + d.codStatus | transloco }}</div>
+        <div><span class="text-slate-500">{{ 'taskQueue.contractColumn' | transloco }}:</span> {{ d.numContract || ('common.dash' | transloco) }}</div>
+        <div><span class="text-slate-500">{{ 'taskQueue.attemptsColumn' | transloco }}:</span> {{ d.numAttempts }} / {{ d.numMaxAttempts }}</div>
+        <div><span class="text-slate-500">{{ 'taskQueue.createdColumn' | transloco }}:</span> {{ d.tstCreation | date: 'dd/MM/yyyy HH:mm:ss' }}</div>
+        <div>
+          <span class="text-slate-500">{{ 'taskQueue.finishedColumn' | transloco }}:</span>
+          {{ d.tstFinished ? (d.tstFinished | date: 'dd/MM/yyyy HH:mm:ss') : ('common.dash' | transloco) }}
+        </div>
+        <div><span class="text-slate-500">{{ 'taskQueue.createdByColumn' | transloco }}:</span> {{ d.usrCreation || ('common.dash' | transloco) }}</div>
+      </div>
+      @if (d.desError) {
+        <div>
+          <div class="text-slate-500">{{ 'taskQueue.errorLabel' | transloco }}</div>
+          <pre class="whitespace-pre-wrap rounded bg-red-50 p-2 text-xs text-red-800">{{ d.desError }}</pre>
+        </div>
+      }
+      @if (d.desSkipReason) {
+        <div>
+          <div class="text-slate-500">{{ 'taskQueue.skipLabel' | transloco }}</div>
+          <p class="rounded bg-amber-50 p-2 text-xs text-amber-800">{{ d.desSkipReason }}</p>
+        </div>
+      }
+      <div>
+        <div class="text-slate-500">{{ 'taskQueue.dataLabel' | transloco }}</div>
+        <pre class="max-h-64 overflow-auto rounded bg-slate-50 p-2 text-xs">{{ detailJson() }}</pre>
+      </div>
+    </div>
+  } @else {
+    <p class="py-6 text-center text-sm text-slate-500">{{ 'common.loading' | transloco }}</p>
+  }
+</p-dialog>

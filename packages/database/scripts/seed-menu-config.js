@@ -109,6 +109,16 @@ const SITE_MAP_ITEMS = [
     icon: 'pi-share-alt',
   },
   {
+    // "Cola de tareas" -- vista global de TBackgroundTask (correos, SMS y
+    // documentos en segundo plano; reintentar/cancelar). Pensada para
+    // soporte/ADMIN.
+    cod: 'COLA_TAREAS',
+    des: 'Cola de tareas',
+    order: 18,
+    path: '/cola-de-tareas',
+    icon: 'pi-sync',
+  },
+  {
     cod: 'CONFIG_PRODUCTOS',
     des: 'Configuración de productos',
     order: 8,

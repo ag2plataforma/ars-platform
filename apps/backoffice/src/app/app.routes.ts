@@ -204,6 +204,11 @@ export const routes: Routes = [
           import('./features/menu-config/menu-config.component').then((m) => m.MenuConfigComponent),
       },
       {
+        path: 'cola-de-tareas',
+        loadComponent: () =>
+          import('./features/task-queue/task-queue.component').then((m) => m.TaskQueueComponent),
+      },
+      {
         path: 'configuracion-estados',
         loadComponent: () =>
           import('./features/state-machine/state-machine.component').then((m) => m.StateMachineComponent),
