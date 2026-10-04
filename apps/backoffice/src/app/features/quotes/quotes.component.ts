@@ -29,6 +29,7 @@ import {
 import { MOBILE_PHONE_CONTACT_CLASS, Person, PersonsService } from '../../core/party/persons.service';
 import { downloadBlob } from '../../core/files/file.util';
 import { DocumentTemplatesService } from '../documents/document-templates.service';
+import { PaymentFractionPickerComponent } from './payment-fraction-picker.component';
 import { RiskAttributeField, RiskAttributesService, STEP_CODE_CUSTOM_ATTRIBUTES } from './risk-attributes.service';
 
 const PRODUCTS_PATH = '/product-rating/products';
@@ -176,6 +177,7 @@ type RiskFieldsState = ReturnType<typeof buildRiskFieldsState>;
     TagModule,
     ToastModule,
     TranslocoPipe,
+    PaymentFractionPickerComponent,
   ],
   providers: [MessageService],
   templateUrl: './quotes.component.html',
@@ -202,6 +204,11 @@ export class QuotesComponent {
   readonly pricing = signal<QuotePricingResult | null>(null);
   readonly step = signal<QuoteStep>('form');
   private ideQuote: string | null = null;
+
+  /** `ideQuote` para el template (el campo es privado). */
+  get currentIdeQuote(): string | null {
+    return this.ideQuote;
+  }
   private numQuote: string | null = null;
 
   // --- Etapa 2.5: Impacto Social (Fase 3 Etapa 2, ver docs/02-roadmap.md) ---
@@ -245,6 +252,9 @@ export class QuotesComponent {
   readonly quoteAccepted = signal(false);
   readonly contracting = signal(false);
   readonly contractResult = signal<{ IdeContract: string; NumContract: string } | null>(null);
+  /** `CodPaymentFraction` elegido en el selector de forma de pago (vacío =
+   *  todavía sin cargar; el selector deja la de por defecto al abrirse). */
+  readonly paymentFraction = signal('');
 
   /** Todos los `SRiskProduct` (de cualquier producto), cacheados una
    * sola vez -- se filtran client-side por el producto elegido, mismo
@@ -1067,7 +1077,7 @@ export class QuotesComponent {
   generateContract(): void {
     if (!this.ideQuote) return;
     this.contracting.set(true);
-    this.quoting.createContract(this.ideQuote).subscribe({
+    this.quoting.createContract(this.ideQuote, this.paymentFraction() || undefined).subscribe({
       next: (result) => {
         this.contracting.set(false);
         this.contractResult.set(result);
@@ -1183,6 +1193,7 @@ export class QuotesComponent {
     this.submittingSocialImpact.set(false);
     this.quoteAccepted.set(false);
     this.contractResult.set(null);
+    this.paymentFraction.set('');
     this.accepting.set(false);
     this.contracting.set(false);
     for (const slot of this.personSlots) {

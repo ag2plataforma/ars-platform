@@ -26,6 +26,7 @@ import {
   ContractFile,
   ContractOperation,
   ContractPerson,
+  ContractReceipt,
   ContractRequirement,
   ContractRisk,
   ContractsService,
@@ -274,6 +275,67 @@ export class ContractDetailComponent implements OnInit {
     const daysUntilExpiry = msUntilExpiry / 86_400_000;
     return daysUntilExpiry <= this.MANUAL_RENEWAL_WINDOW_DAYS;
   });
+
+  /** Cuotas del ciclo vigente: cada período de facturación junto al recibo
+   *  (NEW/REN no anulado) que lo cubre. Mismo criterio que el backend
+   *  (`findNextInstallment`): la cuota N es la N-ésima operación de recibos
+   *  regulares del ciclo, ordenadas por fecha de inicio. */
+  readonly installmentRows = computed(() => {
+    const c = this.contract();
+    if (!c) return [];
+    const cycleStart = new Date(c.TstInitial).getTime();
+    const cycleEnd = c.TstEnd ? new Date(c.TstEnd).getTime() : Number.POSITIVE_INFINITY;
+    const periods = c.TContractBilling.filter(
+      (p) => new Date(p.TstInitial).getTime() >= cycleStart && new Date(p.TstEnd).getTime() <= cycleEnd,
+    );
+    const byOperation = new Map<string, ContractReceipt[]>();
+    [...c.TReceipt]
+      .filter(
+        (r) =>
+          !r.TstCancellation &&
+          ['NEW', 'REN'].includes(r.SReceiptType.CodReceiptType) &&
+          new Date(r.TstInitial).getTime() >= cycleStart,
+      )
+      .sort((a, b) => new Date(a.TstInitial).getTime() - new Date(b.TstInitial).getTime())
+      .forEach((r) => byOperation.set(r.IdeContractOperation, [...(byOperation.get(r.IdeContractOperation) ?? []), r]));
+    const groups = [...byOperation.values()];
+    return periods.map((period, index) => {
+      const receipts = groups[index] ?? [];
+      return {
+        period,
+        numReceipt: receipts.map((r) => r.NumReceipt).join(', '),
+        prime: receipts.length ? receipts.reduce((sum, r) => sum + Number(r.Prime), 0) : null,
+        issued: receipts.length > 0,
+      };
+    });
+  });
+
+  readonly issueSubmitting = signal(false);
+  readonly canIssueNext = computed(() => {
+    const c = this.contract();
+    return !!c && c.SState.CodState === 'ACTIVO' && this.installmentRows().some((row) => !row.issued);
+  });
+
+  issueNextInstallment(): void {
+    const c = this.contract();
+    if (!c) return;
+    this.issueSubmitting.set(true);
+    this.contracts.issueNextInstallment(c.IdeContract).subscribe({
+      next: (result) => {
+        this.issueSubmitting.set(false);
+        this.contract.set(result);
+        this.messages.add({
+          severity: 'success',
+          summary: this.transloco.translate('common.done'),
+          detail: this.transloco.translate('contractDetail.installments.issuedDetail'),
+        });
+      },
+      error: (err: HttpErrorResponse) => {
+        this.issueSubmitting.set(false);
+        this.showError(err);
+      },
+    });
+  }
 
   private buildCancelForm() {
     return this.fb.nonNullable.group({

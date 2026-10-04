@@ -36,6 +36,9 @@
       <div class="flex items-center gap-2">
         <span class="text-slate-500">{{ 'contractDetail.paymentFractionLabel' | transloco }}</span>
         <span class="text-slate-900">{{ c.SPaymentFraction.DesPaymentFraction }}</span>
+        <span class="text-xs text-slate-500">
+          ({{ 'contractDetail.installments.summary' | transloco: { n: c.PaymentSchedule.numFraction } }}@if (c.PaymentSchedule.porSurCharge > 0) {, {{ 'paymentFraction.surcharge' | transloco: { pct: c.PaymentSchedule.porSurCharge } }}})
+        </span>
       </div>
       <div class="flex items-center gap-2">
         <span class="text-slate-500">{{ 'contractDetail.subscriptionLabel' | transloco }}</span>
@@ -84,6 +87,7 @@
         <p-tab value="riesgos" [disabled]="risksDisabled()">{{ 'contractDetail.tabs.risks' | transloco }}</p-tab>
         <p-tab value="coberturas" [disabled]="coveragesDisabled()">{{ 'contractDetail.tabs.coverages' | transloco }}</p-tab>
         <p-tab value="movimientos">{{ 'contractDetail.tabs.operations' | transloco }}</p-tab>
+        <p-tab value="cuotas">{{ 'contractDetail.tabs.installments' | transloco }}</p-tab>
         <p-tab value="documentos">{{ 'contractDetail.tabs.documents' | transloco }}</p-tab>
         <p-tab value="canal">{{ 'contractDetail.tabs.channel' | transloco }}</p-tab>
         <p-tab value="requisitos">{{ 'contractDetail.tabs.requirements' | transloco }}</p-tab>
@@ -332,6 +336,63 @@
               </ng-template>
             </p-table>
           }
+        </p-tabpanel>
+
+        <!-- ============================== Cuotas ============================== -->
+        <p-tabpanel value="cuotas">
+          <div class="mb-2 flex items-center justify-between gap-3">
+            <p class="text-xs text-slate-500">{{ 'contractDetail.installments.note' | transloco }}</p>
+            <button
+              pButton
+              type="button"
+              icon="pi pi-file-plus"
+              size="small"
+              [disabled]="!canIssueNext()"
+              [loading]="issueSubmitting()"
+              [label]="'contractDetail.installments.issueNextButton' | transloco"
+              (click)="issueNextInstallment()"
+            ></button>
+          </div>
+          <p-table [value]="installmentRows()" styleClass="text-sm">
+            <ng-template pTemplate="header">
+              <tr>
+                <th>{{ 'contractDetail.installments.periodColumn' | transloco }}</th>
+                <th>{{ 'contractDetail.installments.fromColumn' | transloco }}</th>
+                <th>{{ 'contractDetail.installments.toColumn' | transloco }}</th>
+                <th>{{ 'contractDetail.installments.receiptColumn' | transloco }}</th>
+                <th class="text-right">{{ 'contractDetail.installments.amountColumn' | transloco }}</th>
+                <th>{{ 'contractDetail.installments.receiptStatusColumn' | transloco }}</th>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-row>
+              <tr>
+                <td>{{ row.period.NumPeriod }}</td>
+                <td>{{ row.period.TstInitial | date: 'dd/MM/yyyy' }}</td>
+                <td>{{ row.period.TstEnd | date: 'dd/MM/yyyy' }}</td>
+                <td>{{ row.issued ? row.numReceipt : ('common.dash' | transloco) }}</td>
+                <td class="text-right">
+                  @if (row.prime !== null) {
+                    {{ c.SProduct.SCurrency.SymbolCurrency }}{{ row.prime | number: '1.2-2' }}
+                  } @else if (c.PaymentSchedule.estimatedInstallment !== null) {
+                    <span class="text-slate-400">~{{ c.SProduct.SCurrency.SymbolCurrency }}{{ c.PaymentSchedule.estimatedInstallment | number: '1.2-2' }}</span>
+                  } @else {
+                    {{ 'common.dash' | transloco }}
+                  }
+                </td>
+                <td>
+                  <p-tag
+                    [value]="(row.issued ? 'contractDetail.installments.issued' : 'contractDetail.installments.pending') | transloco"
+                    [severity]="row.issued ? 'success' : 'secondary'"
+                  />
+                </td>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="emptymessage">
+              <tr>
+                <td colspan="6" class="py-6 text-center text-sm text-slate-500">{{ 'contractDetail.installments.empty' | transloco }}</td>
+              </tr>
+            </ng-template>
+          </p-table>
         </p-tabpanel>
 
         <!-- ============================== Movimientos ============================== -->

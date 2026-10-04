@@ -188,6 +188,7 @@ export class ContractsService {
         await this.createInitialMovements(riskCoverages, actor, tx);
         await this.setNetPrime(contractFile.IdeContractFile, actor, tx);
         await this.generateReceipts(contract.IdeContract, null, actor, tx);
+        await this.issueRemainingInstallmentsIfConfigured(contract.IdeContract, actor, tx);
 
         await this.quotesService.transitionState(quote.IdeQuote, 'Contratar', actor, tx);
 
@@ -1027,7 +1028,11 @@ export class ContractsService {
         }
       }
     }
-    return this.enrichDistributionChannels(contract);
+    const [enriched, paymentSchedule] = await Promise.all([
+      this.enrichDistributionChannels(contract),
+      this.buildPaymentSchedule(contract),
+    ]);
+    return { ...enriched, PaymentSchedule: paymentSchedule };
   }
 
   /**
@@ -1206,6 +1211,7 @@ export class ContractsService {
         // genérico por NumOperation es inalcanzable en la práctica para
         // un contrato que ya tuvo algún suplemento antes de renovarse.
         await this.generateReceipts(ideContract, null, actor, tx, 'REN');
+        await this.issueRemainingInstallmentsIfConfigured(ideContract, actor, tx);
 
         await tx.tContractRenewalCycle.create({
           data: {
@@ -1711,35 +1717,132 @@ export class ContractsService {
     return `CONT-${year}-${result[0].nextval}`;
   }
 
+  /**
+   * Resuelve la fracción de pago con la que se contrata. Solo cuentan las
+   * `SProductPaymentFraction` ACTIVAS y vigentes hoy, cuya `SPaymentFraction`
+   * también esté ACTIVA (mismo criterio que la renovación y que
+   * `listPaymentFractionOptions`). Sin `codPaymentFraction` se usa la de
+   * menor `NumOrder`.
+   */
   private async resolvePaymentFraction(
     ideProduct: string,
     codPaymentFraction: string | undefined,
     tx: Prisma.TransactionClient = this.prisma,
   ): Promise<string> {
+    const available = await this.findAvailablePaymentFractions(ideProduct, tx);
     if (codPaymentFraction) {
-      const row = await tx.sProductPaymentFraction.findFirst({
-        where: { IdeProduct: ideProduct, SPaymentFraction: { CodPaymentFraction: codPaymentFraction } },
-        select: { IdePaymentFraction: true },
-      });
+      const row = available.find((f) => f.SPaymentFraction.CodPaymentFraction === codPaymentFraction);
       if (!row) {
         throw new NotFoundException(
-          `El producto "${ideProduct}" no tiene configurada la fracción de pago "${codPaymentFraction}"`,
+          `El producto no ofrece la fracción de pago "${codPaymentFraction}" (no está configurada, no está activa o no está vigente hoy)`,
         );
       }
       return row.IdePaymentFraction;
     }
-
-    const productFractions = await tx.sProductPaymentFraction.findMany({
-      where: { IdeProduct: ideProduct },
-      include: { SPaymentFraction: { select: { NumOrder: true } } },
-    });
-    if (productFractions.length === 0) {
-      throw new NotFoundException(`El producto "${ideProduct}" no tiene ninguna fracción de pago configurada`);
+    if (available.length === 0) {
+      throw new NotFoundException(
+        `El producto "${ideProduct}" no tiene ninguna fracción de pago activa y vigente configurada`,
+      );
     }
-    const defaultFraction = productFractions.sort(
-      (a, b) => a.SPaymentFraction.NumOrder - b.SPaymentFraction.NumOrder,
-    )[0];
-    return defaultFraction.IdePaymentFraction;
+    return available[0].IdePaymentFraction;
+  }
+
+  /** Fracciones que el producto ofrece hoy, ordenadas por `NumOrder` (la primera es la de por defecto). */
+  private async findAvailablePaymentFractions(ideProduct: string, tx: Prisma.TransactionClient = this.prisma) {
+    const ideActivo = await this.stateMachine.getStateByCode('Activo');
+    const now = new Date();
+    const rows = await tx.sProductPaymentFraction.findMany({
+      where: {
+        IdeProduct: ideProduct,
+        IdeState: ideActivo,
+        TstInitial: { lte: now },
+        TstEnd: { gte: now },
+        SPaymentFraction: { IdeState: ideActivo },
+      },
+      include: { SPaymentFraction: true },
+    });
+    return rows.sort((a, b) => a.SPaymentFraction.NumOrder - b.SPaymentFraction.NumOrder);
+  }
+
+  /**
+   * `GET /quotes/:ideQuote/payment-fractions` -- fracciones de pago que se
+   * pueden elegir al contratar esta cotización, con una vista previa de lo
+   * que costaría cada cuota. La cuota replica la fórmula del movimiento
+   * inicial (`prima / NumFraction * (1 + PorSurCharge/100)`); si el
+   * producto no usa prima proporcional (`IndProportionalPrime=false`) el
+   * contrato la calcula por días exactos del período, así que el importe
+   * es aproximado (`approximate: true`).
+   */
+  async listPaymentFractionOptions(ideQuote: string) {
+    const quote = await this.prisma.tQuote.findUnique({
+      where: { IdeQuote: ideQuote },
+      include: { SProduct: { include: { SCurrency: true } } },
+    });
+    if (!quote) throw new NotFoundException(`No existe cotización con id "${ideQuote}"`);
+
+    const [fractions, primeAgg] = await Promise.all([
+      this.findAvailablePaymentFractions(quote.IdeProduct),
+      this.prisma.tQuoteCoverage.aggregate({
+        _sum: { Prime: true },
+        where: { IndSelected: true, TQuoteRiskPlan: { IndSelected: true, TQuoteRisk: { IdeQuote: ideQuote } } },
+      }),
+    ]);
+    const quotePrime = round2(Number(primeAgg._sum.Prime ?? 0));
+
+    return {
+      symbolCurrency: quote.SProduct.SCurrency.SymbolCurrency,
+      quotePrime,
+      approximate: !quote.SProduct.IndProportionalPrime,
+      options: fractions.map((row, index) => {
+        const numFraction = Math.max(row.SPaymentFraction.NumFraction, 1);
+        const porSurCharge = Number(row.PorSurCharge);
+        const factor = 1 + porSurCharge / 100;
+        return {
+          codPaymentFraction: row.SPaymentFraction.CodPaymentFraction,
+          desPaymentFraction: row.SPaymentFraction.DesPaymentFraction,
+          numFraction,
+          porSurCharge,
+          installmentPrime: round2((quotePrime / numFraction) * factor),
+          totalPrime: round2(quotePrime * factor),
+          isDefault: index === 0,
+        };
+      }),
+    };
+  }
+
+  /**
+   * Resumen para el calendario de cuotas del detalle del contrato: cuántas
+   * cuotas, recargo de la fracción elegida y cuota estimada (misma fórmula
+   * que `listPaymentFractionOptions`, sobre la prima vigente de las
+   * coberturas ACTIVAS). Los recibos de las cuotas 2..N todavía no se
+   * emiten (ver docs/02-roadmap.md), por eso es una estimación.
+   */
+  private async buildPaymentSchedule(contract: {
+    IdeProduct: string;
+    IdePaymentFraction: string;
+    SPaymentFraction: { NumFraction: number; DesPaymentFraction: string };
+    TContractFile: Array<{
+      TFileRisk: Array<{ TRiskCoverage: Array<{ Prime: Prisma.Decimal | number; SState: { CodState: string } }> }>;
+    }>;
+  }) {
+    const productFraction = await this.prisma.sProductPaymentFraction.findFirst({
+      where: { IdeProduct: contract.IdeProduct, IdePaymentFraction: contract.IdePaymentFraction },
+      orderBy: { TstEnd: 'desc' },
+    });
+    const porSurCharge = Number(productFraction?.PorSurCharge ?? 0);
+    const numFraction = Math.max(contract.SPaymentFraction.NumFraction, 1);
+    const activePrime = contract.TContractFile
+      .flatMap((file) => file.TFileRisk)
+      .flatMap((risk) => risk.TRiskCoverage)
+      .filter((coverage) => coverage.SState.CodState.toUpperCase() === 'ACTIVO')
+      .reduce((sum, coverage) => sum + Number(coverage.Prime), 0);
+    return {
+      numFraction,
+      desPaymentFraction: contract.SPaymentFraction.DesPaymentFraction,
+      porSurCharge,
+      estimatedInstallment:
+        activePrime > 0 ? round2((activePrime / numFraction) * (1 + porSurCharge / 100)) : null,
+    };
   }
 
   /**
@@ -4187,9 +4290,20 @@ export class ContractsService {
       this.stateMachine.getInitialState('TReceiptDetail'),
     ]);
 
+    // CORREGIDO 2026-10-04 (encontrado por el usuario al activar un contrato
+    // fraccionado en 6 cuotas): el recibo inicial (NEW/REN) salía con la
+    // vigencia COMPLETA del contrato (min/max de las fechas de los
+    // movimientos = 04/10/2026 -> 04/10/2027) en vez de la del primer
+    // período de facturación (~2 meses). Para NEW/REN las fechas del recibo
+    // son las de la PRIMERA cuota del ciclo; los suplementos (SUP) siguen
+    // usando las de sus movimientos.
+    const cyclePeriods = receiptTypeCode === 'SUP' ? [] : await this.findCycleBillingPeriods(contract, tx);
+    const firstPeriod = cyclePeriods[0] ?? null;
+
     for (const [ideContractFile, fileMovements] of movementsByFile) {
-      const initialDate = new Date(Math.min(...fileMovements.map((m) => m.TstInitial.getTime())));
-      const endDate = new Date(Math.max(...fileMovements.map((m) => m.TstEnd.getTime())));
+      const initialDate =
+        firstPeriod?.TstInitial ?? new Date(Math.min(...fileMovements.map((m) => m.TstInitial.getTime())));
+      const endDate = firstPeriod?.TstEnd ?? new Date(Math.max(...fileMovements.map((m) => m.TstEnd.getTime())));
       const primeSum = round2(fileMovements.reduce((sum, m) => sum + Number(m.Prime), 0));
 
       const receipt = await tx.tReceipt.create({
@@ -4279,6 +4393,279 @@ export class ContractsService {
         data: { Fee: trunc2(fee), UsrModification: actor, TstModification: now },
       });
     }
+  }
+
+  /**
+   * Períodos de facturación (`TContractBilling`) del CICLO VIGENTE del
+   * contrato: los que caen dentro de `TContract.TstInitial`..`TstEnd` (que
+   * `renew()` corre al nuevo ciclo, así que los períodos de ciclos
+   * anteriores quedan fuera solos). Ordenados por `NumPeriod`.
+   */
+  private async findCycleBillingPeriods(
+    contract: { IdeContract: string; TstInitial: Date; TstEnd: Date | null },
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    if (!contract.TstEnd) return [];
+    return tx.tContractBilling.findMany({
+      where: {
+        IdeContract: contract.IdeContract,
+        TstInitial: { gte: contract.TstInitial },
+        TstEnd: { lte: contract.TstEnd },
+      },
+      orderBy: { NumPeriod: 'asc' },
+    });
+  }
+
+  /**
+   * Cuántas cuotas del ciclo ya tienen recibo y cuál es la siguiente.
+   *
+   * Un recibo "regular" es uno NEW/REN no anulado (`TstCancellation null`)
+   * del ciclo vigente (`TstInitial >= TContract.TstInitial`); cada cuota emite
+   * UNA operación `RECEGENE` propia (`UK_TReceipt_01`), con un recibo por
+   * archivo de póliza dentro de ella, así que "cuotas emitidas" = operaciones
+   * distintas. El recibo base para clonar es el de la primera cuota.
+   */
+  private async findNextInstallment(
+    contract: { IdeContract: string; TstInitial: Date; TstEnd: Date | null },
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const periods = await this.findCycleBillingPeriods(contract, tx);
+    const receipts = await tx.tReceipt.findMany({
+      where: {
+        IdeContract: contract.IdeContract,
+        TstCancellation: null,
+        TstInitial: { gte: contract.TstInitial },
+        SReceiptType: { CodReceiptType: { in: ['NEW', 'REN'] } },
+      },
+      orderBy: [{ TstInitial: 'asc' }, { NumReceipt: 'asc' }],
+      select: { IdeReceipt: true, IdeContractFile: true, IdeContractOperation: true, IdeReceiptType: true },
+    });
+    const operations = [...new Set(receipts.map((r) => r.IdeContractOperation))];
+    const baseReceipts = operations.length > 0 ? receipts.filter((r) => r.IdeContractOperation === operations[0]) : [];
+    return {
+      numPeriods: periods.length,
+      numIssued: operations.length,
+      nextPeriod: periods[operations.length] ?? null,
+      baseReceipts,
+    };
+  }
+
+  /**
+   * Emite el recibo de UNA cuota (período `period`) clonando el de la primera
+   * cuota del ciclo: misma estructura (movimiento/línea/concepto) y mismos
+   * importes -- las cuotas regulares son iguales entre sí (la fórmula de
+   * `setNetPrime` es prima/N + recargo) -- con las fechas del período.
+   *
+   * Decisiones (acordadas con el usuario, 2026-10-04):
+   * - Operación `RECEGENE` PROPIA por cuota (`UK_TReceipt_01`).
+   * - NO crea movimientos de cobertura nuevos: los suplementos/anulaciones
+   *   comparan contra el último movimiento de cada cobertura, y una cuota no
+   *   cambia la cobertura. `TReceiptDetail` apunta al movimiento base.
+   * - Se omiten las coberturas ya canceladas (`TstCancellation`); si todas
+   *   lo están, no se emite recibo para ese archivo.
+   * - Los suplementos ya cobran su diferencia completa por adelantado en su
+   *   propio recibo `SUP`, por eso las cuotas siguientes quedan en el importe
+   *   base (limitación conocida).
+   *
+   * Devuelve la cantidad de recibos creados (uno por archivo de póliza).
+   */
+  private async issueInstallmentReceipt(
+    contract: { IdeContract: string; IdeProduct: string },
+    baseReceipts: Array<{ IdeReceipt: string; IdeContractFile: string; IdeReceiptType: string }>,
+    period: { TstInitial: Date; TstEnd: Date },
+    actor: string,
+    tx: Prisma.TransactionClient,
+  ): Promise<number> {
+    const comisionConcept = await tx.sConcept.findFirst({ where: { CodConcept: 'Comision' } });
+    const [ideReceiptInitial, ideReceiptDetailInitial] = await Promise.all([
+      this.stateMachine.getInitialState('TReceipt'),
+      this.stateMachine.getInitialState('TReceiptDetail'),
+    ]);
+    const now = new Date();
+    const contractOperation = await this.createContractOperation(
+      contract.IdeContract,
+      contract.IdeProduct,
+      'RECEGENE',
+      actor,
+      tx,
+    );
+
+    let created = 0;
+    for (const base of baseReceipts) {
+      const baseDetails = await tx.tReceiptDetail.findMany({
+        where: {
+          IdeReceipt: base.IdeReceipt,
+          TCoverageMovement: { TRiskCoverage: { TstCancellation: null } },
+        },
+        include: { TCoverageMovement: { select: { IdeCoverageMovement: true, Prime: true } } },
+      });
+      if (baseDetails.length === 0) continue;
+
+      const movements = new Map(baseDetails.map((d) => [d.IdeCoverageMovement, Number(d.TCoverageMovement.Prime)]));
+      const prime = round2([...movements.values()].reduce((sum, value) => sum + value, 0));
+      const fee = baseDetails
+        .filter((d) => comisionConcept && d.IdeConcept === comisionConcept.IdeConcept)
+        .reduce((sum, d) => sum + Number(d.ConceptValue), 0);
+
+      const receipt = await tx.tReceipt.create({
+        data: {
+          IdeContractFile: base.IdeContractFile,
+          IdeContractOperation: contractOperation.IdeContractOperation,
+          IdeContract: contract.IdeContract,
+          IdeReceiptType: base.IdeReceiptType,
+          NumReceipt: await this.generateNumReceipt(contract.IdeProduct),
+          TstIssue: now,
+          TstInitial: period.TstInitial,
+          TstEnd: period.TstEnd,
+          Fee: trunc2(fee),
+          Prime: prime,
+          IdeState: ideReceiptInitial,
+          UsrCreation: actor,
+          TstCreation: now,
+          UsrModification: actor,
+          TstModification: now,
+        },
+      });
+      await tx.tReceiptDetail.createMany({
+        data: baseDetails.map((d) => ({
+          IdeReceipt: receipt.IdeReceipt,
+          IdeCoverageMovement: d.IdeCoverageMovement,
+          IdeInsuranceLine: d.IdeInsuranceLine,
+          IdeConcept: d.IdeConcept,
+          ConceptValue: d.ConceptValue,
+          IdeState: ideReceiptDetailInitial,
+          UsrCreation: actor,
+          TstCreation: now,
+          UsrModification: actor,
+          TstModification: now,
+        })),
+      });
+      created++;
+    }
+    return created;
+  }
+
+  /**
+   * Si el producto tiene `IndGenerateAllFraction`, emite de una vez los
+   * recibos de las cuotas 2..N del ciclo (al contratar y al renovar). Si no,
+   * las cuotas las emite el job `EMISION_RECIBOS_CUOTAS` o el botón manual.
+   */
+  private async issueRemainingInstallmentsIfConfigured(
+    ideContract: string,
+    actor: string,
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
+    const contract = await tx.tContract.findUniqueOrThrow({ where: { IdeContract: ideContract } });
+    const product = await tx.sProduct.findFirst({
+      where: { IdeProduct: contract.IdeProduct },
+      orderBy: { TstInitial: 'desc' },
+      select: { IndGenerateAllFraction: true },
+    });
+    if (!product?.IndGenerateAllFraction) return;
+
+    for (;;) {
+      const next = await this.findNextInstallment(contract, tx);
+      if (!next.nextPeriod || next.baseReceipts.length === 0) return;
+      const created = await this.issueInstallmentReceipt(contract, next.baseReceipts, next.nextPeriod, actor, tx);
+      if (created === 0) return; // todas las coberturas canceladas: evita un bucle infinito
+    }
+  }
+
+  /**
+   * Emite el recibo de la próxima cuota pendiente de un contrato ACTIVO
+   * (botón "Emitir próxima cuota" del detalle del contrato). Bloquea la fila
+   * del contrato (`FOR UPDATE`) para que dos clics -- o un clic y el job --
+   * no emitan la misma cuota dos veces.
+   */
+  async issueNextInstallment(ideContract: string, actor: string) {
+    const result = await this.prisma.$transaction(
+      (tx) => this.issueNextInstallmentTx(ideContract, actor, tx, null),
+      { timeout: CREATE_TRANSACTION_TIMEOUT_MS, maxWait: 10_000 },
+    );
+    if (result === 'NO_PENDING') {
+      throw new ConflictException(`El contrato "${ideContract}" no tiene cuotas pendientes de emitir`);
+    }
+    if (result === 'NOT_ACTIVE') {
+      throw new ConflictException(`El contrato "${ideContract}" debe estar "Activo" para emitir cuotas`);
+    }
+    return this.findOne(ideContract);
+  }
+
+  /**
+   * `dueBefore` (solo el job): emite únicamente si el período de la cuota
+   * empieza antes de esa fecha (hoy + días de anticipación).
+   */
+  private async issueNextInstallmentTx(
+    ideContract: string,
+    actor: string,
+    tx: Prisma.TransactionClient,
+    dueBefore: Date | null,
+  ): Promise<{ numPeriod: number; numReceipts: number } | 'NO_PENDING' | 'NOT_ACTIVE'> {
+    await tx.$queryRaw`SELECT "IdeContract" FROM ars_platform."TContract" WHERE "IdeContract" = ${ideContract}::uuid FOR UPDATE`;
+    const contract = await tx.tContract.findUnique({ where: { IdeContract: ideContract } });
+    if (!contract) throw new NotFoundException(`No existe contrato con id "${ideContract}"`);
+    const ideActivo = await this.stateMachine.getStateByCode('Activo');
+    if (contract.IdeState !== ideActivo) return 'NOT_ACTIVE';
+
+    const next = await this.findNextInstallment(contract, tx);
+    if (!next.nextPeriod || next.baseReceipts.length === 0) return 'NO_PENDING';
+    if (dueBefore && next.nextPeriod.TstInitial.getTime() > dueBefore.getTime()) return 'NO_PENDING';
+
+    const numReceipts = await this.issueInstallmentReceipt(contract, next.baseReceipts, next.nextPeriod, actor, tx);
+    if (numReceipts === 0) {
+      // Revierte la operación RECEGENE vacía (la transacción aborta).
+      throw new ConflictException(
+        `El contrato "${contract.NumContract}" no tiene coberturas vigentes para emitir la cuota ${next.nextPeriod.NumPeriod}`,
+      );
+    }
+    return { numPeriod: next.nextPeriod.NumPeriod, numReceipts };
+  }
+
+  /**
+   * Corrida del job `EMISION_RECIBOS_CUOTAS`: para cada contrato Activo
+   * fraccionado (más de 1 cuota), emite los recibos de las cuotas cuyo período
+   * empieza dentro de los próximos `leadDays` días (o ya empezó -- si el job
+   * estuvo caído, se pone al día). Una transacción por cuota y por contrato:
+   * un contrato con datos raros no frena a los demás.
+   */
+  async issueDueInstallmentReceipts(leadDays: number, actor: string) {
+    const ideActivo = await this.stateMachine.getStateByCode('Activo');
+    const now = new Date();
+    const dueBefore = addDays(now, leadDays);
+    const candidates = await this.prisma.tContract.findMany({
+      where: {
+        IdeState: ideActivo,
+        TstEnd: { gte: now },
+        SPaymentFraction: { NumFraction: { gt: 1 } },
+      },
+      select: { IdeContract: true, NumContract: true },
+    });
+
+    let numIssued = 0;
+    let numContracts = 0;
+    let numFailed = 0;
+    const failures: string[] = [];
+    for (const candidate of candidates) {
+      let issuedForContract = 0;
+      try {
+        for (;;) {
+          const result = await this.prisma.$transaction(
+            (tx) => this.issueNextInstallmentTx(candidate.IdeContract, actor, tx, dueBefore),
+            { timeout: CREATE_TRANSACTION_TIMEOUT_MS, maxWait: 10_000 },
+          );
+          if (typeof result === 'string') break;
+          issuedForContract += 1;
+        }
+      } catch (error) {
+        numFailed++;
+        failures.push(`${candidate.NumContract}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      if (issuedForContract > 0) {
+        numContracts++;
+        numIssued += issuedForContract;
+      }
+    }
+    return { numCandidates: candidates.length, numContracts, numIssued, numFailed, failures };
   }
 
   /**

@@ -1,0 +1,43 @@
+<div class="flex flex-col gap-2 rounded-lg border border-slate-200 p-4">
+  <p class="text-xs font-medium uppercase tracking-wide text-slate-500">{{ 'paymentFraction.title' | transloco }}</p>
+
+  @if (loading()) {
+    <p class="text-sm text-slate-500">{{ 'common.loading' | transloco }}</p>
+  } @else if (failed()) {
+    <p class="text-sm text-red-600">{{ 'paymentFraction.loadError' | transloco }}</p>
+  } @else if (data(); as d) {
+    @if (d.options.length === 0) {
+      <p class="text-sm text-amber-700">{{ 'paymentFraction.none' | transloco }}</p>
+    } @else {
+      @for (option of d.options; track option.codPaymentFraction) {
+        <button
+          type="button"
+          class="flex items-center justify-between gap-4 rounded-lg border px-3 py-2 text-left transition"
+          [class.border-slate-900]="selected() === option.codPaymentFraction"
+          [class.bg-slate-50]="selected() === option.codPaymentFraction"
+          [class.border-slate-200]="selected() !== option.codPaymentFraction"
+          [class.hover:bg-slate-50]="!readonly()"
+          [disabled]="readonly()"
+          (click)="choose(option)"
+        >
+          <span class="flex items-center gap-3">
+            <i class="pi" [class.pi-check-circle]="selected() === option.codPaymentFraction" [class.pi-circle]="selected() !== option.codPaymentFraction"></i>
+            <span class="flex flex-col">
+              <span class="text-sm font-medium text-slate-900">{{ option.desPaymentFraction }}</span>
+              <span class="text-xs text-slate-500">
+                {{ detail(option) }}
+                @if (option.porSurCharge > 0) {
+                  · {{ 'paymentFraction.surcharge' | transloco: { pct: option.porSurCharge } }}
+                }
+              </span>
+            </span>
+          </span>
+          <span class="text-right text-sm font-semibold text-slate-900">{{ 'paymentFraction.total' | transloco: { amount: money(option.totalPrime) } }}</span>
+        </button>
+      }
+      @if (d.approximate) {
+        <p class="text-xs text-slate-500">{{ 'paymentFraction.approximate' | transloco }}</p>
+      }
+    }
+  }
+</div>

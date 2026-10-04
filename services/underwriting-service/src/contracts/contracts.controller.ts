@@ -28,6 +28,16 @@ import { SetRenewalOptOutDto } from './dto/set-renewal-opt-out.dto';
 export class ContractsController {
   constructor(private readonly service: ContractsService) {}
 
+  /**
+   * Fracciones de pago elegibles para esta cotización, con vista previa del
+   * importe de cada cuota (ver `ContractsService.listPaymentFractionOptions`).
+   * La elegida viaja como `codPaymentFraction` en el body del POST de abajo.
+   */
+  @Get('quotes/:ideQuote/payment-fractions')
+  listPaymentFractionOptions(@Param('ideQuote') ideQuote: string) {
+    return this.service.listPaymentFractionOptions(ideQuote);
+  }
+
   @Post('quotes/:ideQuote/contract')
   create(@Param('ideQuote') ideQuote: string, @Body() dto: CreateContractDto, @CurrentUser() actor: JwtPayload) {
     return this.service.create(ideQuote, dto, actor.code);
@@ -104,6 +114,15 @@ export class ContractsController {
   @Post('contracts/:id/renew')
   renew(@Param('id') id: string, @CurrentUser() actor: JwtPayload) {
     return this.service.renew(id, actor.code);
+  }
+
+  /**
+   * Botón "Emitir próxima cuota": emite el recibo de la siguiente cuota
+   * pendiente del ciclo (ver `ContractsService.issueNextInstallment`).
+   */
+  @Post('contracts/:id/issue-next-installment')
+  issueNextInstallment(@Param('id') id: string, @CurrentUser() actor: JwtPayload) {
+    return this.service.issueNextInstallment(id, actor.code);
   }
 
   /** Etapa 2 de "Gestión de renovaciones" -- marcar/desmarcar "No

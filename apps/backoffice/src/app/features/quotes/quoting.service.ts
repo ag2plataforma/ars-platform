@@ -287,6 +287,28 @@ interface CreateContractResponse {
   NumContract: string;
 }
 
+/** Una fracción de pago elegible al contratar (`GET :id/payment-fractions`),
+ *  con la vista previa de importes calculada en el backend. */
+export interface PaymentFractionOption {
+  codPaymentFraction: string;
+  desPaymentFraction: string;
+  numFraction: number;
+  /** Recargo por fraccionar, en %. */
+  porSurCharge: number;
+  installmentPrime: number;
+  totalPrime: number;
+  /** La de menor orden: la que usa el backend si no se elige otra. */
+  isDefault: boolean;
+}
+
+export interface PaymentFractionOptions {
+  symbolCurrency: string;
+  quotePrime: number;
+  /** `true` si el producto no usa prima proporcional: la cuota real se calcula por días exactos. */
+  approximate: boolean;
+  options: PaymentFractionOption[];
+}
+
 /** `GET /quotes/stats` -- widget "Comercial" del dashboard de inicio
  *  (pedido explícito del usuario, 2026-10-02, ver docs/02-roadmap.md:
  *  "Gráficos en el dashboard de inicio"). Ver el doc-comment de
@@ -420,13 +442,20 @@ export class QuotingService {
   /** `POST :ideQuote/contract` -- ejecuta toda la cascada real de
    * creación de contrato (`ContractsService.create`, ver su README):
    * exige que la cotización ya esté en estado "Aceptado" y sin contrato
-   * previo. `codPaymentFraction`/`initialDate` quedan afuera de esta
-   * etapa (se usan los valores por defecto del backend: primera
-   * fracción de pago vigente del producto y fecha actual) -- ver nota en
-   * `docs/02-roadmap.md` sobre por qué esto no se puede probar de punta
-   * a punta todavía contra la BD real. */
-  createContract(ideQuote: string): Observable<CreateContractResponse> {
-    return this.http.post<CreateContractResponse>(`${this.base}/${ideQuote}/contract`, {});
+   * previo. `codPaymentFraction` (opcional) es la fracción de pago elegida
+   * (ver `listPaymentFractionOptions`); sin ella el backend usa la de menor
+   * orden del producto. `initialDate` queda afuera (se usa la fecha actual). */
+  createContract(ideQuote: string, codPaymentFraction?: string): Observable<CreateContractResponse> {
+    return this.http.post<CreateContractResponse>(
+      `${this.base}/${ideQuote}/contract`,
+      codPaymentFraction ? { codPaymentFraction } : {},
+    );
+  }
+
+  /** `GET :id/payment-fractions` -- fracciones que ofrece el producto hoy,
+   * con el importe estimado de cada cuota y el total. */
+  listPaymentFractionOptions(ideQuote: string): Observable<PaymentFractionOptions> {
+    return this.http.get<PaymentFractionOptions>(`${this.base}/${ideQuote}/payment-fractions`);
   }
   /** `GET :id/requirements` -- resuelve (lazy, del lado del backend) y
    * lista el checklist de documentos exigidos por la cotización. */

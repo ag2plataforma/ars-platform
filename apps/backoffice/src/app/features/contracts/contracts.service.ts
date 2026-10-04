@@ -120,6 +120,16 @@ export interface ContractBillingPeriod {
   SState: ContractStateRef;
 }
 
+/** Resumen de la fracción de pago para el calendario de cuotas (`ContractsService.buildPaymentSchedule`). */
+export interface ContractPaymentSchedule {
+  numFraction: number;
+  desPaymentFraction: string;
+  /** Recargo por fraccionar, en %. */
+  porSurCharge: number;
+  /** Cuota estimada, o `null` si el contrato no tiene coberturas activas. */
+  estimatedInstallment: number | null;
+}
+
 export interface ContractReceipt {
   IdeReceipt: string;
   /** Para el popup de recibos por movimiento (pestaña "Movimientos") --
@@ -131,6 +141,8 @@ export interface ContractReceipt {
   TstIssue: string;
   TstInitial: string;
   TstEnd: string;
+  /** Fecha de anulación -- null mientras el recibo esté vigente. */
+  TstCancellation?: string | null;
   Prime: DecimalString;
   Fee: DecimalString;
   SReceiptType: { CodReceiptType: string; DesReceiptType: string };
@@ -279,6 +291,7 @@ export interface ContractDetail {
   IndNoRenovar: boolean;
   TContractPerson: ContractPerson[];
   TContractBilling: ContractBillingPeriod[];
+  PaymentSchedule: ContractPaymentSchedule;
   TReceipt: ContractReceipt[];
   TContractDistributionChannel: ContractDistributionChannel[];
   TContractOperation: ContractOperation[];
@@ -463,6 +476,12 @@ export class ContractsService {
    *  que el caller recargue el detalle. */
   renew(ideContract: string): Observable<ContractDetail> {
     return this.http.post<ContractDetail>(`${this.base}/${ideContract}/renew`, {});
+  }
+
+  /** `POST /contracts/:id/issue-next-installment` -- emite el recibo de la
+   *  siguiente cuota pendiente (botón "Emitir próxima cuota"). */
+  issueNextInstallment(ideContract: string): Observable<ContractDetail> {
+    return this.http.post<ContractDetail>(`${this.base}/${ideContract}/issue-next-installment`, {});
   }
 
   /** `GET /contracts/renewal-candidates` -- Etapa 2 de "Gestión de

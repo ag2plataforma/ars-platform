@@ -32,6 +32,7 @@
     "db:setup-contract-sequence": "node packages/database/scripts/setup-contract-number-sequence.js",
     "db:investigate-party-service": "node packages/database/scripts/investigate-party-service.js",
     "db:investigate-contract-engine": "node packages/database/scripts/investigate-contract-engine.js",
+    "db:investigate-receipt-fractions": "node packages/database/scripts/investigate-receipt-fractions.js",
     "db:investigate-testing-data": "node packages/database/scripts/investigate-testing-data.js",
     "db:seed-contract-testing-fixtures": "node packages/database/scripts/seed-contract-testing-fixtures.js",
     "db:seed-cancelcontract-fixtures": "node packages/database/scripts/seed-cancelcontract-fixtures.js",
