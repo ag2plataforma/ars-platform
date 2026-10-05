@@ -28,6 +28,12 @@ export class AttributesService {
       'DesAttribute',
       'IdeAttribute',
       'atributo',
+      // `SFieldDictionary` incluido para que el frontend pueda mostrar el
+      // código de campo real (`CodFieldDictionary`, el token que se usa
+      // tal cual dentro de una fórmula de `SCalculationRule`) sin pedirlo
+      // aparte -- lo consume el panel de referencias de la pantalla de
+      // Reglas de cálculo (backlog ítem 8, ver docs/02-roadmap.md).
+      { SFieldDictionary: true },
     );
   }
 

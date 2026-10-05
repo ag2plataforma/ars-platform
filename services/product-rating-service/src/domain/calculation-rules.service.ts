@@ -5,6 +5,12 @@ import { CatalogCrudService } from '@ars-platform/shared-common';
 import { CreateCalculationRuleDto } from './dto/create-calculation-rule.dto';
 import { UpdateCalculationRuleDto } from './dto/update-calculation-rule.dto';
 import { ListCalculationRulesDto } from './dto/list-calculation-rules.dto';
+import { FormulaDto } from './dto/formula.dto';
+import {
+  CalculationFormulaCodes,
+  FormulaValidationResult,
+  validateCalculationFormula,
+} from './dto/formula-validation.util';
 
 const INCLUDE = {
   SConcept: true,
@@ -79,6 +85,50 @@ export class CalculationRulesService {
   async setState(id: string, codState: string, actor: string): Promise<SCalculationRule> {
     const stateId = await this.stateMachine.getStateByCode(codState);
     return this.crud.setState(id, stateId, actor);
+  }
+
+  /**
+   * Validación "en seco" de una fórmula (backlog ítem 8, ver
+   * docs/02-roadmap.md) -- no crea ni edita ninguna `SCalculationRule`,
+   * solo chequea que los códigos referenciados (`rule`/`adjustment`/
+   * `FGetRateValue`/campos personalizados) existan y estén Activos, y que
+   * la expresión resultante sea sintácticamente válida para el mismo
+   * parser que usa `RulesEngineService` en producción. Ver el doc-comment
+   * de `validateCalculationFormula` para el detalle de por qué hace falta
+   * (los resolvers reales devuelven 0 en silencio ante un código
+   * inexistente, en vez de fallar).
+   */
+  async validateFormula(formula: FormulaDto): Promise<FormulaValidationResult> {
+    const codes = await this.loadFormulaCodes();
+    return validateCalculationFormula(formula, codes);
+  }
+
+  private async loadFormulaCodes(): Promise<CalculationFormulaCodes> {
+    const activeStateId = await this.stateMachine.getStateByCode('ACTIVO');
+    const [attributes, rules, adjustments, rateTables] = await Promise.all([
+      this.prisma.sAttribute.findMany({
+        where: { IdeState: activeStateId, SFieldDictionary: { IdeState: activeStateId } },
+        select: { SFieldDictionary: { select: { CodFieldDictionary: true } } },
+      }),
+      this.prisma.sCalculationRule.findMany({
+        where: { IdeState: activeStateId },
+        select: { CodCalculationRule: true },
+      }),
+      this.prisma.sAdjustment.findMany({
+        where: { SState: { CodState: 'ACTIVO' } },
+        select: { CodAdjustment: true },
+      }),
+      this.prisma.sRateTable.findMany({
+        where: { SState: { CodState: 'ACTIVO' } },
+        select: { CodRateTable: true },
+      }),
+    ]);
+    return {
+      fieldTokens: new Set(attributes.map((a) => a.SFieldDictionary.CodFieldDictionary)),
+      ruleCodes: new Set(rules.map((r) => r.CodCalculationRule)),
+      adjustmentCodes: new Set(adjustments.map((a) => a.CodAdjustment)),
+      rateTableCodes: new Set(rateTables.map((r) => r.CodRateTable)),
+    };
   }
 
   private async buildExtra(

@@ -4,6 +4,7 @@ import { CalculationRulesService } from './calculation-rules.service';
 import { CreateCalculationRuleDto } from './dto/create-calculation-rule.dto';
 import { UpdateCalculationRuleDto } from './dto/update-calculation-rule.dto';
 import { ListCalculationRulesDto } from './dto/list-calculation-rules.dto';
+import { ValidateFormulaDto } from './dto/validate-formula.dto';
 import { SetCatalogStateDto } from '../catalogs/dto/set-catalog-state.dto';
 
 /**
@@ -23,6 +24,21 @@ export class CalculationRulesController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);
+  }
+
+  /**
+   * Validación "en seco" (backlog ítem 8, ver docs/02-roadmap.md) --
+   * SIN `@Roles('ADMIN')` a propósito, mismo criterio que `findAll`/
+   * `findOne`: es de solo lectura (no crea ni edita nada), así que
+   * cualquier usuario autenticado que pueda VER la pantalla de Reglas de
+   * cálculo también puede validar una fórmula antes de guardarla. Ruta
+   * fija antes de `@Post()` (sin conflicto real -- son verbos/paths
+   * distintos -- pero se deja primero por legibilidad, junto al resto de
+   * los endpoints de lectura).
+   */
+  @Post('validate-formula')
+  validateFormula(@Body() dto: ValidateFormulaDto) {
+    return this.service.validateFormula(dto.formula);
   }
 
   @Roles('ADMIN')

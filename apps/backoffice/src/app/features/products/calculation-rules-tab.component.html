@@ -118,7 +118,7 @@
   [header]="(dialogMode() === 'create' ? 'products.calculationRules.createDialogTitle' : 'products.calculationRules.editDialogTitle') | transloco"
   [visible]="dialogVisible()"
   [modal]="true"
-  [style]="{ width: '36rem' }"
+  [style]="{ width: '64rem', 'max-width': '95vw' }"
   (visibleChange)="!$event && closeDialog()"
 >
   <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
@@ -150,28 +150,275 @@
     </div>
 
     <div class="rounded-md border border-slate-200 p-3">
-      <p class="mb-2 text-xs text-slate-500">
-        {{ 'products.calculationRules.formulaHintPart1' | transloco }}
-        <code>RulesEngineService</code>
-        {{ 'products.calculationRules.formulaHintPart2' | transloco }}
-        <code>rule('COD')</code>
-        {{ 'products.calculationRules.formulaHintPart3' | transloco }}
-        <code>FGetRateValue(...)</code>
-        {{ 'products.calculationRules.formulaHintPart4' | transloco }}
-      </p>
-      <div class="flex flex-col gap-3">
-        <div class="flex flex-col gap-1">
-          <label class="text-sm font-medium text-slate-700">IF</label>
-          <input pInputText formControlName="formulaIf" class="w-full font-mono text-sm" />
+      <div class="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_16rem]">
+        <div class="flex flex-col gap-4">
+          <div class="flex flex-col gap-1">
+            <div class="flex items-center justify-between">
+              <label class="text-sm font-medium text-slate-700">IF</label>
+              <button
+                pButton
+                type="button"
+                [label]="(ifAdvancedMode() ? 'products.calculationRules.builder.visualModeLabel' : 'products.calculationRules.builder.advancedModeLabel') | transloco"
+                [text]="true"
+                size="small"
+                (click)="toggleIfAdvanced()"
+              ></button>
+            </div>
+            @if (ifAdvancedMode()) {
+              <textarea
+                #ifField
+                pTextarea
+                formControlName="formulaIf"
+                rows="2"
+                class="w-full font-mono text-sm"
+                (focus)="onFormulaFieldFocus('formulaIf')"
+                (input)="onFormulaFieldInput()"
+              ></textarea>
+            } @else {
+              <app-formula-if-editor
+                [ifModel]="ifModel()"
+                [fieldTokenChoices]="fieldTokenChoices()"
+                [ruleChoices]="ruleChoices()"
+                [adjustmentChoices]="adjustmentChoices()"
+                [rateTableChoices]="rateTableChoices()"
+                (ifModelChange)="onIfModelChange($event)"
+              ></app-formula-if-editor>
+            }
+          </div>
+
+          <div class="flex flex-col gap-1">
+            <div class="flex items-center justify-between">
+              <label class="text-sm font-medium text-slate-700">THEN</label>
+              <button
+                pButton
+                type="button"
+                [label]="(thenAdvancedMode() ? 'products.calculationRules.builder.visualModeLabel' : 'products.calculationRules.builder.advancedModeLabel') | transloco"
+                [text]="true"
+                size="small"
+                (click)="toggleThenAdvanced()"
+              ></button>
+            </div>
+            @if (thenAdvancedMode()) {
+              <textarea
+                #thenField
+                pTextarea
+                formControlName="formulaThen"
+                rows="2"
+                class="w-full font-mono text-sm"
+                (focus)="onFormulaFieldFocus('formulaThen')"
+                (input)="onFormulaFieldInput()"
+              ></textarea>
+            } @else {
+              <div class="flex flex-col gap-2 rounded-md border border-slate-100 bg-slate-50/50 p-2">
+                <div class="flex items-center gap-2">
+                  <p-checkbox
+                    [ngModel]="thenModel().round.enabled"
+                    [ngModelOptions]="{ standalone: true }"
+                    (ngModelChange)="onThenRoundToggle($event)"
+                    [binary]="true"
+                    inputId="then-round"
+                  />
+                  <label for="then-round" class="text-sm text-slate-700">{{ 'products.calculationRules.builder.roundLabel' | transloco }}</label>
+                  @if (thenModel().round.enabled) {
+                    <p-inputNumber
+                      [ngModel]="thenModel().round.decimals"
+                      [ngModelOptions]="{ standalone: true }"
+                      (ngModelChange)="onThenRoundDecimals($event)"
+                      [useGrouping]="false"
+                      [min]="0"
+                      [max]="10"
+                      styleClass="w-20"
+                    />
+                    <span class="text-xs text-slate-500">{{ 'products.calculationRules.builder.decimalsLabel' | transloco }}</span>
+                  }
+                </div>
+                <app-formula-chain-editor
+                  [chain]="thenModel().chain"
+                  [fieldTokenChoices]="fieldTokenChoices()"
+                  [ruleChoices]="ruleChoices()"
+                  [adjustmentChoices]="adjustmentChoices()"
+                  [rateTableChoices]="rateTableChoices()"
+                  (chainChange)="onThenChainChange($event)"
+                ></app-formula-chain-editor>
+              </div>
+            }
+          </div>
+
+          <div class="flex flex-col gap-1">
+            <div class="flex items-center justify-between">
+              <label class="text-sm font-medium text-slate-700">ELSE</label>
+              <button
+                pButton
+                type="button"
+                [label]="(elseAdvancedMode() ? 'products.calculationRules.builder.visualModeLabel' : 'products.calculationRules.builder.advancedModeLabel') | transloco"
+                [text]="true"
+                size="small"
+                (click)="toggleElseAdvanced()"
+              ></button>
+            </div>
+            @if (elseAdvancedMode()) {
+              <textarea
+                #elseField
+                pTextarea
+                formControlName="formulaElse"
+                rows="2"
+                class="w-full font-mono text-sm"
+                (focus)="onFormulaFieldFocus('formulaElse')"
+                (input)="onFormulaFieldInput()"
+              ></textarea>
+            } @else {
+              <div class="flex flex-col gap-2 rounded-md border border-slate-100 bg-slate-50/50 p-2">
+                <div class="flex items-center gap-2">
+                  <p-checkbox
+                    [ngModel]="elseModel().round.enabled"
+                    [ngModelOptions]="{ standalone: true }"
+                    (ngModelChange)="onElseRoundToggle($event)"
+                    [binary]="true"
+                    inputId="else-round"
+                  />
+                  <label for="else-round" class="text-sm text-slate-700">{{ 'products.calculationRules.builder.roundLabel' | transloco }}</label>
+                  @if (elseModel().round.enabled) {
+                    <p-inputNumber
+                      [ngModel]="elseModel().round.decimals"
+                      [ngModelOptions]="{ standalone: true }"
+                      (ngModelChange)="onElseRoundDecimals($event)"
+                      [useGrouping]="false"
+                      [min]="0"
+                      [max]="10"
+                      styleClass="w-20"
+                    />
+                    <span class="text-xs text-slate-500">{{ 'products.calculationRules.builder.decimalsLabel' | transloco }}</span>
+                  }
+                </div>
+                <app-formula-chain-editor
+                  [chain]="elseModel().chain"
+                  [fieldTokenChoices]="fieldTokenChoices()"
+                  [ruleChoices]="ruleChoices()"
+                  [adjustmentChoices]="adjustmentChoices()"
+                  [rateTableChoices]="rateTableChoices()"
+                  (chainChange)="onElseChainChange($event)"
+                ></app-formula-chain-editor>
+              </div>
+            }
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button
+              pButton
+              type="button"
+              [label]="'products.calculationRules.validateButton' | transloco"
+              [loading]="validating()"
+              severity="secondary"
+              [outlined]="true"
+              size="small"
+              (click)="validateFormulaNow()"
+            ></button>
+            @if (validationErrors() !== null && validationErrors()!.length === 0) {
+              <span class="text-sm text-green-600">{{ 'products.calculationRules.validDetail' | transloco }}</span>
+            }
+          </div>
+          @if (validationErrors() && validationErrors()!.length > 0) {
+            <ul class="list-disc rounded-md bg-red-50 p-3 pl-6 text-xs text-red-700">
+              @for (error of validationErrors(); track error) {
+                <li>{{ error }}</li>
+              }
+            </ul>
+          }
         </div>
-        <div class="flex flex-col gap-1">
-          <label class="text-sm font-medium text-slate-700">THEN</label>
-          <input pInputText formControlName="formulaThen" class="w-full font-mono text-sm" />
-        </div>
-        <div class="flex flex-col gap-1">
-          <label class="text-sm font-medium text-slate-700">ELSE</label>
-          <input pInputText formControlName="formulaElse" class="w-full font-mono text-sm" />
-        </div>
+
+        @if (anyAdvancedMode()) {
+          <div class="flex flex-col gap-3 rounded-md bg-slate-50 p-2 text-xs lg:max-h-[22rem] lg:overflow-y-auto">
+            <p class="text-slate-500">{{ 'products.calculationRules.referencesHint' | transloco }}</p>
+
+            <div class="flex flex-col gap-1">
+              <div class="flex items-center justify-between">
+                <p class="font-medium text-slate-700">{{ 'products.calculationRules.fieldsGroupLabel' | transloco }}</p>
+                <button
+                  pButton
+                  type="button"
+                  icon="pi pi-plus"
+                  [text]="true"
+                  size="small"
+                  [pTooltip]="'products.calculationRules.builder.newFieldButton' | transloco"
+                  tooltipPosition="top"
+                  (click)="openNewFieldDialog()"
+                ></button>
+              </div>
+              @if (fieldTokens().length === 0) {
+                <p class="text-slate-400">{{ 'products.calculationRules.noFieldsHint' | transloco }}</p>
+              }
+              <div class="flex flex-wrap gap-1">
+                @for (row of fieldTokens(); track row['IdeAttribute']) {
+                  <button
+                    type="button"
+                    class="rounded border border-slate-300 bg-white px-1.5 py-0.5 font-mono hover:bg-slate-100"
+                    [title]="fieldTokenTitle(row)"
+                    (click)="insertFormulaReference(fieldTokenCode(row))"
+                  >
+                    {{ fieldTokenCode(row) }}
+                  </button>
+                }
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-1">
+              <p class="font-medium text-slate-700">{{ 'products.calculationRules.rulesGroupLabel' | transloco }}</p>
+              @if (otherRules().length === 0) {
+                <p class="text-slate-400">{{ 'products.calculationRules.noRulesHint' | transloco }}</p>
+              }
+              <div class="flex flex-wrap gap-1">
+                @for (row of otherRules(); track row['IdeCalculationRule']) {
+                  <button
+                    type="button"
+                    class="rounded border border-slate-300 bg-white px-1.5 py-0.5 font-mono hover:bg-slate-100"
+                    [title]="ruleTitle(row)"
+                    (click)="insertFormulaReference('rule(\'' + ruleCode(row) + '\')')"
+                  >
+                    {{ ruleCode(row) }}
+                  </button>
+                }
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-1">
+              <p class="font-medium text-slate-700">{{ 'products.calculationRules.adjustmentsGroupLabel' | transloco }}</p>
+              @if (adjustmentOptions().length === 0) {
+                <p class="text-slate-400">{{ 'products.calculationRules.noAdjustmentsHint' | transloco }}</p>
+              }
+              <div class="flex flex-wrap gap-1">
+                @for (row of adjustmentOptions(); track row['IdeAdjustment']) {
+                  <button
+                    type="button"
+                    class="rounded border border-slate-300 bg-white px-1.5 py-0.5 font-mono hover:bg-slate-100"
+                    [title]="adjustmentTitle(row)"
+                    (click)="insertFormulaReference('adjustment(\'' + adjustmentCode(row) + '\')')"
+                  >
+                    {{ adjustmentCode(row) }}
+                  </button>
+                }
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-1">
+              <p class="font-medium text-slate-700">{{ 'products.calculationRules.rateTablesGroupLabel' | transloco }}</p>
+              @if (rateTables().length === 0) {
+                <p class="text-slate-400">{{ 'products.calculationRules.noRateTablesHint' | transloco }}</p>
+              }
+              <div class="flex flex-wrap gap-1">
+                @for (row of rateTables(); track row['IdeRateTable']) {
+                  <button
+                    type="button"
+                    class="rounded border border-slate-300 bg-white px-1.5 py-0.5 font-mono hover:bg-slate-100"
+                    [title]="rateTableTitle(row)"
+                    (click)="insertFormulaReference('FGetRateValue(\'' + rateTableCode(row) + '\', \'\', NULL, NULL, NULL, NULL)')"
+                  >
+                    {{ rateTableCode(row) }}
+                  </button>
+                }
+              </div>
+            </div>
+          </div>
+        }
       </div>
     </div>
 
@@ -188,6 +435,29 @@
 
     <div class="mt-2 flex justify-end gap-2">
       <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
+    </div>
+  </form>
+</p-dialog>
+
+<p-dialog
+  [header]="'products.calculationRules.builder.newFieldDialogTitle' | transloco"
+  [visible]="newFieldDialogVisible()"
+  [modal]="true"
+  [style]="{ width: '28rem', 'max-width': '95vw' }"
+  (visibleChange)="!$event && closeNewFieldDialog()"
+>
+  <form [formGroup]="newFieldForm" (ngSubmit)="submitNewField()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'products.calculationRules.builder.newFieldCodeLabel' | transloco }}</label>
+      <input pInputText formControlName="cod" class="w-full font-mono" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'products.calculationRules.builder.newFieldDescLabel' | transloco }}</label>
+      <input pInputText formControlName="des" class="w-full" />
+    </div>
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeNewFieldDialog()"></button>
       <button pButton type="submit" [label]="'common.save' | transloco"></button>
     </div>
   </form>
