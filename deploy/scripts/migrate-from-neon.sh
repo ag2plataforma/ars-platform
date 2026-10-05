@@ -17,8 +17,10 @@ cd "$(dirname "$0")/.."
 
 : "${NEON_URL:?Define NEON_URL con la cadena de conexion de Neon}"
 [ -f .env ] || { echo "Falta deploy/.env" >&2; exit 1; }
-set -a; . ./.env; set +a
-DB="${POSTGRES_DB:-ars}"
+# Lee una variable de deploy/.env SIN ejecutar el archivo (un valor con
+# espacios, p. ej. EMAIL_SENDER_NAME=ARS Platform, rompe un `source`).
+envval() { grep -E "^$1=" .env | tail -n1 | cut -d= -f2- | sed -E 's/^"(.*)"$/\1/'; }
+DB="$(envval POSTGRES_DB)"; DB="${DB:-ars}"
 
 # Quita schema=... de la URL (manteniendo bien formados ? y &).
 CLEAN_URL="$(printf '%s' "$NEON_URL" | sed -E 's/([?&])schema=[^&]*&?/\1/; s/[?&]$//')"

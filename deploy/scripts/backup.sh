@@ -8,8 +8,12 @@
 # (crea antes el log:  sudo touch /var/log/ars-backup.log && sudo chown deploy /var/log/ars-backup.log)
 set -euo pipefail
 cd "$(dirname "$0")/.."
-set -a; . ./.env; set +a
-DB="${POSTGRES_DB:-ars}"
+# Lee una variable de deploy/.env SIN ejecutar el archivo (un valor con
+# espacios, p. ej. EMAIL_SENDER_NAME=ARS Platform, rompe un `source`).
+envval() { grep -E "^$1=" .env | tail -n1 | cut -d= -f2- | sed -E 's/^"(.*)"$/\1/'; }
+DB="$(envval POSTGRES_DB)"; DB="${DB:-ars}"
+BACKUP_KEEP_DAYS="$(envval BACKUP_KEEP_DAYS)"
+BACKUP_RCLONE_REMOTE="$(envval BACKUP_RCLONE_REMOTE)"
 DIR="${BACKUP_DIR:-$HOME/ars-backups}"
 KEEP="${BACKUP_KEEP_DAYS:-14}"
 mkdir -p "$DIR"
