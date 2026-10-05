@@ -753,7 +753,32 @@
       "pending": "Pendiente",
       "issueNextButton": "Emitir próxima cuota",
       "issuedDetail": "Se emitió el recibo de la próxima cuota.",
+      "collectionColumn": "Cobro",
+      "paid": "Cobrado",
+      "unpaid": "Sin cobrar",
       "empty": "Este contrato no tiene cuotas generadas."
+    },
+    "activateDialog": {
+      "title": "Activar contrato",
+      "subtitle": "Elegí cómo se activa. El contrato pasa a Activo y se envía la bienvenida al cliente.",
+      "linkOption": "Enviar landing de pago al cliente",
+      "linkHint": "El tomador recibe un correo con un enlace para aceptar los consentimientos y pagar. El contrato se activa solo cuando se confirma el cobro.",
+      "comingSoon": "Próximamente",
+      "manualOption": "Activar sin pasar por la pasarela de pago",
+      "manualHint": "Activa el contrato y marca el primer recibo como cobrado. Queda registrado quién lo hizo y el motivo.",
+      "reasonLabel": "Motivo (obligatorio)",
+      "reasonRequired": "Escribí el motivo de la activación sin pago (mínimo 3 caracteres).",
+      "confirmButton": "Activar sin pago"
+    },
+    "payments": {
+      "title": "Cobros registrados",
+      "dateColumn": "Fecha",
+      "methodColumn": "Medio",
+      "detailColumn": "Detalle",
+      "method": {
+        "MANUAL": "Manual (sin pasarela)",
+        "PASARELA": "Pasarela de pago"
+      }
     },
     "nameColumn": "Nombre y apellido",
     "roleColumn": "Rol",

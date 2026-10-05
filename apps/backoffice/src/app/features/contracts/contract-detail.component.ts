@@ -306,6 +306,7 @@ export class ContractDetailComponent implements OnInit {
         numReceipt: receipts.map((r) => r.NumReceipt).join(', '),
         prime: receipts.length ? receipts.reduce((sum, r) => sum + Number(r.Prime), 0) : null,
         issued: receipts.length > 0,
+        paid: receipts.length > 0 && receipts.every((r) => r.SState.CodState === 'COBRADO'),
       };
     });
   });
@@ -670,13 +671,33 @@ export class ContractDetailComponent implements OnInit {
     this.cancelDialogVisible.set(false);
   }
 
+  /** Popup "Activar": elegir cómo se activa (ver `ActivateContractDto` en el
+   *  backend). Hoy solo está disponible "sin pasarela"; la landing de pago
+   *  llega en la etapa 2 de cobranza. */
+  readonly activateDialogVisible = signal(false);
+  readonly activateReason = this.fb.nonNullable.control('', [Validators.required, Validators.minLength(3)]);
+
+  openActivateDialog(): void {
+    this.activateReason.reset('');
+    this.activateDialogVisible.set(true);
+  }
+
+  closeActivateDialog(): void {
+    this.activateDialogVisible.set(false);
+  }
+
   activateContract(): void {
     const c = this.contract();
     if (!c) return;
+    if (this.activateReason.invalid) {
+      this.activateReason.markAsTouched();
+      return;
+    }
     this.activateSubmitting.set(true);
-    this.contracts.activate(c.IdeContract).subscribe({
+    this.contracts.activate(c.IdeContract, { mode: 'MANUAL', desReason: this.activateReason.value.trim() }).subscribe({
       next: (result) => {
         this.activateSubmitting.set(false);
+        this.activateDialogVisible.set(false);
         this.contract.set(result);
         this.messages.add({
           severity: 'success',

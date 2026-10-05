@@ -3,7 +3,9 @@ import { Prisma, PrismaService, TaskQueueRepository } from '@ars-platform/databa
 import { RulesEngineService, StateMachineService } from '@ars-platform/shared-common';
 import { QuotesService } from '../quoting/quotes.service';
 import { RequirementsService } from '../requirements/requirements.service';
+import { PaymentsService } from '../payments/payments.service';
 import { CreateContractDto } from './dto/create-contract.dto';
+import { ActivateContractDto } from './dto/activate-contract.dto';
 import { CancelContractDto } from './dto/cancel-contract.dto';
 import { ChangeInsuredAmountDto } from './dto/change-insured-amount.dto';
 import { AddCoverageDto } from './dto/add-coverage.dto';
@@ -128,6 +130,7 @@ export class ContractsService {
     private readonly quotesService: QuotesService,
     private readonly requirementsService: RequirementsService,
     private readonly taskQueue: TaskQueueRepository,
+    private readonly payments: PaymentsService,
   ) {}
 
   /**
@@ -227,7 +230,7 @@ export class ContractsService {
    * `applyStateCascade`) -- quedan en su estado inicial, comportamiento
    * preexistente, no algo que este método deba corregir.
    */
-  async activate(ideContract: string, actor: string) {
+  async activate(ideContract: string, dto: ActivateContractDto, actor: string) {
     const existing = await this.prisma.tContract.findUnique({ where: { IdeContract: ideContract } });
     if (!existing) {
       throw new NotFoundException(`No existe contrato con id "${ideContract}"`);
@@ -242,6 +245,23 @@ export class ContractsService {
       async (tx) => {
         await this.applyStateCascade(ideContract, 'Activar', actor, tx);
         await this.activateContractPersons(ideContract, actor, tx);
+        // Activación sin pasarela (MANUAL): el primer recibo queda cobrado en
+        // la MISMA transacción, con el motivo del operador como evidencia.
+        // Requiere haber corrido packages/database/scripts/setup-payments.js.
+        try {
+          await this.payments.registerFirstReceiptPayment(
+            ideContract,
+            { codMethod: 'MANUAL', reason: dto.desReason, actor },
+            tx,
+          );
+        } catch (err) {
+          if (err instanceof Error && /TPayment|COBRADO|"Cobrar"/.test(err.message) && !(err instanceof ConflictException)) {
+            throw new ConflictException(
+              'Falta configurar la cobranza: corré packages/database/scripts/setup-payments.js (tabla TPayment y transición Cobrar del recibo).',
+            );
+          }
+          throw err;
+        }
       },
       { timeout: CREATE_TRANSACTION_TIMEOUT_MS, maxWait: 10_000 },
     );
@@ -1028,11 +1048,18 @@ export class ContractsService {
         }
       }
     }
-    const [enriched, paymentSchedule] = await Promise.all([
+    const [enriched, paymentSchedule, payments] = await Promise.all([
       this.enrichDistributionChannels(contract),
       this.buildPaymentSchedule(contract),
+      // Cobros registrados (`TPayment`). Si todavía no se corrió
+      // `setup-payments.js` la tabla no existe: el detalle del contrato no
+      // debe romperse por eso, simplemente no muestra cobros.
+      this.payments.listByContract(ideContract).catch((err: Error) => {
+        this.logger.warn(`No se pudieron leer los cobros del contrato "${ideContract}": ${err.message}`);
+        return [];
+      }),
     ]);
-    return { ...enriched, PaymentSchedule: paymentSchedule };
+    return { ...enriched, PaymentSchedule: paymentSchedule, Payments: payments };
   }
 
   /**

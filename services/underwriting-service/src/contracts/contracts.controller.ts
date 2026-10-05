@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common
 import { CurrentUser, JwtPayload } from '@ars-platform/shared-common';
 import { ContractsService } from './contracts.service';
 import { CreateContractDto } from './dto/create-contract.dto';
+import { ActivateContractDto } from './dto/activate-contract.dto';
 import { TransitionContractStateDto } from './dto/transition-contract-state.dto';
 import { CancelContractDto } from './dto/cancel-contract.dto';
 import { ChangeInsuredAmountDto } from './dto/change-insured-amount.dto';
@@ -98,12 +99,13 @@ export class ContractsController {
    */
   /**
    * Acción explícita "Activar contrato" -- ver el doc-comment de
-   * `ContractsService.activate` para el detalle completo. Sin DTO: no
-   * requiere body, solo el id del contrato.
+   * `ContractsService.activate` para el detalle completo. El body dice
+   * cómo se activa (`ActivateContractDto`: hoy solo `MANUAL`, sin pasarela,
+   * con motivo).
    */
   @Post('contracts/:id/activate')
-  activate(@Param('id') id: string, @CurrentUser() actor: JwtPayload) {
-    return this.service.activate(id, actor.code);
+  activate(@Param('id') id: string, @Body() dto: ActivateContractDto, @CurrentUser() actor: JwtPayload) {
+    return this.service.activate(id, dto, actor.code);
   }
 
   /**

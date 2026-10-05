@@ -3,6 +3,7 @@ import { UnderwritingStateMachineModule } from '../state-machine/underwriting-st
 import { UnderwritingRulesEngineModule } from '../rules-engine/underwriting-rules-engine.module';
 import { QuotingModule } from '../quoting/quoting.module';
 import { RequirementsModule } from '../requirements/requirements.module';
+import { PaymentsModule } from '../payments/payments.module';
 import { ContractsController } from './contracts.controller';
 import { ContractsService } from './contracts.service';
 
@@ -14,7 +15,7 @@ import { ContractsService } from './contracts.service';
  * origen) -- `QuotesService` se exporta desde `QuotingModule` para esto.
  */
 @Module({
-  imports: [UnderwritingStateMachineModule, UnderwritingRulesEngineModule, QuotingModule, RequirementsModule],
+  imports: [UnderwritingStateMachineModule, UnderwritingRulesEngineModule, QuotingModule, RequirementsModule, PaymentsModule],
   controllers: [ContractsController],
   providers: [ContractsService],
   exports: [ContractsService],

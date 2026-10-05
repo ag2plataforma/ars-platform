@@ -130,6 +130,30 @@ export interface ContractPaymentSchedule {
   estimatedInstallment: number | null;
 }
 
+/** `TPayment` -- cobro (o intento de cobro) de un recibo. */
+export interface ContractPayment {
+  IdePayment: string;
+  IdeReceipt: string;
+  NumReceipt: string;
+  Amount: string;
+  CodCurrency: string;
+  /** PASARELA (pago online) | MANUAL (activación sin pasarela). */
+  CodMethod: 'PASARELA' | 'MANUAL';
+  CodProvider: string | null;
+  CodStatus: string;
+  DesExternalId: string | null;
+  DesReason: string | null;
+  TstPaid: string | null;
+  UsrCreation: string;
+  TstCreation: string;
+}
+
+/** Cuerpo de `POST /contracts/:id/activate` (popup "Activar"). */
+export interface ActivateContractBody {
+  mode: 'MANUAL';
+  desReason: string;
+}
+
 export interface ContractReceipt {
   IdeReceipt: string;
   /** Para el popup de recibos por movimiento (pestaña "Movimientos") --
@@ -292,6 +316,7 @@ export interface ContractDetail {
   TContractPerson: ContractPerson[];
   TContractBilling: ContractBillingPeriod[];
   PaymentSchedule: ContractPaymentSchedule;
+  Payments: ContractPayment[];
   TReceipt: ContractReceipt[];
   TContractDistributionChannel: ContractDistributionChannel[];
   TContractOperation: ContractOperation[];
@@ -465,8 +490,8 @@ export class ContractsService {
    *  el contrato esté en "Borrador" y activa toda la cascada
    *  (`TContract` -> ... -> `TMovementConcept`); acá solo se hace el POST
    *  y se deja que el caller recargue el detalle. */
-  activate(ideContract: string): Observable<ContractDetail> {
-    return this.http.post<ContractDetail>(`${this.base}/${ideContract}/activate`, {});
+  activate(ideContract: string, body: ActivateContractBody): Observable<ContractDetail> {
+    return this.http.post<ContractDetail>(`${this.base}/${ideContract}/activate`, body);
   }
 
   /** `POST /contracts/:id/renew` -- renueva el contrato (acción
