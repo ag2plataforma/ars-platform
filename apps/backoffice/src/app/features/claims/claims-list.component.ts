@@ -10,7 +10,13 @@ import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { ClaimListItem, ClaimsApiService } from './claims.service';
+import { ClaimListItem, ClaimPriority, ClaimsApiService } from './claims.service';
+
+/** Orden de la prioridad para poder ordenar la columna (sin triage = al final). */
+const PRIORITY_RANK: Record<ClaimPriority, number> = { URGENTE: 0, ALTA: 1, NORMAL: 2, BAJA: 3 };
+
+/** Fila del listado: el siniestro + el rango de prioridad derivado (campo de orden). */
+export type ClaimRow = ClaimListItem & { PriorityRank: number };
 
 /**
  * Listado de siniestros (`GET /claims`) -- landing de "Siniestros" en el
@@ -34,7 +40,7 @@ export class ClaimsListComponent {
   private readonly messages = inject(MessageService);
   private readonly transloco = inject(TranslocoService);
 
-  readonly items = signal<ClaimListItem[]>([]);
+  readonly items = signal<ClaimRow[]>([]);
   readonly loading = signal(false);
 
   filters = this.fb.nonNullable.group({ filterNumClaim: [''] });
@@ -49,7 +55,9 @@ export class ClaimsListComponent {
     const { filterNumClaim } = this.filters.getRawValue();
     this.claims.list(filterNumClaim || undefined).subscribe({
       next: (items) => {
-        this.items.set(items);
+        this.items.set(
+          items.map((item) => ({ ...item, PriorityRank: item.Triage ? PRIORITY_RANK[item.Triage.CodPriority] : 9 })),
+        );
         this.loading.set(false);
       },
       error: (err: HttpErrorResponse) => {
@@ -77,6 +85,19 @@ export class ClaimsListComponent {
     if (codState === 'RECHAZADO') return 'danger';
     if (!codState) return 'secondary';
     return 'warn';
+  }
+
+  prioritySeverity(priority: ClaimPriority): 'danger' | 'warn' | 'info' | 'secondary' {
+    switch (priority) {
+      case 'URGENTE':
+        return 'danger';
+      case 'ALTA':
+        return 'warn';
+      case 'NORMAL':
+        return 'info';
+      default:
+        return 'secondary';
+    }
   }
 
   nuevo(): void {

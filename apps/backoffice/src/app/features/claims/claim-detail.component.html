@@ -45,6 +45,111 @@
           </div>
         </div>
 
+        @if (canTriage(file) || triageOf(file)) {
+          <div class="flex flex-col gap-3 rounded border border-violet-200 bg-violet-50/40 p-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex flex-wrap items-center gap-2">
+                <i class="pi pi-sparkles text-violet-600"></i>
+                <p class="text-sm font-semibold text-slate-800">{{ 'claims.triage.title' | transloco }}</p>
+                @if (triageOf(file); as t) {
+                  <p-tag [value]="priorityKey(effectivePriority(t)) | transloco" [severity]="prioritySeverity(effectivePriority(t))" />
+                  <p-tag [value]="complexityKey(t.CodComplexity) | transloco" severity="secondary" />
+                  @if (t.CodPriorityFinal) {
+                    <span class="text-xs text-emerald-700">{{ 'claims.triage.confirmedBy' | transloco: { user: t.UsrDecision, date: (t.TstDecision | date: 'short') } }}</span>
+                  } @else {
+                    <span class="text-xs text-violet-700">{{ 'claims.triage.suggestedByAi' | transloco }}</span>
+                  }
+                }
+              </div>
+              @if (canTriage(file)) {
+                <button
+                  pButton
+                  type="button"
+                  size="small"
+                  severity="help"
+                  [outlined]="true"
+                  icon="pi pi-sparkles"
+                  [label]="(triageOf(file) ? 'claims.triage.rerunButton' : 'claims.triage.runButton') | transloco"
+                  [loading]="triageBusyFile() === file.IdeClaimFile"
+                  [disabled]="triageBusyFile() !== null"
+                  (click)="runTriage(file)"
+                ></button>
+              }
+            </div>
+
+            @if (triageOf(file); as t) {
+              <p class="text-sm text-slate-700">{{ t.DesSummary }}</p>
+
+              <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div>
+                  <p class="text-xs font-semibold uppercase text-slate-500">{{ 'claims.triage.reasonsTitle' | transloco }}</p>
+                  <ul class="mt-1 list-disc pl-5 text-sm text-slate-700">
+                    @for (reason of t.DesReasons; track $index) {
+                      <li>{{ reason }}</li>
+                    }
+                  </ul>
+                </div>
+                <div>
+                  <p class="text-xs font-semibold uppercase text-slate-500">{{ 'claims.triage.nextStepsTitle' | transloco }}</p>
+                  <ul class="mt-1 list-disc pl-5 text-sm text-slate-700">
+                    @for (step of t.DesNextSteps; track $index) {
+                      <li>{{ step }}</li>
+                    }
+                  </ul>
+                </div>
+              </div>
+
+              @if (t.DesDecisionNote) {
+                <p class="text-sm text-slate-600"><span class="font-medium">{{ 'claims.triage.noteLabel' | transloco }}:</span> {{ t.DesDecisionNote }}</p>
+              }
+
+              @if (canTriage(file)) {
+                <div class="flex flex-col gap-2 rounded border border-slate-200 bg-white p-3">
+                  <p class="text-xs font-semibold uppercase text-slate-500">{{ 'claims.triage.decisionTitle' | transloco }}</p>
+                  <div class="flex flex-wrap items-start gap-2">
+                    <p-select
+                      [options]="priorityOptions"
+                      optionValue="value"
+                      [ngModel]="draftPriorityOf(file, t)"
+                      (ngModelChange)="setDraftPriority(file, $event)"
+                      [ngModelOptions]="{ standalone: true }"
+                      appendTo="body"
+                      [style]="{ width: '11rem' }"
+                    >
+                      <ng-template #selectedItem let-item>{{ priorityKey(item.value) | transloco }}</ng-template>
+                      <ng-template #item let-item>{{ priorityKey(item.value) | transloco }}</ng-template>
+                    </p-select>
+                    <textarea
+                      pTextarea
+                      rows="1"
+                      maxlength="500"
+                      class="min-w-64 flex-1"
+                      [placeholder]="'claims.triage.notePlaceholder' | transloco"
+                      [ngModel]="draftNoteOf(file)"
+                      (ngModelChange)="setDraftNote(file, $event)"
+                      [ngModelOptions]="{ standalone: true }"
+                    ></textarea>
+                    <button
+                      pButton
+                      type="button"
+                      size="small"
+                      severity="success"
+                      icon="pi pi-check"
+                      [label]="'claims.triage.confirmButton' | transloco"
+                      [loading]="triageBusyFile() === file.IdeClaimFile"
+                      [disabled]="triageBusyFile() !== null"
+                      (click)="confirmTriage(file, t)"
+                    ></button>
+                  </div>
+                </div>
+              }
+              <p class="text-xs text-slate-400">{{ 'claims.triage.disclaimer' | transloco }}</p>
+            } @else {
+              <p class="text-sm text-slate-500">{{ 'claims.triage.empty' | transloco }}</p>
+            }
+          </div>
+        }
+
         @for (risk of file.TClaimRisk; track risk.IdeClaimRisk) {
           <div class="flex flex-col gap-2 rounded border border-slate-100 bg-slate-50 p-3">
             <p class="text-sm font-medium text-slate-800">{{ riskLabel(risk) }} &middot; {{ planLabel(risk) }}</p>

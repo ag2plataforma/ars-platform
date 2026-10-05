@@ -1,5 +1,5 @@
 import { ServiceUnavailableException } from '@nestjs/common';
-import { AiDocumentExtraction, AiProvider } from './ai-provider.interface';
+import { AiDocumentExtraction, AiProvider, AiStructuredResult } from './ai-provider.interface';
 
 /** Se usa cuando la IA está apagada (`AI_ENABLED=false`) o sin configurar: falla con un mensaje claro. */
 export class DisabledAiProvider implements AiProvider {
@@ -10,6 +10,10 @@ export class DisabledAiProvider implements AiProvider {
   constructor(private readonly reason: string) {}
 
   async extractDocumentData(): Promise<AiDocumentExtraction> {
+    throw new ServiceUnavailableException(`La IA no está disponible: ${this.reason}`);
+  }
+
+  async completeStructured(): Promise<AiStructuredResult> {
     throw new ServiceUnavailableException(`La IA no está disponible: ${this.reason}`);
   }
 }

@@ -1248,7 +1248,8 @@
       "claimTypeColumn": "Tipo",
       "contractColumn": "Contrato",
       "occurrenceColumn": "Fecha de ocurrencia",
-      "emptyState": "No hay siniestros declarados todavía."
+      "emptyState": "No hay siniestros declarados todavía.",
+      "priorityColumn": "Prioridad"
     },
     "declare": {
       "title": "Declarar siniestro",
@@ -1356,6 +1357,35 @@
       "updatedDetail": "Umbral de aprobación actualizado.",
       "toggledDetail": "Estado del umbral actualizado.",
       "levelLabel": "Nivel"
+    },
+    "triage": {
+      "title": "Triage con IA",
+      "runButton": "Triage con IA",
+      "rerunButton": "Volver a analizar",
+      "runDoneDetail": "La IA propuso una prioridad. Revísala y confírmala o cámbiala.",
+      "decisionDoneDetail": "Prioridad confirmada.",
+      "suggestedByAi": "Sugerida por IA, pendiente de confirmar",
+      "suggestedShort": "sugerida",
+      "confirmedBy": "Confirmada por {{user}} el {{date}}",
+      "reasonsTitle": "Por qué",
+      "nextStepsTitle": "Próximos pasos sugeridos",
+      "decisionTitle": "Tu decisión",
+      "notePlaceholder": "Nota opcional (por qué confirmas o cambias la prioridad)",
+      "noteLabel": "Nota",
+      "confirmButton": "Confirmar prioridad",
+      "empty": "Aún no se ha pedido un triage para esta carpeta.",
+      "disclaimer": "Sugerencia generada por IA a partir de los datos del siniestro; la decisión final es de la persona que lo gestiona.",
+      "priority": {
+        "URGENTE": "Urgente",
+        "ALTA": "Alta",
+        "NORMAL": "Normal",
+        "BAJA": "Baja"
+      },
+      "complexity": {
+        "SIMPLE": "Simple",
+        "MEDIA": "Media",
+        "COMPLEJA": "Compleja"
+      }
     }
   },
   "documentTemplates": {

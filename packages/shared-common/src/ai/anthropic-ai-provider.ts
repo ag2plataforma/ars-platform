@@ -5,6 +5,8 @@ import {
   AiDocumentExtractionInput,
   AiExtractedField,
   AiProvider,
+  AiStructuredRequest,
+  AiStructuredResult,
   detectDocumentMediaType,
 } from './ai-provider.interface';
 
@@ -90,6 +92,41 @@ export class AnthropicAiProvider implements AiProvider {
         : 'Extrae los datos clave del documento (identificación de personas, fechas, importes, números de referencia...).',
     ].join('\n');
 
+    const data = await this.post({
+      model: this.model,
+      max_tokens: 2048,
+      system: SYSTEM_PROMPT,
+      tools: [TOOL],
+      tool_choice: { type: 'tool', name: TOOL.name },
+      messages: [{ role: 'user', content: [block, { type: 'text', text: task }] }],
+    });
+
+    const toolUse = data.content?.find((c) => c.type === 'tool_use' && c.name === TOOL.name);
+    if (!toolUse?.input) throw new BadGatewayException('La IA no devolvió datos estructurados');
+    return this.normalize(toolUse.input, data.usage);
+  }
+
+  async completeStructured(request: AiStructuredRequest): Promise<AiStructuredResult> {
+    const data = await this.post({
+      model: this.model,
+      max_tokens: request.maxTokens ?? 2048,
+      system: request.system,
+      tools: [{ name: request.toolName, description: request.toolDescription, input_schema: request.inputSchema }],
+      tool_choice: { type: 'tool', name: request.toolName },
+      messages: [{ role: 'user', content: [{ type: 'text', text: request.prompt }] }],
+    });
+    const toolUse = data.content?.find((c) => c.type === 'tool_use' && c.name === request.toolName);
+    if (!toolUse?.input) throw new BadGatewayException('La IA no devolvió datos estructurados');
+    return {
+      output: toolUse.input,
+      model: this.model,
+      inputTokens: data.usage?.input_tokens ?? null,
+      outputTokens: data.usage?.output_tokens ?? null,
+    };
+  }
+
+  /** Llamada HTTP a la API de mensajes; devuelve el JSON o lanza 502 con un mensaje claro. */
+  private async post(body: Record<string, unknown>): Promise<AnthropicResponse> {
     let response: Awaited<ReturnType<typeof fetch>>;
     try {
       response = await fetch(ANTHROPIC_API, {
@@ -99,29 +136,18 @@ export class AnthropicAiProvider implements AiProvider {
           'anthropic-version': ANTHROPIC_VERSION,
           'content-type': 'application/json',
         },
-        body: JSON.stringify({
-          model: this.model,
-          max_tokens: 2048,
-          system: SYSTEM_PROMPT,
-          tools: [TOOL],
-          tool_choice: { type: 'tool', name: TOOL.name },
-          messages: [{ role: 'user', content: [block, { type: 'text', text: task }] }],
-        }),
+        body: JSON.stringify(body),
       });
     } catch (err) {
       this.logger.error(`No se pudo contactar con la API de IA: ${(err as Error).message}`);
       throw new BadGatewayException('No se pudo contactar con el servicio de IA');
     }
-
     const data = (await response.json().catch(() => ({}))) as AnthropicResponse;
     if (!response.ok) {
       this.logger.error(`IA -> ${response.status}: ${data.error?.type} ${data.error?.message}`);
       throw new BadGatewayException(`El servicio de IA rechazó la petición (${data.error?.message ?? response.status})`);
     }
-
-    const toolUse = data.content?.find((c) => c.type === 'tool_use' && c.name === TOOL.name);
-    if (!toolUse?.input) throw new BadGatewayException('La IA no devolvió datos estructurados');
-    return this.normalize(toolUse.input, data.usage);
+    return data;
   }
 
   /** Sanea la salida del modelo (tipos, longitudes, duplicados): nunca se confía en su forma. */

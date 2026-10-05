@@ -11,6 +11,7 @@ import { ToastModule } from 'primeng/toast';
 import { DialogModule } from 'primeng/dialog';
 import { SelectModule } from 'primeng/select';
 import { InputTextModule } from 'primeng/inputtext';
+import { TextareaModule } from 'primeng/textarea';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { CheckboxModule } from 'primeng/checkbox';
 import { MessageService } from 'primeng/api';
@@ -25,13 +26,20 @@ import {
   ClaimCoverageProvision,
   ClaimDetail,
   ClaimFile,
+  ClaimComplexity,
   ClaimFileOperative,
+  ClaimPriority,
+  ClaimTriage,
   ClaimRequirement,
   ClaimRisk,
   ClaimsApiService,
   CreateGuaranteeProvisionRequest,
   GuaranteeProvision,
 } from './claims.service';
+
+/** Estados en los que se puede pedir un triage a la IA (espejo de `TRIAGE_ALLOWED_STATES` en claims-service). */
+const TRIAGE_ALLOWED_STATES = new Set(['DECLARADO', 'EN_REVISION_REQUISITOS', 'EN_EVALUACION']);
+const PRIORITY_VALUES: ClaimPriority[] = ['URGENTE', 'ALTA', 'NORMAL', 'BAJA'];
 
 const PAYMENT_TYPES_PATH = '/reference-data/payment-types';
 const COVERAGE_GUARANTEES_PATH = '/product-rating/coverage-guarantees';
@@ -116,6 +124,7 @@ const INVOICED_AMOUNT_EDITABLE_STATES = new Set(['DECLARADO', 'EN_REVISION_REQUI
     DialogModule,
     SelectModule,
     InputTextModule,
+    TextareaModule,
     InputNumberModule,
     CheckboxModule,
     TranslocoPipe,
@@ -141,6 +150,16 @@ export class ClaimDetailComponent implements OnInit {
    *  siniestro), ver `load()`. */
   readonly approvalsByFile = signal<Record<string, Approval[]>>({});
   readonly transitionBusy = signal(false);
+
+  // --- Triage con IA (sugerencia guardada + decisión humana) ---
+  /** Último triage por carpeta (`null` = nunca se pidió). */
+  readonly triageByFile = signal<Record<string, ClaimTriage | null>>({});
+  /** Carpeta con una petición de triage / decisión en curso. */
+  readonly triageBusyFile = signal<string | null>(null);
+  /** Borrador de la decisión por carpeta (prioridad elegida + nota). */
+  readonly triageDraftPriority = signal<Record<string, ClaimPriority | null>>({});
+  readonly triageDraftNote = signal<Record<string, string>>({});
+  readonly priorityOptions = PRIORITY_VALUES.map((value) => ({ value }));
 
   // --- Diálogo "Nueva aprobación" ---
   readonly approvalDialogVisible = signal(false);
@@ -250,6 +269,7 @@ export class ClaimDetailComponent implements OnInit {
         this.loading.set(false);
         for (const file of claim.TClaimFile) {
           this.loadApprovals(file.IdeClaimFile);
+          this.loadTriage(file.IdeClaimFile);
         }
       },
       error: (err: HttpErrorResponse) => {
@@ -262,6 +282,117 @@ export class ClaimDetailComponent implements OnInit {
   private loadApprovals(ideClaimFile: string): void {
     this.claimsApi.listApprovals(ideClaimFile).subscribe({
       next: (approvals) => this.approvalsByFile.update((byFile) => ({ ...byFile, [ideClaimFile]: approvals })),
+    });
+  }
+
+  private loadTriage(ideClaimFile: string): void {
+    this.claimsApi.getTriage(ideClaimFile).subscribe({
+      next: (triage) => this.triageByFile.update((byFile) => ({ ...byFile, [ideClaimFile]: triage })),
+    });
+  }
+
+  // --- Triage con IA ---
+
+  canTriage(file: ClaimFile): boolean {
+    return TRIAGE_ALLOWED_STATES.has(file.SState.CodState);
+  }
+
+  triageOf(file: ClaimFile): ClaimTriage | null {
+    return this.triageByFile()[file.IdeClaimFile] ?? null;
+  }
+
+  /** Prioridad vigente: la confirmada por una persona o, si no hay, la sugerida. */
+  effectivePriority(triage: ClaimTriage): ClaimPriority {
+    return triage.CodPriorityFinal ?? triage.CodPriority;
+  }
+
+  priorityKey(priority: ClaimPriority): string {
+    return `claims.triage.priority.${priority}`;
+  }
+
+  complexityKey(complexity: ClaimComplexity): string {
+    return `claims.triage.complexity.${complexity}`;
+  }
+
+  prioritySeverity(priority: ClaimPriority): 'danger' | 'warn' | 'info' | 'secondary' {
+    switch (priority) {
+      case 'URGENTE':
+        return 'danger';
+      case 'ALTA':
+        return 'warn';
+      case 'NORMAL':
+        return 'info';
+      default:
+        return 'secondary';
+    }
+  }
+
+  runTriage(file: ClaimFile): void {
+    this.triageBusyFile.set(file.IdeClaimFile);
+    this.claimsApi.runTriage(file.IdeClaimFile).subscribe({
+      next: (triage) => {
+        this.triageBusyFile.set(null);
+        this.triageByFile.update((byFile) => ({ ...byFile, [file.IdeClaimFile]: triage }));
+        this.triageDraftPriority.update((d) => ({ ...d, [file.IdeClaimFile]: triage.CodPriority }));
+        this.triageDraftNote.update((d) => ({ ...d, [file.IdeClaimFile]: '' }));
+        this.messages.add({
+          severity: 'success',
+          summary: this.transloco.translate('common.done'),
+          detail: this.transloco.translate('claims.triage.runDoneDetail'),
+        });
+      },
+      error: (err: HttpErrorResponse) => {
+        this.triageBusyFile.set(null);
+        this.showError(err);
+      },
+    });
+  }
+
+  draftPriorityOf(file: ClaimFile, triage: ClaimTriage): ClaimPriority {
+    return this.triageDraftPriority()[file.IdeClaimFile] ?? this.effectivePriority(triage);
+  }
+
+  setDraftPriority(file: ClaimFile, value: ClaimPriority | null): void {
+    this.triageDraftPriority.update((d) => ({ ...d, [file.IdeClaimFile]: value }));
+  }
+
+  draftNoteOf(file: ClaimFile): string {
+    return this.triageDraftNote()[file.IdeClaimFile] ?? '';
+  }
+
+  setDraftNote(file: ClaimFile, value: string): void {
+    this.triageDraftNote.update((d) => ({ ...d, [file.IdeClaimFile]: value }));
+  }
+
+  confirmTriage(file: ClaimFile, triage: ClaimTriage): void {
+    const priority = this.draftPriorityOf(file, triage);
+    const note = this.draftNoteOf(file).trim();
+    this.triageBusyFile.set(file.IdeClaimFile);
+    this.claimsApi.decideTriage(file.IdeClaimFile, priority, note || undefined).subscribe({
+      next: (updated) => {
+        this.triageBusyFile.set(null);
+        // Se pinta ya con lo que respondió el servidor (asegurando la decisión tomada) y se
+        // recarga el triage vigente para quedar con el estado real guardado.
+        const decided: ClaimTriage = {
+          ...updated,
+          CodPriorityFinal: updated.CodPriorityFinal ?? priority,
+          UsrDecision: updated.UsrDecision ?? '',
+          TstDecision: updated.TstDecision ?? new Date().toISOString(),
+        };
+        this.triageByFile.update((byFile) => ({ ...byFile, [file.IdeClaimFile]: decided }));
+        this.triageDraftPriority.update((d) => ({ ...d, [file.IdeClaimFile]: priority }));
+        this.triageDraftNote.update((d) => ({ ...d, [file.IdeClaimFile]: '' }));
+        this.loadTriage(file.IdeClaimFile);
+        this.messages.add({
+          severity: 'success',
+          summary: this.transloco.translate('common.done'),
+          detail: this.transloco.translate('claims.triage.decisionDoneDetail'),
+        });
+      },
+      error: (err: HttpErrorResponse) => {
+        this.triageBusyFile.set(null);
+        this.showError(err);
+      },
     });
   }
 

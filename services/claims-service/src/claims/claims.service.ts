@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma, PrismaService } from '@ars-platform/database';
 import { StateMachineService } from '@ars-platform/shared-common';
 import { ClaimRequirementsService } from '../requirements/claim-requirements.service';
+import { ClaimTriageService } from '../triage/claim-triage.service';
 import { DeclareClaimDto } from './dto/declare-claim.dto';
 
 const CLAIM_INCLUDE = {
@@ -71,6 +72,7 @@ export class ClaimsService {
     private readonly prisma: PrismaService,
     private readonly stateMachine: StateMachineService,
     private readonly claimRequirements: ClaimRequirementsService,
+    private readonly triage: ClaimTriageService,
   ) {}
 
   async declare(dto: DeclareClaimDto, actor: string) {
@@ -322,15 +324,30 @@ export class ClaimsService {
     const where: Prisma.TClaimWhereInput = {};
     if (filterNumClaim) where.NumClaim = { contains: filterNumClaim, mode: 'insensitive' };
     if (codState) where.SState = { CodState: codState };
-    return this.prisma.tClaim.findMany({
+    const claims = await this.prisma.tClaim.findMany({
       where,
       include: {
         SClaimType: true,
         SState: true,
         TContractFile: { include: { TContract: true } },
-        TClaimFile: { select: { SState: true } },
+        TClaimFile: { select: { IdeClaimFile: true, SState: true } },
       },
       orderBy: { TstCreation: 'desc' },
+    });
+    // Prioridad de triage (Fase 4, IA): la confirmada por una persona o, si no hay, la sugerida.
+    const triages = await this.triage.latestByClaimFiles(claims.flatMap((c) => c.TClaimFile.map((f) => f.IdeClaimFile)));
+    return claims.map((c) => {
+      const t = c.TClaimFile.map((f) => triages.get(f.IdeClaimFile)).find(Boolean);
+      return {
+        ...c,
+        Triage: t
+          ? {
+              CodPriority: t.CodPriorityFinal ?? t.CodPriority,
+              IndConfirmed: t.CodPriorityFinal !== null,
+              CodComplexity: t.CodComplexity,
+            }
+          : null,
+      };
     });
   }
 

@@ -1,4 +1,10 @@
-import { AiDocumentExtraction, AiDocumentExtractionInput, AiProvider } from './ai-provider.interface';
+import {
+  AiDocumentExtraction,
+  AiDocumentExtractionInput,
+  AiProvider,
+  AiStructuredRequest,
+  AiStructuredResult,
+} from './ai-provider.interface';
 
 /** Proveedor simulado (`AI_PROVIDER=mock`): permite probar el flujo completo sin clave ni coste. */
 export class MockAiProvider implements AiProvider {
@@ -19,5 +25,9 @@ export class MockAiProvider implements AiProvider {
       inputTokens: 0,
       outputTokens: 0,
     };
+  }
+
+  async completeStructured(request: AiStructuredRequest): Promise<AiStructuredResult> {
+    return { output: request.mockOutput ?? {}, model: this.model, inputTokens: 0, outputTokens: 0 };
   }
 }

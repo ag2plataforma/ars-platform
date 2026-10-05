@@ -21,6 +21,7 @@
         <th>{{ 'claims.list.contractColumn' | transloco }}</th>
         <th>{{ 'claims.list.occurrenceColumn' | transloco }}</th>
         <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+        <th pSortableColumn="PriorityRank">{{ 'claims.list.priorityColumn' | transloco }} <p-sortIcon field="PriorityRank" /></th>
       </tr>
     </ng-template>
     <ng-template #body let-row>
@@ -34,11 +35,21 @@
             <p-tag [value]="state.DesState" [severity]="fileStateSeverity(row)" />
           }
         </td>
+        <td>
+          @if (row.Triage; as triage) {
+            <div class="flex items-center gap-2">
+              <p-tag [value]="'claims.triage.priority.' + triage.CodPriority | transloco" [severity]="prioritySeverity(triage.CodPriority)" />
+              @if (!triage.IndConfirmed) {
+                <span class="text-xs text-violet-700">{{ 'claims.triage.suggestedShort' | transloco }}</span>
+              }
+            </div>
+          }
+        </td>
       </tr>
     </ng-template>
     <ng-template #emptymessage>
       <tr>
-        <td colspan="5" class="text-center text-slate-500">{{ 'claims.list.emptyState' | transloco }}</td>
+        <td colspan="6" class="text-center text-slate-500">{{ 'claims.list.emptyState' | transloco }}</td>
       </tr>
     </ng-template>
   </p-table>

@@ -40,6 +40,28 @@ export interface AiDocumentExtraction {
   outputTokens: number | null;
 }
 
+/** Petición genérica de "pregunta -> JSON estructurado" (triage, etc.). */
+export interface AiStructuredRequest {
+  system: string;
+  prompt: string;
+  /** Nombre de la herramienta que la IA debe "llamar" para devolver el JSON. */
+  toolName: string;
+  toolDescription: string;
+  /** JSON Schema del objeto que debe devolver. */
+  inputSchema: Record<string, unknown>;
+  maxTokens?: number;
+  /** Solo lo usa el proveedor `mock`: la salida simulada a devolver. */
+  mockOutput?: Record<string, unknown>;
+}
+
+export interface AiStructuredResult {
+  /** Objeto devuelto por la IA; SIN validar: el llamador debe sanearlo. */
+  output: Record<string, unknown>;
+  model: string;
+  inputTokens: number | null;
+  outputTokens: number | null;
+}
+
 export interface AiProvider {
   /** Código del proveedor (`anthropic`, `mock`, `none`). */
   readonly codProvider: string;
@@ -48,6 +70,8 @@ export interface AiProvider {
   /** Nombre del modelo en uso (para la trazabilidad). */
   readonly model: string;
   extractDocumentData(input: AiDocumentExtractionInput): Promise<AiDocumentExtraction>;
+  /** Pregunta de texto con salida JSON forzada por esquema (la salida no se debe asumir válida). */
+  completeStructured(request: AiStructuredRequest): Promise<AiStructuredResult>;
 }
 
 export const AI_PROVIDER = Symbol('AI_PROVIDER');

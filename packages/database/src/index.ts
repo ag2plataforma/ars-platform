@@ -9,4 +9,5 @@ export * from './repositories/social-impact-config.resolver';
 export * from './repositories/adjustment-value.resolver';
 export * from './repositories/process-flow.resolver';
 export * from './repositories/task-queue.repository';
+export * from './repositories/ai-trace.repository';
 export * from '@prisma/client';

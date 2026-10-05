@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
-import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma, PrismaService } from '@ars-platform/database';
+import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { AiTraceRepository, Prisma, PrismaService } from '@ars-platform/database';
 import { AI_PROVIDER, AiDocumentExtraction, AiProvider } from '@ars-platform/shared-common';
 import { ConfirmExtractionDto } from './dto/confirm-extraction.dto';
 
@@ -49,10 +49,9 @@ interface RequirementFile {
  */
 @Injectable()
 export class RequirementExtractionService {
-  private readonly logger = new Logger(RequirementExtractionService.name);
-
   constructor(
     private readonly prisma: PrismaService,
+    private readonly trace: AiTraceRepository,
     @Inject(AI_PROVIDER) private readonly ai: AiProvider,
   ) {}
 
@@ -67,7 +66,17 @@ export class RequirementExtractionService {
     }
     const hint = await this.loadHint(file.ideProductRequirement);
     const entity = kind === 'CONTRACT' ? 'CONTRACT_REQUIREMENT' : 'QUOTE_REQUIREMENT';
-    const idAiRequest = await this.openTrace(entity, id, file, actor);
+    const idAiRequest = await this.trace.open({
+      codTask: 'DOC_EXTRACT',
+      codEntity: entity,
+      ideEntity: id,
+      codProvider: this.ai.codProvider,
+      model: this.ai.model,
+      fileName: file.fileName,
+      contentBytes: file.bytes.length,
+      contentHash: createHash('sha256').update(file.bytes).digest('hex'),
+      actor,
+    });
 
     try {
       const result = await this.ai.extractDocumentData({
@@ -76,7 +85,7 @@ export class RequirementExtractionService {
         requirementName: file.requirementName,
         hint,
       });
-      await this.closeTrace(idAiRequest, 'OK', actor, {
+      await this.trace.close(idAiRequest, 'OK', actor, {
         numFields: result.fields.length,
         inputTokens: result.inputTokens,
         outputTokens: result.outputTokens,
@@ -90,7 +99,7 @@ export class RequirementExtractionService {
         model: result.model,
       };
     } catch (err) {
-      await this.closeTrace(idAiRequest, 'ERROR', actor, { error: (err as Error).message });
+      await this.trace.close(idAiRequest, 'ERROR', actor, { error: (err as Error).message });
       throw err;
     }
   }
@@ -153,39 +162,5 @@ export class RequirementExtractionService {
       SELECT "DesExtractionHint" FROM ars_platform."SProductRequirement"
        WHERE "IdeProductRequirement" = ${ideProductRequirement}::uuid`;
     return rows[0]?.DesExtractionHint ?? null;
-  }
-
-  private async openTrace(entity: string, ideEntity: string, file: RequirementFile, actor: string): Promise<string> {
-    const now = new Date();
-    const hash = createHash('sha256').update(file.bytes).digest('hex');
-    const rows = await this.prisma.$queryRaw<Array<{ IdeAiRequest: string }>>`
-      INSERT INTO ars_platform."TAiRequest"
-        ("CodTask", "CodEntity", "IdeEntity", "CodProvider", "DesModel", "DesFileName", "NumFileBytes", "DesFileHash",
-         "CodStatus", "UsrCreation", "TstCreation", "UsrModification", "TstModification")
-      VALUES
-        ('DOC_EXTRACT', ${entity}, ${ideEntity}::uuid, ${this.ai.codProvider}, ${this.ai.model}, ${file.fileName},
-         ${file.bytes.length}, ${hash}, 'PENDIENTE', ${actor}, ${now}, ${actor}, ${now})
-      RETURNING "IdeAiRequest"`;
-    return rows[0].IdeAiRequest;
-  }
-
-  private async closeTrace(
-    idAiRequest: string,
-    status: 'OK' | 'ERROR',
-    actor: string,
-    info: { numFields?: number; inputTokens?: number | null; outputTokens?: number | null; model?: string; error?: string },
-  ): Promise<void> {
-    try {
-      await this.prisma.$executeRaw`
-        UPDATE ars_platform."TAiRequest"
-           SET "CodStatus" = ${status}, "NumFields" = ${info.numFields ?? null},
-               "NumInputTokens" = ${info.inputTokens ?? null}, "NumOutputTokens" = ${info.outputTokens ?? null},
-               "DesModel" = COALESCE(${info.model ?? null}, "DesModel"),
-               "DesError" = ${info.error ? info.error.slice(0, 500) : null},
-               "UsrModification" = ${actor}, "TstModification" = ${new Date()}
-         WHERE "IdeAiRequest" = ${idAiRequest}::uuid`;
-    } catch (err) {
-      this.logger.error(`No se pudo cerrar la traza de IA ${idAiRequest}: ${(err as Error).message}`);
-    }
   }
 }

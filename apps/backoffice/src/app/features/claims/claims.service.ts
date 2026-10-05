@@ -16,6 +16,27 @@ export interface ClaimStateRef {
  * pantalla -- ver el doc-comment de `ClaimDetailComponent`). El estado que sí
  * es real y se muestra es el de la carpeta (`TClaimFile[0].SState`, un solo
  * `TClaimFile` por siniestro en esta primera vuelta). */
+export type ClaimPriority = 'URGENTE' | 'ALTA' | 'NORMAL' | 'BAJA';
+export type ClaimComplexity = 'SIMPLE' | 'MEDIA' | 'COMPLEJA';
+
+/** Triage de IA de una carpeta de siniestro (`TClaimTriage`): la IA SUGIERE y una persona decide. */
+export interface ClaimTriage {
+  IdeClaimTriage: string;
+  IdeClaimFile: string;
+  CodPriority: ClaimPriority;
+  CodComplexity: ClaimComplexity;
+  DesSummary: string;
+  DesReasons: string[];
+  DesNextSteps: string[];
+  DesModel: string | null;
+  CodPriorityFinal: ClaimPriority | null;
+  DesDecisionNote: string | null;
+  UsrDecision: string | null;
+  TstDecision: string | null;
+  UsrCreation: string;
+  TstCreation: string;
+}
+
 export interface ClaimListItem {
   IdeClaim: string;
   NumClaim: string;
@@ -26,6 +47,8 @@ export interface ClaimListItem {
   SClaimType: { CodClaimType: string; DesClaimType: string };
   TContractFile: { TContract: { NumContract: string } };
   TClaimFile: { SState: ClaimStateRef }[];
+  /** Prioridad vigente (la confirmada o, si no hay, la sugerida por la IA). */
+  Triage: { CodPriority: ClaimPriority; IndConfirmed: boolean; CodComplexity: ClaimComplexity } | null;
 }
 
 export interface ClaimCoverageProvision {
@@ -238,6 +261,21 @@ export class ClaimsApiService {
 
   createApproval(ideClaimFile: string, dto: CreateApprovalRequest): Observable<Approval> {
     return this.http.post<Approval>(`${this.claimFilesBase}/${ideClaimFile}/approvals`, dto);
+  }
+
+  /** Último triage de la carpeta (o `null` si nunca se pidió). */
+  getTriage(ideClaimFile: string): Observable<ClaimTriage | null> {
+    return this.http.get<ClaimTriage | null>(`${this.claimFilesBase}/${ideClaimFile}/triage`);
+  }
+
+  /** Pide un triage a la IA (propone; no decide nada). */
+  runTriage(ideClaimFile: string): Observable<ClaimTriage> {
+    return this.http.post<ClaimTriage>(`${this.claimFilesBase}/${ideClaimFile}/triage`, {});
+  }
+
+  /** Confirma o cambia la prioridad sugerida. */
+  decideTriage(ideClaimFile: string, codPriority: ClaimPriority, note?: string): Observable<ClaimTriage> {
+    return this.http.patch<ClaimTriage>(`${this.claimFilesBase}/${ideClaimFile}/triage/decision`, { codPriority, note });
   }
 
   listApprovals(ideClaimFile: string): Observable<Approval[]> {
