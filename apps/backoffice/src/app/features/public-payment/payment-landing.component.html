@@ -20,6 +20,13 @@
           <p-message severity="warn" class="mt-4 block">{{ 'publicPayment.cancelled' | transloco }}</p-message>
         }
         @default {
+          @if (checkoutResult() === 'success') {
+            <p-message severity="info" class="mt-4 block">{{ 'publicPayment.processing' | transloco }}</p-message>
+            <button pButton type="button" class="mt-3" severity="secondary" [outlined]="true" icon="pi pi-refresh" [label]="'publicPayment.refresh' | transloco" (click)="load()"></button>
+          } @else if (checkoutResult() === 'cancel') {
+            <p-message severity="warn" class="mt-4 block">{{ 'publicPayment.cancelledCheckout' | transloco }}</p-message>
+          }
+
           @if (v.contract && v.payment) {
             <dl class="mt-5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-lg bg-slate-50 p-4 text-sm">
               <dt class="text-slate-500">{{ 'publicPayment.product' | transloco }}</dt>

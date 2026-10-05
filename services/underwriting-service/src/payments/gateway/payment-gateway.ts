@@ -1,7 +1,7 @@
 /**
  * Puerto de pasarela de pago (mismo patrón que `SMS_SENDER`): el resto del
  * sistema habla SOLO con esta interfaz, y el proveedor concreto se elige por
- * `PAYMENT_PROVIDER` en el `.env` (hoy `sandbox`; Stripe en la etapa 3).
+ * `PAYMENT_PROVIDER` en el `.env` (`sandbox` para pruebas, `stripe` real).
  * Las credenciales de cada proveedor viven únicamente en el `.env`.
  */
 export interface CheckoutSessionInput {
@@ -43,7 +43,18 @@ export interface PaymentGateway {
    * Interpreta (y VERIFICA, p. ej. la firma) la notificación de la pasarela.
    * Devuelve `null` si el evento no es relevante; lanza si la verificación falla.
    */
-  parseWebhook(body: unknown, headers: Record<string, string | string[] | undefined>): Promise<PaymentEvent | null>;
+  parseWebhook(
+    body: unknown,
+    headers: Record<string, string | string[] | undefined>,
+    /** Cuerpo crudo exacto de la petición (necesario para verificar firmas HMAC). */
+    rawBody?: Buffer,
+  ): Promise<PaymentEvent | null>;
+  /**
+   * Opcional: consulta a la pasarela el estado actual de una sesión y lo
+   * devuelve como evento (o `null` si sigue pendiente). Red de seguridad por si
+   * el webhook no llega; el proveedor `sandbox` no la implementa.
+   */
+  retrieveEvent?(externalId: string): Promise<PaymentEvent | null>;
 }
 
 export const PAYMENT_GATEWAY = Symbol('PAYMENT_GATEWAY');

@@ -5,12 +5,15 @@ import { PaymentEvent, PaymentGateway, CheckoutSession } from './payment-gateway
 export class UnconfiguredPaymentGateway implements PaymentGateway {
   readonly codProvider = 'none';
 
-  constructor(private readonly configured: string | undefined) {}
+  constructor(
+    private readonly configured: string | undefined,
+    private readonly reason?: string,
+  ) {}
 
   async createCheckoutSession(): Promise<CheckoutSession> {
     throw new ServiceUnavailableException(
-      `Pasarela de pago no configurada${this.configured ? ` (PAYMENT_PROVIDER="${this.configured}" no se reconoce)` : ''}: ` +
-        'define PAYMENT_PROVIDER en services/underwriting-service/.env (por ahora: sandbox).',
+      `Pasarela de pago no configurada${this.configured ? ` (PAYMENT_PROVIDER="${this.configured}": ${this.reason ?? 'no se reconoce'})` : ''}: ` +
+        'define PAYMENT_PROVIDER en services/underwriting-service/.env (sandbox o stripe).',
     );
   }
 

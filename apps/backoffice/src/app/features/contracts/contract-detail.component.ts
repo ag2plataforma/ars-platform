@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -730,6 +730,48 @@ export class ContractDetailComponent implements OnInit {
   });
 
   readonly paymentLinkSubmitting = signal(false);
+
+  /** Mientras hay un enlace de pago activo se vuelve a leer el contrato cada
+   *  pocos segundos (y al volver a esta pestaña): el cliente paga en otra
+   *  ventana/dispositivo y el operador ve el cambio sin recargar. Se detiene
+   *  solo cuando el enlace deja de estar activo o se sale de la pantalla. */
+  private readonly watchPaymentLink = effect((onCleanup) => {
+    if (!this.activePaymentLink()) return;
+    const timer = setInterval(() => this.refreshSilently(), 5000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') this.refreshSilently();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    onCleanup(() => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    });
+  });
+
+  private refreshSilently(): void {
+    const current = this.contract();
+    if (!current || document.visibilityState === 'hidden') return;
+    this.contracts.getContract(current.IdeContract).subscribe({
+      next: (fresh) => {
+        const now = this.contract();
+        if (!now || now.IdeContract !== fresh.IdeContract) return;
+        const stateChanged = fresh.SState.CodState !== now.SState.CodState;
+        const linkChanged = fresh.PaymentLink?.CodStatus !== now.PaymentLink?.CodStatus;
+        if (!stateChanged && !linkChanged) return;
+        this.contract.set(fresh);
+        if (stateChanged && fresh.SState.CodState !== 'BORRADOR') {
+          this.messages.add({
+            severity: 'success',
+            summary: this.transloco.translate('common.done'),
+            detail: this.transloco.translate('contractDetail.paymentLink.paidDetail'),
+          });
+        }
+      },
+      error: () => {
+        // Refresco en segundo plano: un fallo puntual no se muestra al operador.
+      },
+    });
+  }
 
   resendPaymentLink(): void {
     const c = this.contract();

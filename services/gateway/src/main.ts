@@ -13,7 +13,17 @@ async function bootstrap() {
   // servicio final. 15mb cubre con margen una plantilla Word típica
   // codificada en base64 (~33% más grande que el archivo original).
   const app = await NestFactory.create(AppModule, { bodyParser: false });
-  app.use(json({ limit: '15mb' }));
+  // `verify` guarda el cuerpo CRUDO en `req.rawBody` para reenviar tal cual el
+  // webhook de la pasarela (la firma de Stripe es sobre los bytes originales;
+  // reserializar el JSON la invalidaría).
+  app.use(
+    json({
+      limit: '15mb',
+      verify: (req, _res, buf) => {
+        (req as unknown as { rawBody?: Buffer }).rawBody = buf;
+      },
+    }),
+  );
   app.enableCors();
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),

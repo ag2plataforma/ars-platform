@@ -956,7 +956,8 @@
         "PAGADO": "Pagado",
         "VENCIDO": "Vencido",
         "CANCELADO": "Cancelado"
-      }
+      },
+      "paidDetail": "El cliente ha pagado: el contrato está activo."
     }
   },
   "rateTables": {
@@ -1627,6 +1628,9 @@
       "back": "Volver",
       "success": "Pago correcto",
       "failure": "Pago fallido"
-    }
+    },
+    "processing": "Hemos recibido tu pago y lo estamos confirmando. Puede tardar unos instantes.",
+    "refresh": "Actualizar estado",
+    "cancelledCheckout": "Has cancelado el pago. Puedes intentarlo de nuevo cuando quieras."
   }
 }

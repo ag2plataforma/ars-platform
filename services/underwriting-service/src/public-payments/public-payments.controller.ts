@@ -49,7 +49,8 @@ export class PublicPaymentsController {
   @HttpCode(200)
   async webhook(@Param('provider') provider: string, @Body() body: unknown, @Req() req: Request) {
     if (provider !== this.gateway.codProvider) throw new NotFoundException();
-    const event = await this.gateway.parseWebhook(body, req.headers);
+    const rawBody = (req as Request & { rawBody?: Buffer }).rawBody;
+    const event = await this.gateway.parseWebhook(body, req.headers, rawBody);
     if (!event) return { received: true };
     return { received: true, ...(await this.events.handle(event)) };
   }

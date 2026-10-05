@@ -136,6 +136,13 @@ export class PaymentLinksService {
     return rows.length ? this.withEffectiveStatus(rows[0]) : null;
   }
 
+  /** Relee un enlace por su id (con el estado efectivo, VENCIDO incluido). */
+  async getById(ideLink: string): Promise<PaymentLinkRow | null> {
+    const rows = await this.prisma.$queryRaw<PaymentLinkRow[]>`
+      SELECT ${COLUMNS} FROM ars_platform."TPaymentLink" WHERE "IdePaymentLink" = ${ideLink}::uuid`;
+    return rows.length ? this.withEffectiveStatus(rows[0]) : null;
+  }
+
   /** Busca el enlace por su token; marca VENCIDO si corresponde. Lanza 404 si no existe. */
   async resolveByToken(token: string): Promise<PaymentLinkRow> {
     if (!token || token.length < 20 || token.length > 200) throw new NotFoundException('Enlace no válido');

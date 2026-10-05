@@ -1,9 +1,10 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@ars-platform/database';
 import { StateMachineService } from '@ars-platform/shared-common';
 import { PAYMENT_GATEWAY, PaymentGateway } from '../payments/gateway/payment-gateway';
 import { ACTIVE_LINK_STATUSES, PaymentLinkRow, PaymentLinksService, publicAppUrl } from '../payments/payment-links.service';
 import { PaymentsService } from '../payments/payments.service';
+import { PaymentEventsService } from './payment-events.service';
 
 interface ApplicableConsentRow {
   IdeConsent: string;
@@ -30,16 +31,20 @@ export interface LandingConsent {
  */
 @Injectable()
 export class PaymentLandingService {
+  private readonly logger = new Logger(PaymentLandingService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly stateMachine: StateMachineService,
     private readonly links: PaymentLinksService,
     private readonly payments: PaymentsService,
+    private readonly events: PaymentEventsService,
     @Inject(PAYMENT_GATEWAY) private readonly gateway: PaymentGateway,
   ) {}
 
   async getView(token: string) {
     let link = await this.links.resolveByToken(token);
+    if (this.isActive(link)) link = await this.reconcilePending(link);
     const contract = await this.loadContract(link.IdeContract);
 
     if (link.CodStatus === 'ENVIADO') {
@@ -152,6 +157,36 @@ export class PaymentLandingService {
   }
 
   // ---------------------------------------------------------------------
+
+  /**
+   * Red de seguridad: si hay un pago PENDIENTE de este enlace y la pasarela
+   * sabe consultarlo, se le pregunta su estado real (servidor a servidor) y se
+   * procesa igual que un webhook (mismo camino idempotente). Cubre el webhook
+   * que no llega (desarrollo local sin túnel) o que se retrasa. Un fallo aquí
+   * nunca rompe la landing.
+   */
+  private async reconcilePending(link: PaymentLinkRow): Promise<PaymentLinkRow> {
+    if (!this.gateway.retrieveEvent) return link;
+    try {
+      const pending = await this.prisma.$queryRaw<Array<{ DesExternalId: string }>>`
+        SELECT "DesExternalId" FROM ars_platform."TPayment"
+         WHERE "IdePaymentLink" = ${link.IdePaymentLink}::uuid
+           AND "CodProvider" = ${this.gateway.codProvider} AND "CodStatus" = 'PENDIENTE'
+         ORDER BY "TstCreation" DESC`;
+      let changed = false;
+      for (const row of pending) {
+        const event = await this.gateway.retrieveEvent(row.DesExternalId);
+        if (event) {
+          const result = await this.events.handle(event);
+          changed = changed || result.processed;
+        }
+      }
+      return changed ? ((await this.links.getById(link.IdePaymentLink)) ?? link) : link;
+    } catch (err) {
+      this.logger.warn(`No se pudo reconciliar el enlace ${link.IdePaymentLink}: ${(err as Error).message}`);
+      return link;
+    }
+  }
 
   private isActive(link: PaymentLinkRow): boolean {
     return (ACTIVE_LINK_STATUSES as readonly string[]).includes(link.CodStatus);

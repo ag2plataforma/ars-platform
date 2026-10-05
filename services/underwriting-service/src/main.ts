@@ -13,7 +13,17 @@ async function bootstrap() {
   // porque cada microservicio valida/parsea el body de forma
   // independiente, el límite del gateway no alcanza por sí solo.
   const app = await NestFactory.create(AppModule, { bodyParser: false });
-  app.use(json({ limit: '15mb' }));
+  // `verify` conserva el cuerpo CRUDO en `req.rawBody`: el webhook de Stripe se
+  // firma sobre los bytes exactos recibidos, así que no se puede verificar con
+  // el JSON ya parseado.
+  app.use(
+    json({
+      limit: '15mb',
+      verify: (req, _res, buf) => {
+        (req as unknown as { rawBody?: Buffer }).rawBody = buf;
+      },
+    }),
+  );
   app.enableCors();
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),

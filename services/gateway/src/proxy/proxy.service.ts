@@ -65,8 +65,12 @@ export class ProxyService {
       req.body &&
       typeof req.body === 'object' &&
       Object.keys(req.body).length > 0;
+    // Webhooks de pasarelas de pago: se reenvía el cuerpo CRUDO original (la
+    // firma se calcula sobre esos bytes exactos).
+    const rawBody = (req as Request & { rawBody?: Buffer }).rawBody;
+    const forwardRaw = hasBody && !!rawBody && /\/public\/payments\/webhook\//.test(req.path);
     if (hasBody) {
-      headers['content-type'] = 'application/json';
+      headers['content-type'] = forwardRaw ? (req.headers['content-type'] ?? 'application/json') : 'application/json';
     }
 
     let upstream: Awaited<ReturnType<typeof fetch>>;
@@ -74,7 +78,7 @@ export class ProxyService {
       upstream = await fetch(url, {
         method: req.method,
         headers,
-        body: hasBody ? JSON.stringify(req.body) : undefined,
+        body: forwardRaw ? new Uint8Array(rawBody as Buffer) : hasBody ? JSON.stringify(req.body) : undefined,
       });
     } catch (err) {
       this.logger.error(`No se pudo contactar "${serviceKey}" en ${url}: ${(err as Error).message}`);

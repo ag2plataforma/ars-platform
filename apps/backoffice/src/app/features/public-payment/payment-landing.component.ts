@@ -35,6 +35,8 @@ export class PaymentLandingComponent implements OnInit {
   readonly submitting = signal(false);
   readonly notFound = signal(false);
   readonly errorMessage = signal<string | null>(null);
+  /** `?checkout=success|cancel`: así vuelve la pasarela (Stripe) a la landing. */
+  readonly checkoutResult = signal<'success' | 'cancel' | null>(null);
   readonly view = signal<PublicPaymentView | null>(null);
   /** Consentimientos tildados en pantalla (ideConsent -> bool). */
   readonly checked = signal<Record<string, boolean>>({});
@@ -53,6 +55,8 @@ export class PaymentLandingComponent implements OnInit {
 
   ngOnInit(): void {
     this.token = this.route.snapshot.paramMap.get('token') ?? '';
+    const result = this.route.snapshot.queryParamMap.get('checkout');
+    this.checkoutResult.set(result === 'success' || result === 'cancel' ? result : null);
     this.load();
   }
 

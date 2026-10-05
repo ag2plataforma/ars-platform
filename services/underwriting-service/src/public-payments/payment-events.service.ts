@@ -18,9 +18,11 @@ export type PaymentEventResult =
   | { processed: false; reason: 'UNKNOWN_PAYMENT' | 'ALREADY_PROCESSED' | 'AMOUNT_MISMATCH' | 'CONTRACT_NOT_PENDING' };
 
 /**
- * Procesa los eventos YA NORMALIZADOS de la pasarela (webhook). Es lo ÚNICO
- * que activa un contrato por pago -- nunca el regreso del navegador a la
- * landing -- y es idempotente: la pasarela puede reenviar el mismo evento.
+ * Procesa los eventos YA NORMALIZADOS de la pasarela. Es lo ÚNICO que activa
+ * un contrato por pago, y SOLO con datos verificados contra la pasarela: el
+ * webhook firmado o la consulta servidor a servidor de `reconcilePending`
+ * (nunca lo que diga el navegador). Es idempotente: el mismo evento puede
+ * llegar por los dos caminos o reenviarse.
  */
 @Injectable()
 export class PaymentEventsService {
