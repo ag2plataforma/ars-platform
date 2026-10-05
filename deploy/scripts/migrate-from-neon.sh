@@ -37,12 +37,23 @@ docker compose exec -T postgres pg_dump "$CLEAN_URL" \
   --schema=ars_platform --format=custom --no-owner --no-privileges > "$DUMP"
 ls -lh "$DUMP"
 
-echo ">> Extensiones y restauracion en la VPS..."
-docker compose exec -T postgres psql -U ars -d "$DB" -v ON_ERROR_STOP=1 <<'SQL'
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-DROP SCHEMA IF EXISTS ars_platform CASCADE;
-SQL
+echo ">> Extensiones: se recrean en el MISMO esquema que en el origen"
+# El dump referencia funciones con esquema (p. ej. entity.uuid_generate_v1()),
+# asi que uuid-ossp & co. deben vivir en el mismo esquema que en Neon.
+EXTS="$(docker compose exec -T postgres psql "$CLEAN_URL" -Atc \
+  "select e.extname||'|'||n.nspname from pg_extension e join pg_namespace n on n.oid=e.extnamespace where e.extname<>'plpgsql'")"
+docker compose exec -T postgres psql -U ars -d "$DB" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA IF EXISTS ars_platform CASCADE'
+while IFS='|' read -r EXT SCH; do
+  [ -n "$EXT" ] || continue
+  echo "   $EXT -> esquema $SCH"
+  docker compose exec -T postgres psql -U ars -d "$DB" \
+    -c "CREATE SCHEMA IF NOT EXISTS \"$SCH\"" \
+    -c "DROP EXTENSION IF EXISTS \"$EXT\" CASCADE" \
+    -c "CREATE EXTENSION \"$EXT\" SCHEMA \"$SCH\"" </dev/null \
+    || echo "   AVISO: no se pudo crear la extension $EXT (se ignora si el dump no la usa)"
+done <<< "$EXTS"
+
+echo ">> Restauracion en la VPS..."
 docker compose exec -T postgres pg_restore -U ars -d "$DB" \
   --no-owner --no-privileges --exit-on-error < "$DUMP"
 
