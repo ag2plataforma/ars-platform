@@ -140,6 +140,16 @@
           <input pInputText [formControl]="getExtraControl(field.key)" class="w-full" />
         } @else if (field.type === 'number') {
           <input pInputText type="number" step="1" min="0" [formControl]="getExtraControl(field.key)" class="w-full" />
+        } @else if (field.type === 'boolean') {
+          <p-select
+            appendTo="body"
+            [formControl]="getExtraControl(field.key)"
+            [options]="booleanOptions()"
+            optionLabel="label"
+            optionValue="value"
+            [placeholder]="'catalogs.selectPlaceholder' | transloco"
+            styleClass="w-full"
+          />
         } @else if (field.type === 'textarea') {
           <textarea pTextarea rows="3" [formControl]="getExtraControl(field.key)" class="w-full"></textarea>
         } @else {

@@ -2027,11 +2027,14 @@ export class ContractsService {
     collective = false,
   ) {
     const productValidityType = await tx.sProductValidityType.findFirst({
-      where: { IdeProduct: quote.IdeProduct },
+      where: { IdeProduct: quote.IdeProduct, SState: { CodState: 'ACTIVO' } },
       select: { IdeValidityType: true },
     });
     if (!productValidityType) {
-      throw new NotFoundException(`El producto "${quote.IdeProduct}" no tiene un tipo de vigencia configurado`);
+      const product = await tx.sProduct.findUnique({ where: { IdeProduct: quote.IdeProduct }, select: { CodProduct: true } });
+      throw new NotFoundException(
+        `El producto "${product?.CodProduct ?? quote.IdeProduct}" no tiene un tipo de vigencia activo configurado -- agregalo en Productos > pestaña "Vigencia"`,
+      );
     }
 
     const idePaymentFraction = await this.resolvePaymentFraction(quote.IdeProduct, dto.codPaymentFraction, tx);

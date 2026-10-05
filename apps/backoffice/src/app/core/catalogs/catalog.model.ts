@@ -6,7 +6,7 @@ export interface CatalogRow {
   [key: string]: unknown;
 }
 
-export type CatalogFieldType = 'text' | 'textarea' | 'select' | 'number';
+export type CatalogFieldType = 'text' | 'textarea' | 'select' | 'number' | 'boolean';
 
 /** Campo adicional (más allá de código/descripción) que necesitan algunos
  * catálogos -- hoy solo `SCountry` (código DDI + idioma). El resto de los
@@ -256,6 +256,16 @@ export const PRODUCT_CATALOG_REGISTRY: CatalogConfig[] = [
       { key: 'numFraction', label: 'catalogFields.numFraction', type: 'number', required: true },
       { key: 'numOrder', label: 'catalogFields.numOrder', type: 'number', required: true },
     ],
+  },
+  {
+    key: 'validity-types',
+    label: 'catalogsRegistry.validity-types.label',
+    singular: 'catalogsRegistry.validity-types.singular',
+    path: '/product-rating/validity-types',
+    codField: 'CodValidityType',
+    desField: 'DesValidityType',
+    idField: 'IdeValidityType',
+    extraFields: [{ key: 'indAnnual', label: 'catalogFields.indAnnual', type: 'boolean', required: true }],
   },
   {
     key: 'insurance-areas',

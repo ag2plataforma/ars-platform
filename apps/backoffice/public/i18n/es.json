@@ -200,6 +200,10 @@
     "endorsement-reasons": {
       "label": "Motivos de endoso",
       "singular": "motivo de endoso"
+    },
+    "validity-types": {
+      "label": "Tipos de vigencia",
+      "singular": "tipo de vigencia"
     }
   },
   "catalogFields": {
@@ -215,7 +219,8 @@
     "codChannelType": "Tipo de canal",
     "codClaimType": "Tipo de siniestro",
     "numFraction": "Cantidad de cuotas",
-    "numOrder": "Orden (la menor es la de por defecto)"
+    "numOrder": "Orden (la menor es la de por defecto)",
+    "indAnnual": "¿Vigencia anual?"
   },
   "common": {
     "error": "Error",
@@ -622,7 +627,39 @@
     "collectivePremiumModeLabel": "Modo de prima",
     "collectiveModePerCertificate": "Por certificado (cada asegurado paga su prima)",
     "collectiveModeSingle": "Prima única (próximamente)",
-    "collectiveHelp": "Los productos colectivos se cotizan con una lista de asegurados y generan un certificado por cada uno. Con prima por certificado, el total de la póliza es la suma de las primas individuales."
+    "collectiveHelp": "Los productos colectivos se cotizan con una lista de asegurados y generan un certificado por cada uno. Con prima por certificado, el total de la póliza es la suma de las primas individuales.",
+    "validityTypesTab": "Vigencia",
+    "productValidityTypes": {
+      "subtitle": "Tipo de vigencia del producto. Es obligatorio para poder contratarlo: sin un tipo activo no se puede generar el contrato.",
+      "newButton": "Agregar tipo de vigencia",
+      "missingWarning": "Este producto no tiene ningún tipo de vigencia activo: no se podrá contratar hasta agregar uno.",
+      "loadErrorDetail": "No se pudo cargar el tipo de vigencia del producto.",
+      "typeColumn": "Tipo de vigencia",
+      "annualColumn": "Anual",
+      "emptyState": "Este producto todavía no tiene tipo de vigencia configurado.",
+      "createDialogTitle": "Agregar tipo de vigencia",
+      "typePlaceholder": "Elegí un tipo de vigencia",
+      "noTypesHint": "No hay tipos de vigencia disponibles. Creá uno en Catálogos de producto > Tipos de vigencia.",
+      "createdDetail": "Tipo de vigencia agregado al producto."
+    },
+    "operationsTab": "Operaciones",
+    "productOperations": {
+      "subtitle": "Operaciones habilitadas para este producto. Las base (CONTGENE generación de contrato, RECEGENE generación de recibo, RENOVGENE renovación) son obligatorias para contratar y renovar; las de cada endoso se crean en la pestaña Endosos.",
+      "setupBaseButton": "Configurar operaciones base",
+      "newButton": "Agregar operación",
+      "loadErrorDetail": "No se pudieron cargar las operaciones del producto.",
+      "operationColumn": "Operación",
+      "processColumn": "Proceso",
+      "endorsementColumn": "Endoso",
+      "emptyState": "Este producto no tiene operaciones: usá \"Configurar operaciones base\" para poder contratarlo.",
+      "createDialogTitle": "Agregar operación al producto",
+      "operationPlaceholder": "Elegí una operación",
+      "processPlaceholder": "Elegí un proceso",
+      "createdDetail": "Operación agregada al producto.",
+      "setupCreated": "Se crearon: {{list}}.",
+      "setupExisting": "Ya existían: {{list}}.",
+      "setupSkipped": "No se pudieron crear: {{list}}."
+    }
   },
   "quotes": {
     "backToListButton": "← Volver al listado",

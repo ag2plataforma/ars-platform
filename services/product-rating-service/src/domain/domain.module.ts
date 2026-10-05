@@ -21,6 +21,10 @@ import { ProductEndorsementsController } from './product-endorsements.controller
 import { ProductEndorsementsService } from './product-endorsements.service';
 import { ProductPaymentFractionsController } from './product-payment-fractions.controller';
 import { ProductPaymentFractionsService } from './product-payment-fractions.service';
+import { ProductValidityTypesController } from './product-validity-types.controller';
+import { ProductValidityTypesService } from './product-validity-types.service';
+import { ProductOperationsController } from './product-operations.controller';
+import { ProductOperationsService } from './product-operations.service';
 import { ProductConsentsController } from './product-consents.controller';
 import { ProductConsentsService } from './product-consents.service';
 
@@ -54,6 +58,8 @@ import { ProductConsentsService } from './product-consents.service';
     CoverageGuaranteesController,
     ProductEndorsementsController,
     ProductPaymentFractionsController,
+    ProductValidityTypesController,
+    ProductOperationsController,
     ProductConsentsController,
   ],
   providers: [
@@ -67,6 +73,8 @@ import { ProductConsentsService } from './product-consents.service';
     CoverageGuaranteesService,
     ProductEndorsementsService,
     ProductPaymentFractionsService,
+    ProductValidityTypesService,
+    ProductOperationsService,
     ProductConsentsService,
   ],
 })

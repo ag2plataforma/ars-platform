@@ -1,0 +1,90 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex flex-col gap-4">
+  <div class="flex items-center justify-between gap-4">
+    <p class="text-sm text-slate-500">{{ 'products.productOperations.subtitle' | transloco }}</p>
+    <div class="flex shrink-0 gap-2">
+      <button pButton type="button" icon="pi pi-cog" severity="secondary" [outlined]="true" [label]="'products.productOperations.setupBaseButton' | transloco" [loading]="settingUp()" (click)="setupBase()"></button>
+      <button pButton type="button" icon="pi pi-plus" [label]="'products.productOperations.newButton' | transloco" (click)="openCreate()"></button>
+    </div>
+  </div>
+
+  <p-table [value]="rows()" [loading]="loading()" dataKey="IdeOperationProduct" styleClass="p-datatable-sm">
+    <ng-template #header>
+      <tr>
+        <th>{{ 'products.productOperations.operationColumn' | transloco }}</th>
+        <th>{{ 'products.productOperations.processColumn' | transloco }}</th>
+        <th>{{ 'products.productOperations.endorsementColumn' | transloco }}</th>
+        <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+        <th class="w-24"></th>
+      </tr>
+    </ng-template>
+    <ng-template #body let-row>
+      <tr>
+        <td>{{ operationName(row) }}</td>
+        <td>{{ processName(row) }}</td>
+        <td>{{ endorsementName(row) }}</td>
+        <td>
+          <p-tag [value]="(isActive(row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isActive(row) ? 'success' : 'danger'" />
+        </td>
+        <td>
+          <button
+            pButton
+            type="button"
+            [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'"
+            [text]="true"
+            [severity]="isActive(row) ? 'danger' : 'success'"
+            (click)="toggleState(row)"
+          ></button>
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="5" class="text-center text-slate-500">{{ 'products.productOperations.emptyState' | transloco }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-dialog
+  [header]="'products.productOperations.createDialogTitle' | transloco"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  [style]="{ width: '28rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'products.productOperations.operationColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codOperation"
+        [options]="operations()"
+        optionLabel="DesOperation"
+        optionValue="CodOperation"
+        [filter]="true"
+        [placeholder]="'products.productOperations.operationPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'products.productOperations.processColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codProcess"
+        [options]="processes()"
+        optionLabel="DesProcess"
+        optionValue="CodProcess"
+        [filter]="true"
+        [placeholder]="'products.productOperations.processPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
+    </div>
+  </form>
+</p-dialog>

@@ -181,7 +181,20 @@ export class CatalogsComponent {
       const related = row[field.columnRelation] as Record<string, unknown> | undefined;
       return related ? String(related[field.optionDesField] ?? '') : '';
     }
+    if (field.type === 'boolean') {
+      const value = row[extraRowField(field)];
+      if (value === null || value === undefined) return '';
+      return this.transloco.translate(value ? 'common.yes' : 'common.no');
+    }
     return String(row[extraRowField(field)] ?? '');
+  }
+
+  /** Opciones Sí/No de los campos `boolean` (el formulario maneja strings `'true'`/`'false'`). */
+  booleanOptions(): { value: string; label: string }[] {
+    return [
+      { value: 'true', label: this.transloco.translate('common.yes') },
+      { value: 'false', label: this.transloco.translate('common.no') },
+    ];
   }
 
   /** Nombre de campo (posiblemente con path anidado, ej.
@@ -268,9 +281,12 @@ export class CatalogsComponent {
     const numberKeys = new Set(
       (config.extraFields ?? []).filter((field) => field.type === 'number').map((field) => field.key),
     );
+    const booleanKeys = new Set(
+      (config.extraFields ?? []).filter((field) => field.type === 'boolean').map((field) => field.key),
+    );
     for (const [key, value] of Object.entries(raw.extra)) {
       if (value === '' || value === null || value === undefined) continue;
-      extra[key] = numberKeys.has(key) ? Number(value) : value;
+      extra[key] = numberKeys.has(key) ? Number(value) : booleanKeys.has(key) ? value === 'true' : value;
     }
 
     if (this.dialogMode() === 'create') {

@@ -957,7 +957,7 @@ export class QuotesService {
     }
 
     const productValidityType = await this.prisma.sProductValidityType.findFirst({
-      where: { IdeProduct: quote.IdeProduct },
+      where: { IdeProduct: quote.IdeProduct, SState: { CodState: 'ACTIVO' } },
       include: { SValidityType: true },
     });
     const indAnnual = productValidityType?.SValidityType.IndAnnual ?? false;

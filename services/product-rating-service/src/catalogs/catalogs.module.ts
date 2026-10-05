@@ -21,6 +21,8 @@ import { AdjustmentsController } from './adjustments.controller';
 import { AdjustmentsService } from './adjustments.service';
 import { PaymentFractionsController } from './payment-fractions.controller';
 import { PaymentFractionsService } from './payment-fractions.service';
+import { ValidityTypesController } from './validity-types.controller';
+import { ValidityTypesService } from './validity-types.service';
 
 /**
  * Los 8 catálogos "simples" necesarios para poder configurar
@@ -50,6 +52,7 @@ import { PaymentFractionsService } from './payment-fractions.service';
     LimitTypesController,
     AdjustmentsController,
     PaymentFractionsController,
+    ValidityTypesController,
   ],
   providers: [
     RiskLevelsService,
@@ -62,6 +65,7 @@ import { PaymentFractionsService } from './payment-fractions.service';
     LimitTypesService,
     AdjustmentsService,
     PaymentFractionsService,
+    ValidityTypesService,
   ],
 })
 export class CatalogsModule {}
