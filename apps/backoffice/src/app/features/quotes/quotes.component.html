@@ -535,6 +535,12 @@
                   ></button>
                 }
                 <input type="file" class="text-sm" (change)="onRequirementFileSelected(row, $event)" />
+                @if (row.DesFileName && row.SProductRequirement.IndApplyOCR) {
+                  <button pButton type="button" size="small" severity="help" [outlined]="true" icon="pi pi-sparkles" [label]="'requirements.extraction.extractButton' | transloco" (click)="openExtraction(row, false)"></button>
+                }
+                @if (hasExtraction(row)) {
+                  <button pButton type="button" size="small" severity="secondary" [text]="true" icon="pi pi-list" [label]="'requirements.extraction.viewButton' | transloco" (click)="openExtraction(row, true)"></button>
+                }
               </div>
             </div>
           }
@@ -707,3 +713,9 @@
     </div>
   }
 }
+
+<app-requirement-extraction-dialog
+  [target]="extractionTarget()"
+  (closed)="extractionTarget.set(null)"
+  (saved)="onExtractionSaved($event)"
+/>

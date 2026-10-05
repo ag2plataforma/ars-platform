@@ -1,4 +1,4 @@
-import { IsBoolean, IsInt, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 /**
  * Ver el doc-comment de `ProductRequirementService` para el análisis
@@ -88,6 +88,16 @@ export class CreateProductRequirementDto {
   /** Reservado para Etapa 2 (OCR real) -- se guarda pero no dispara ninguna ejecución todavía. */
   @IsBoolean()
   indApplyOCR!: boolean;
+
+  /**
+   * Pista (texto libre) de qué datos debe buscar la IA en el documento de este
+   * requisito, p. ej. "nombre, número de documento, fecha de nacimiento".
+   * Solo se usa en la extracción con IA (Fase 4) y si `indApplyOCR` está activo.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  desExtractionHint?: string;
 
   @IsOptional()
   @IsInt()

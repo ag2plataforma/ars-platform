@@ -1,9 +1,11 @@
-import { Body, Controller, Get, Param, Patch, Res } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { CurrentUser, JwtPayload } from '@ars-platform/shared-common';
 import { RequirementsService } from './requirements.service';
 import { SetQuoteRequirementDeliveredDto } from './dto/set-quote-requirement-delivered.dto';
 import { UploadRequirementFileDto } from './dto/upload-requirement-file.dto';
+import { ConfirmExtractionDto } from './dto/confirm-extraction.dto';
+import { RequirementExtractionService } from './requirement-extraction.service';
 
 /**
  * Endpoints del checklist de Requisitos consumidos por el nuevo paso del
@@ -14,7 +16,26 @@ import { UploadRequirementFileDto } from './dto/upload-requirement-file.dto';
  */
 @Controller('quotes/:ideQuote/requirements')
 export class RequirementsController {
-  constructor(private readonly service: RequirementsService) {}
+  constructor(
+    private readonly service: RequirementsService,
+    private readonly extraction: RequirementExtractionService,
+  ) {}
+
+  /** IA (Fase 4): propone los datos del documento; NO guarda nada hasta `PATCH :id/extraction`. */
+  @Post(':ideQuoteRequirement/extract')
+  extract(@Param('ideQuoteRequirement') id: string, @CurrentUser() actor: JwtPayload) {
+    return this.extraction.extract('QUOTE', id, actor.code);
+  }
+
+  /** Guarda los datos ya revisados por el operador en `Data.extraction`. */
+  @Patch(':ideQuoteRequirement/extraction')
+  confirmExtraction(
+    @Param('ideQuoteRequirement') id: string,
+    @Body() dto: ConfirmExtractionDto,
+    @CurrentUser() actor: JwtPayload,
+  ) {
+    return this.extraction.confirm('QUOTE', id, dto, actor.code);
+  }
 
   @Get()
   list(@Param('ideQuote') ideQuote: string, @CurrentUser() actor: JwtPayload) {

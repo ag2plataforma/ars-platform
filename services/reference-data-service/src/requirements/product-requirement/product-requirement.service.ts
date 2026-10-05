@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, PrismaService, SProductRequirement } from '@ars-platform/database';
 import { StateMachineService } from '@ars-platform/shared-common';
 import { CreateProductRequirementDto } from './dto/create-product-requirement.dto';
@@ -61,11 +61,44 @@ export class ProductRequirementService {
     private readonly stateMachine: StateMachineService,
   ) {}
 
-  findAll(codProduct?: string, codProcess?: string): Promise<SProductRequirement[]> {
+  private readonly logger = new Logger(ProductRequirementService.name);
+
+  async findAll(codProduct?: string, codProcess?: string): Promise<SProductRequirement[]> {
     const where: Prisma.SProductRequirementWhereInput = {};
     if (codProduct) where.SProduct = { CodProduct: codProduct };
     if (codProcess) where.SProcess = { CodProcess: codProcess };
-    return this.prisma.sProductRequirement.findMany({ where, include: INCLUDE, orderBy: { Order: 'asc' } });
+    return this.withHints(await this.prisma.sProductRequirement.findMany({ where, include: INCLUDE, orderBy: { Order: 'asc' } }));
+  }
+
+  /**
+   * `DesExtractionHint` (pista para la extracción con IA, ver
+   * `setup-ai-extraction.js`) se lee/escribe con SQL crudo hasta regenerar el
+   * cliente de Prisma (`db:pull`/`db:generate`). Si la columna aún no existe
+   * (script sin correr) la pantalla sigue funcionando, solo sin pista.
+   */
+  private async withHints<T extends { IdeProductRequirement: string }>(
+    rows: T[],
+  ): Promise<Array<T & { DesExtractionHint: string | null }>> {
+    const hints = new Map<string, string | null>();
+    if (rows.length > 0) {
+      try {
+        const found = await this.prisma.$queryRaw<Array<{ IdeProductRequirement: string; DesExtractionHint: string | null }>>`
+          SELECT "IdeProductRequirement", "DesExtractionHint" FROM ars_platform."SProductRequirement"
+           WHERE "IdeProductRequirement" IN (${Prisma.join(rows.map((r) => Prisma.sql`${r.IdeProductRequirement}::uuid`))})`;
+        for (const f of found) hints.set(f.IdeProductRequirement, f.DesExtractionHint);
+      } catch (err) {
+        this.logger.warn(`No se pudo leer DesExtractionHint (¿falta correr setup-ai-extraction.js?): ${(err as Error).message}`);
+      }
+    }
+    return rows.map((r) => ({ ...r, DesExtractionHint: hints.get(r.IdeProductRequirement) ?? null }));
+  }
+
+  private async saveHint(id: string, hint: string | undefined): Promise<void> {
+    if (hint === undefined) return;
+    await this.prisma.$executeRaw`
+      UPDATE ars_platform."SProductRequirement"
+         SET "DesExtractionHint" = ${hint.trim() || null}
+       WHERE "IdeProductRequirement" = ${id}::uuid`;
   }
 
   async findOne(id: string): Promise<SProductRequirement> {
@@ -76,7 +109,7 @@ export class ProductRequirementService {
     if (!row) {
       throw new NotFoundException(`No existe requisito de producto con id "${id}"`);
     }
-    return row;
+    return (await this.withHints([row]))[0];
   }
 
   async create(dto: CreateProductRequirementDto, actor: string): Promise<SProductRequirement> {
@@ -113,7 +146,7 @@ export class ProductRequirementService {
 
     const activeStateId = await this.stateMachine.getStateByCode('ACTIVO');
     const now = new Date();
-    return this.prisma.sProductRequirement.create({
+    const created = await this.prisma.sProductRequirement.create({
       data: {
         IdeProcess: ideProcess,
         IdeOperation: ideOperation,
@@ -140,6 +173,8 @@ export class ProductRequirementService {
       },
       include: INCLUDE,
     });
+    await this.saveHint(created.IdeProductRequirement, dto.desExtractionHint);
+    return (await this.withHints([created]))[0];
   }
 
   async update(id: string, dto: UpdateProductRequirementDto, actor: string): Promise<SProductRequirement> {
@@ -178,17 +213,23 @@ export class ProductRequirementService {
     if (dto.indApplyOCR !== undefined) data.IndApplyOCR = dto.indApplyOCR;
     if (dto.order !== undefined) data.Order = dto.order;
 
-    return this.prisma.sProductRequirement.update({ where: { IdeProductRequirement: id }, data, include: INCLUDE });
+    const updated = await this.prisma.sProductRequirement.update({ where: { IdeProductRequirement: id }, data, include: INCLUDE });
+    await this.saveHint(id, dto.desExtractionHint);
+    return (await this.withHints([updated]))[0];
   }
 
   async setState(id: string, codState: string, actor: string): Promise<SProductRequirement> {
     await this.findOne(id);
     const stateId = await this.stateMachine.getStateByCode(codState);
-    return this.prisma.sProductRequirement.update({
-      where: { IdeProductRequirement: id },
-      data: { IdeState: stateId, UsrModification: actor, TstModification: new Date() },
-      include: INCLUDE,
-    });
+    return (
+      await this.withHints([
+        await this.prisma.sProductRequirement.update({
+          where: { IdeProductRequirement: id },
+          data: { IdeState: stateId, UsrModification: actor, TstModification: new Date() },
+          include: INCLUDE,
+        }),
+      ])
+    )[0];
   }
 
   private async resolveProcess(codProcess: string): Promise<string> {

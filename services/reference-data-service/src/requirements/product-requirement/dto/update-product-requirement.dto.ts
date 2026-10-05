@@ -1,4 +1,4 @@
-import { IsBoolean, IsInt, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class UpdateProductRequirementDto {
   @IsOptional()
@@ -65,6 +65,16 @@ export class UpdateProductRequirementDto {
   @IsOptional()
   @IsBoolean()
   indApplyOCR?: boolean;
+
+  /**
+   * Pista (texto libre) de qué datos debe buscar la IA en el documento de este
+   * requisito, p. ej. "nombre, número de documento, fecha de nacimiento".
+   * Solo se usa en la extracción con IA (Fase 4) y si `indApplyOCR` está activo.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  desExtractionHint?: string;
 
   @IsOptional()
   @IsInt()

@@ -1175,7 +1175,7 @@
       "coveragePlanHint": "Solo se puede elegir una cobertura específica cuando el riesgo y el plan están fijados (no en \"cualquiera\").",
       "reviewableLabel": "Revisable",
       "applyOcrLabel": "Aplicar OCR",
-      "applyOcrHint": "Reservado para una etapa futura -- por ahora se guarda pero no ejecuta ningún reconocimiento automático (ya se puede subir el archivo real del requisito, pero todavía no se procesa con OCR).",
+      "applyOcrHint": "Habilita el botón \"Extraer datos con IA\" sobre el archivo que se suba para este requisito (PDF o imagen). La IA solo propone: una persona revisa y confirma.",
       "requirementTypeLabel": "Tipo de requisito",
       "documentTypeLabel": "Tipo de documento",
       "orderLabel": "Orden",
@@ -1185,7 +1185,10 @@
       "processSelectPlaceholder": "Selecciona un proceso",
       "productSelectPlaceholder": "Selecciona un producto",
       "requirementSelectPlaceholder": "Selecciona un requisito",
-      "loadErrorDetail": "No se pudieron cargar los requisitos."
+      "loadErrorDetail": "No se pudieron cargar los requisitos.",
+      "extractionHintLabel": "Datos a extraer (pista para la IA, opcional)",
+      "extractionHintPlaceholder": "Ej.: nombre completo, número de documento, fecha de nacimiento",
+      "extractionHintHelp": "Si lo dejas vacío, la IA elige los datos clave del documento."
     },
     "wizardStep": {
       "title": "Requisitos",
@@ -1198,6 +1201,26 @@
       "updateErrorDetail": "No se pudo actualizar el requisito.",
       "deliveredTag": "Entregado",
       "pendingTag": "Pendiente"
+    },
+    "extraction": {
+      "title": "Datos del documento",
+      "analyzing": "Analizando el documento con IA...",
+      "aiWarning": "Propuesta de la IA: revisa y corrige los datos antes de confirmar. Puede contener errores.",
+      "storedInfo": "Datos confirmados por {{user}} el {{date}}.",
+      "noFields": "No hay datos para mostrar.",
+      "notes": "Observaciones de la IA: {{notes}}",
+      "confidence": {
+        "ALTA": "Confianza alta",
+        "MEDIA": "Confianza media",
+        "BAJA": "Confianza baja"
+      },
+      "confirm": "Confirmar y guardar",
+      "saveChanges": "Guardar cambios",
+      "reExtract": "Volver a extraer con IA",
+      "close": "Cerrar",
+      "savedDetail": "Datos del documento guardados.",
+      "extractButton": "Extraer datos con IA",
+      "viewButton": "Datos extraídos"
     }
   },
   "claims": {

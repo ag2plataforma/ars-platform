@@ -1,0 +1,82 @@
+<p-dialog
+  [header]="'requirements.extraction.title' | transloco"
+  [visible]="!!target()"
+  (visibleChange)="!$event && close()"
+  [modal]="true"
+  appendTo="body"
+  [style]="{ width: '42rem' }"
+  [breakpoints]="{ '960px': '95vw' }"
+>
+  @if (target(); as t) {
+    <div class="flex flex-col gap-4">
+      <p class="text-sm text-slate-600">
+        <span class="font-medium text-slate-800">{{ t.name }}</span>
+        @if (documentType()) { <span> · {{ documentType() }}</span> }
+      </p>
+
+      @if (loading()) {
+        <div class="flex items-center gap-3 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
+          <i class="pi pi-spin pi-spinner"></i>
+          {{ 'requirements.extraction.analyzing' | transloco }}
+        </div>
+      } @else {
+        @if (showingStored() && storedInfo(); as info) {
+          <p class="text-xs text-slate-500">
+            {{ 'requirements.extraction.storedInfo' | transloco: { user: info.usrConfirmed, date: (info.tstConfirmed | date: 'dd/MM/yyyy HH:mm') } }}
+          </p>
+        } @else if (fields().length > 0 || notes()) {
+          <p-message severity="warn">{{ 'requirements.extraction.aiWarning' | transloco }}</p-message>
+        }
+
+        @if (errorMessage()) {
+          <p-message severity="error">{{ errorMessage() }}</p-message>
+        }
+
+        @if (fields().length === 0 && !errorMessage()) {
+          <p class="text-sm text-slate-500">{{ 'requirements.extraction.noFields' | transloco }}</p>
+        }
+
+        @if (fields().length > 0) {
+          <div class="flex max-h-[50vh] flex-col gap-3 overflow-y-auto pr-1">
+            @for (f of fields(); track f.key; let i = $index) {
+              <div class="flex items-end gap-2">
+                <div class="flex min-w-0 flex-1 flex-col gap-1">
+                  <label class="flex items-center gap-2 text-xs font-medium text-slate-600">
+                    {{ f.label }}
+                    @if (f.confidence) {
+                      <p-tag
+                        [value]="'requirements.extraction.confidence.' + f.confidence | transloco"
+                        [severity]="f.confidence === 'ALTA' ? 'success' : f.confidence === 'MEDIA' ? 'warn' : 'danger'"
+                      />
+                    }
+                  </label>
+                  <input pInputText class="w-full" [ngModel]="f.value" (ngModelChange)="setValue(i, $event)" [name]="'f-' + f.key" />
+                </div>
+                <button pButton type="button" icon="pi pi-trash" [text]="true" severity="danger" (click)="removeField(i)"></button>
+              </div>
+            }
+          </div>
+        }
+
+        @if (notes()) {
+          <p class="text-xs text-slate-500">{{ 'requirements.extraction.notes' | transloco: { notes: notes() } }}</p>
+        }
+      }
+
+      <div class="flex flex-wrap justify-end gap-2">
+        @if (showingStored()) {
+          <button pButton type="button" severity="secondary" [outlined]="true" icon="pi pi-sparkles" [label]="'requirements.extraction.reExtract' | transloco" (click)="reExtract()"></button>
+        }
+        <button pButton type="button" severity="secondary" [text]="true" [label]="'requirements.extraction.close' | transloco" (click)="close()"></button>
+        <button
+          pButton
+          type="button"
+          [label]="(showingStored() ? 'requirements.extraction.saveChanges' : 'requirements.extraction.confirm') | transloco"
+          [disabled]="loading() || (fields().length === 0 && !showingStored())"
+          [loading]="saving()"
+          (click)="confirm()"
+        ></button>
+      </div>
+    </div>
+  }
+</p-dialog>

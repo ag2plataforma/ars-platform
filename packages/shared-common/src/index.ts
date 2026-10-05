@@ -27,3 +27,5 @@ export * from './social-impact/social-impact.module';
 export * from './social-impact/social-impact-config.interface';
 export * from './process-flow/process-flow.module';
 export * from './process-flow/process-flow.interface';
+export * from './ai/ai-provider.interface';
+export * from './ai/ai.module';

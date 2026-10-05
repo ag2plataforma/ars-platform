@@ -262,6 +262,8 @@ export interface ContractRequirement {
     DesShort: string | null;
     DesLarge: string | null;
     IndMandatory: boolean;
+    /** Habilita "Extraer datos con IA" sobre el archivo (Fase 4). */
+    IndApplyOCR: boolean;
     SRequirement: { CodRequirement: string; DesRequirement: string };
   };
 }

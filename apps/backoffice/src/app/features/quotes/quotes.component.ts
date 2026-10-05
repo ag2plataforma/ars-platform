@@ -13,6 +13,12 @@ import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import {
+  ExtractionTarget,
+  RequirementExtractionDialogComponent,
+  StoredExtraction,
+  storedExtractionOf,
+} from '../requirements/requirement-extraction-dialog.component';
 import { CatalogService } from '../../core/catalogs/catalog.service';
 import { CatalogRow } from '../../core/catalogs/catalog.model';
 import {
@@ -169,6 +175,7 @@ type RiskFieldsState = ReturnType<typeof buildRiskFieldsState>;
     CommonModule,
     FormsModule,
     ReactiveFormsModule,
+    RequirementExtractionDialogComponent,
     ButtonModule,
     CheckboxModule,
     InputTextModule,
@@ -957,6 +964,45 @@ export class QuotesComponent {
         });
       },
     );
+  }
+
+  // --- Extracción de datos del documento con IA (Fase 4) ---
+
+  readonly extractionTarget = signal<ExtractionTarget | null>(null);
+
+  hasExtraction(row: QuoteRequirementRow): boolean {
+    return storedExtractionOf(row.Data) !== null;
+  }
+
+  openExtraction(row: QuoteRequirementRow, viewStored: boolean): void {
+    if (!this.ideQuote) return;
+    this.extractionTarget.set({
+      kind: 'QUOTE',
+      id: row.IdeQuoteRequirement,
+      ideQuote: this.ideQuote,
+      name: row.SProductRequirement.DesShort ?? row.SProductRequirement.SRequirement.DesRequirement,
+      stored: viewStored ? storedExtractionOf(row.Data) : null,
+    });
+  }
+
+  onExtractionSaved(extraction: StoredExtraction | null): void {
+    const target = this.extractionTarget();
+    this.extractionTarget.set(null);
+    if (!target) return;
+    this.requirementRows.set(
+      this.requirementRows().map((r) => {
+        if (r.IdeQuoteRequirement !== target.id) return r;
+        const data = { ...(r.Data ?? {}) } as Record<string, unknown>;
+        if (extraction) data['extraction'] = extraction;
+        else delete data['extraction'];
+        return { ...r, Data: data as QuoteRequirementRow['Data'] };
+      }),
+    );
+    this.messages.add({
+      severity: 'success',
+      summary: this.transloco.translate('common.done'),
+      detail: this.transloco.translate('requirements.extraction.savedDetail'),
+    });
   }
 
   downloadRequirementFile(row: QuoteRequirementRow): void {

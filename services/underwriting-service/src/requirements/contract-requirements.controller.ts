@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Param, Patch, Res } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { CurrentUser, JwtPayload } from '@ars-platform/shared-common';
 import { RequirementsService } from './requirements.service';
 import { UploadRequirementFileDto } from './dto/upload-requirement-file.dto';
+import { ConfirmExtractionDto } from './dto/confirm-extraction.dto';
+import { RequirementExtractionService } from './requirement-extraction.service';
 
 /**
  * Subida/descarga del archivo real de un `TContractRequirement` --
@@ -16,7 +18,26 @@ import { UploadRequirementFileDto } from './dto/upload-requirement-file.dto';
  */
 @Controller('contract-requirements')
 export class ContractRequirementsController {
-  constructor(private readonly service: RequirementsService) {}
+  constructor(
+    private readonly service: RequirementsService,
+    private readonly extraction: RequirementExtractionService,
+  ) {}
+
+  /** IA (Fase 4): propone los datos del documento; NO guarda nada hasta `PATCH :id/extraction`. */
+  @Post(':ideContractRequirement/extract')
+  extract(@Param('ideContractRequirement') id: string, @CurrentUser() actor: JwtPayload) {
+    return this.extraction.extract('CONTRACT', id, actor.code);
+  }
+
+  /** Guarda los datos ya revisados por el operador en `Data.extraction`. */
+  @Patch(':ideContractRequirement/extraction')
+  confirmExtraction(
+    @Param('ideContractRequirement') id: string,
+    @Body() dto: ConfirmExtractionDto,
+    @CurrentUser() actor: JwtPayload,
+  ) {
+    return this.extraction.confirm('CONTRACT', id, dto, actor.code);
+  }
 
   @Patch(':ideContractRequirement/file')
   uploadFile(

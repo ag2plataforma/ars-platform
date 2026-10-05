@@ -119,6 +119,7 @@ export class ProductRequirementsComponent {
       codRequirementType: ['DOCUMENTO', Validators.required],
       codDocumentType: ['PDF', Validators.required],
       indApplyOCR: [false],
+      desExtractionHint: [''],
       order: [null as number | null],
     });
   }
@@ -256,6 +257,7 @@ export class ProductRequirementsComponent {
       codRequirementType: String(row['CodRequirementType'] ?? ''),
       codDocumentType: String(row['CodDocumentType'] ?? ''),
       indApplyOCR: Boolean(row['IndApplyOCR']),
+      desExtractionHint: String(row['DesExtractionHint'] ?? ''),
       order: (row['Order'] as number | null) ?? null,
     });
     if (row['IdeCoveragePlan']) {
@@ -291,6 +293,8 @@ export class ProductRequirementsComponent {
       codRequirementType: raw.codRequirementType,
       codDocumentType: raw.codDocumentType,
       indApplyOCR: raw.indApplyOCR,
+      // Se envía siempre (aunque vacío) para poder borrar la pista.
+      desExtractionHint: (raw.desExtractionHint ?? '').trim(),
       order: raw.order ?? undefined,
     };
 

@@ -271,12 +271,14 @@ export interface QuotePerson {
  * ahí y no en `IdeState`). */
 export interface QuoteRequirementRow {
   IdeQuoteRequirement: string;
-  Data: { indDelivered: boolean; usrDelivered: string; tstDelivered: string } | null;
+  Data: { indDelivered: boolean; usrDelivered: string; tstDelivered: string; extraction?: unknown } | null;
   /** Nombre del archivo subido (Etapa 2, ver docs/02-roadmap.md ítem 4) --
    *  `null` significa que todavía no se subió nada para este requisito. */
   DesFileName: string | null;
   SProductRequirement: {
     IndMandatory: boolean;
+    /** Habilita "Extraer datos con IA" sobre el archivo (Fase 4). */
+    IndApplyOCR: boolean;
     DesShort: string | null;
     SRequirement: { CodRequirement: string; DesRequirement: string };
   };

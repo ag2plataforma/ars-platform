@@ -196,6 +196,13 @@
       <label for="pr-ocr" class="text-sm text-slate-700">{{ 'requirements.assignments.applyOcrLabel' | transloco }}</label>
     </div>
     <p class="-mt-2 text-xs text-slate-500">{{ 'requirements.assignments.applyOcrHint' | transloco }}</p>
+    @if (form.value.indApplyOCR) {
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'requirements.assignments.extractionHintLabel' | transloco }}</label>
+        <textarea pTextarea formControlName="desExtractionHint" rows="2" maxlength="500" class="w-full" [placeholder]="'requirements.assignments.extractionHintPlaceholder' | transloco"></textarea>
+        <p class="text-xs text-slate-500">{{ 'requirements.assignments.extractionHintHelp' | transloco }}</p>
+      </div>
+    }
 
     <div class="flex gap-4">
       <div class="flex flex-1 flex-col gap-2">

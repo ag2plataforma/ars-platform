@@ -3,6 +3,7 @@ import { UnderwritingStateMachineModule } from '../state-machine/underwriting-st
 import { RequirementsController } from './requirements.controller';
 import { ContractRequirementsController } from './contract-requirements.controller';
 import { RequirementsService } from './requirements.service';
+import { RequirementExtractionService } from './requirement-extraction.service';
 
 /**
  * Ver el doc-comment de `RequirementsService`. Exporta el servicio para
@@ -14,7 +15,7 @@ import { RequirementsService } from './requirements.service';
 @Module({
   imports: [UnderwritingStateMachineModule],
   controllers: [RequirementsController, ContractRequirementsController],
-  providers: [RequirementsService],
+  providers: [RequirementsService, RequirementExtractionService],
   exports: [RequirementsService],
 })
 export class RequirementsModule {}

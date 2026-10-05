@@ -21,6 +21,12 @@ import { MOBILE_PHONE_CONTACT_CLASS, PersonDetail, PersonsService } from '../../
 import { CatalogService } from '../../core/catalogs/catalog.service';
 import { CatalogRow } from '../../core/catalogs/catalog.model';
 import {
+  ExtractionTarget,
+  RequirementExtractionDialogComponent,
+  StoredExtraction,
+  storedExtractionOf,
+} from '../requirements/requirement-extraction-dialog.component';
+import {
   ActivateContractBody,
   ContractCoverage,
   ContractDetail,
@@ -156,6 +162,7 @@ interface RequirementRow {
     CommonModule,
     ReactiveFormsModule,
     FormsModule,
+    RequirementExtractionDialogComponent,
     ButtonModule,
     CheckboxModule,
     DialogModule,
@@ -587,6 +594,49 @@ export class ContractDetailComponent implements OnInit {
         });
       },
     );
+  }
+
+  // --- Extracción de datos del documento con IA (Fase 4) ---
+
+  readonly extractionTarget = signal<ExtractionTarget | null>(null);
+
+  hasExtraction(row: RequirementRow): boolean {
+    return storedExtractionOf(row.requirement.Data) !== null;
+  }
+
+  openExtraction(row: RequirementRow, viewStored: boolean): void {
+    const stored = viewStored ? storedExtractionOf(row.requirement.Data) : null;
+    this.extractionTarget.set({
+      kind: 'CONTRACT',
+      id: row.requirement.IdeContractRequirement,
+      name: row.requirement.SProductRequirement.DesShort ?? row.requirement.SProductRequirement.SRequirement.DesRequirement,
+      stored,
+    });
+  }
+
+  onExtractionSaved(extraction: StoredExtraction | null): void {
+    const target = this.extractionTarget();
+    this.extractionTarget.set(null);
+    const current = this.contract();
+    if (!target || !current) return;
+    // Actualiza solo `Data.extraction` del requisito en memoria (sin recargar todo el contrato).
+    for (const file of current.TContractFile) {
+      for (const risk of file.TFileRisk) {
+        for (const req of risk.TContractRequirement) {
+          if (req.IdeContractRequirement !== target.id) continue;
+          const data = { ...((req.Data as Record<string, unknown> | null) ?? {}) };
+          if (extraction) data['extraction'] = extraction;
+          else delete data['extraction'];
+          req.Data = data;
+        }
+      }
+    }
+    this.contract.set({ ...current });
+    this.messages.add({
+      severity: 'success',
+      summary: this.transloco.translate('common.done'),
+      detail: this.transloco.translate('requirements.extraction.savedDetail'),
+    });
   }
 
   downloadRequirementFile(row: RequirementRow): void {

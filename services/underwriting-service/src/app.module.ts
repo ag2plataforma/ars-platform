@@ -3,7 +3,7 @@ import { join } from 'path';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from '@ars-platform/database';
-import { AuthModule, EmailModule } from '@ars-platform/shared-common';
+import { AiModule, AuthModule, EmailModule } from '@ars-platform/shared-common';
 import { HealthController } from './health/health.controller';
 import { QuotingModule } from './quoting/quoting.module';
 import { ContractsModule } from './contracts/contracts.module';
@@ -37,6 +37,7 @@ import { PublicPaymentsModule } from './public-payments/public-payments.module';
     ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule, // guard JWT global — mismo JWT_SECRET que iam-service, este servicio solo VERIFICA tokens
+    AiModule, // AI_PROVIDER (Fase 4: extracción de datos de documentos, ver RequirementExtractionService)
     EmailModule, // EMAIL_SENDER (Brevo) -- el aviso de renovación ya no lo usa (va por la cola de documents-service); se deja disponible para otros envíos
     QuotingModule,
     ContractsModule,
