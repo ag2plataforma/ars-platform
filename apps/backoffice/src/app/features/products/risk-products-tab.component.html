@@ -31,7 +31,7 @@
         <th>{{ 'products.riskProducts.riskTypeColumn' | transloco }}</th>
         <th>{{ 'products.riskProducts.validityColumn' | transloco }}</th>
         <th>{{ 'catalogs.stateColumn' | transloco }}</th>
-        <th class="w-32">{{ 'catalogs.actionsColumn' | transloco }}</th>
+        <th class="w-40">{{ 'catalogs.actionsColumn' | transloco }}</th>
       </tr>
     </ng-template>
     <ng-template #body let-row>
@@ -45,6 +45,7 @@
         </td>
         <td>
           <div class="flex gap-1">
+            <button pButton type="button" icon="pi pi-list" [text]="true" severity="info" [attr.title]="'products.riskFields.openButton' | transloco" (click)="openFields(row)"></button>
             <button pButton type="button" icon="pi pi-pencil" [text]="true" severity="secondary" (click)="openEdit(row)"></button>
             <button
               pButton
@@ -127,3 +128,5 @@
     </div>
   </form>
 </p-dialog>
+
+<app-risk-fields-dialog [ideRiskProduct]="fieldsRiskId()" [riskLabel]="fieldsRiskLabel()" [(visible)]="fieldsDialogVisible" />

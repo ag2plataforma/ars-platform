@@ -15,6 +15,7 @@ import { MessageService, ConfirmationService } from 'primeng/api';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { CatalogService } from '../../core/catalogs/catalog.service';
 import { CatalogRow } from '../../core/catalogs/catalog.model';
+import { RiskFieldsDialogComponent } from './risk-fields-dialog.component';
 
 const PATH = '/product-rating/risk-products';
 const RISKS_PATH = '/product-rating/risks';
@@ -42,6 +43,7 @@ const RISK_TYPES_PATH = '/product-rating/risk-types';
     ToastModule,
     ConfirmDialogModule,
     TranslocoPipe,
+    RiskFieldsDialogComponent,
   ],
   providers: [MessageService, ConfirmationService],
   templateUrl: './risk-products-tab.component.html',
@@ -54,6 +56,17 @@ export class RiskProductsTabComponent {
   private readonly messages = inject(MessageService);
   private readonly confirm = inject(ConfirmationService);
   private readonly transloco = inject(TranslocoService);
+
+  readonly fieldsDialogVisible = signal(false);
+  readonly fieldsRiskId = signal<string | null>(null);
+  readonly fieldsRiskLabel = signal('');
+
+  /** Abre el diálogo de campos personalizados del tipo de riesgo elegido. */
+  openFields(row: CatalogRow): void {
+    this.fieldsRiskId.set(String(row['IdeRiskProduct']));
+    this.fieldsRiskLabel.set(this.riskName(row));
+    this.fieldsDialogVisible.set(true);
+  }
 
   readonly rows = signal<CatalogRow[]>([]);
   readonly loading = signal(false);

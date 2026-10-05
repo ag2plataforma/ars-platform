@@ -18,6 +18,8 @@ import { FlowStepsController } from './flow-steps/flow-steps.controller';
 import { FlowStepsService } from './flow-steps/flow-steps.service';
 import { ProductProcessFlowsController } from './product-process-flows/product-process-flows.controller';
 import { ProductProcessFlowsService } from './product-process-flows/product-process-flows.service';
+import { RiskFieldsController } from './risk-fields/risk-fields.controller';
+import { RiskFieldsService } from './risk-fields/risk-fields.service';
 
 /**
  * Motor de atributos personalizables + flujo configurable de cotización,
@@ -56,6 +58,7 @@ import { ProductProcessFlowsService } from './product-process-flows/product-proc
     AttributePropertiesController,
     FlowStepsController,
     ProductProcessFlowsController,
+    RiskFieldsController,
   ],
   providers: [
     EntitiesService,
@@ -67,6 +70,7 @@ import { ProductProcessFlowsService } from './product-process-flows/product-proc
     AttributePropertiesService,
     FlowStepsService,
     ProductProcessFlowsService,
+    RiskFieldsService,
   ],
 })
 export class AttributeEngineModule {}
