@@ -6,6 +6,7 @@ import { UnderwritingProcessFlowModule } from '../process-flow/underwriting-proc
 import { RequirementsModule } from '../requirements/requirements.module';
 import { QuotesController } from './quotes.controller';
 import { QuotesService } from './quotes.service';
+import { CollectiveQuotesService } from './collective-quotes.service';
 
 /**
  * Fase 1 del motor de cotización real (`FQuote`/`FQuoteRiskPlan`/
@@ -23,7 +24,7 @@ import { QuotesService } from './quotes.service';
     RequirementsModule,
   ],
   controllers: [QuotesController],
-  providers: [QuotesService],
-  exports: [QuotesService],
+  providers: [QuotesService, CollectiveQuotesService],
+  exports: [QuotesService, CollectiveQuotesService],
 })
 export class QuotingModule {}

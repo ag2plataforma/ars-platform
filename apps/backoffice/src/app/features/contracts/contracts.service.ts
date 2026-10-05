@@ -3,6 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { fileToBase64 } from '../../core/files/file.util';
+import { CollectiveInsuredPayload } from '../quotes/quoting.service';
 
 /** Una fila de `GET /contracts` (plural) -- deliberadamente liviana
  *  (sin riesgos/coberturas/facturación, que solo hacen falta al abrir
@@ -302,7 +303,7 @@ export interface ContractRisk {
 export interface ContractFilePerson {
   IdePerson: string;
   SPersonRol: { CodPersonRol: string; DesPersonRol: string };
-  TPerson: ContractPersonRef;
+  TPerson: ContractPersonRef & { NumIdentification?: string | null };
 }
 
 export interface ContractFile {
@@ -331,6 +332,8 @@ export interface ContractDetail {
    *  de Prisma (`ContractsService.findOne` no usa `select`). Pedido
    *  explícito del usuario (2026-10-01): visible en el detalle. */
   IndNoRenovar: boolean;
+  /** Colectivo (etapa 1): un certificado por asegurado, prima por certificado. */
+  IndCollective?: boolean;
   TContractPerson: ContractPerson[];
   TContractBilling: ContractBillingPeriod[];
   PaymentSchedule: ContractPaymentSchedule;
@@ -428,6 +431,24 @@ export interface AddRiskPayload {
  *  tiempo, mismo mecanismo que `removeCoverage`) y cierra el riesgo. */
 export interface RemoveRiskPayload {
   ideFileRisk: string;
+  ideProductEndorsement: string;
+  tstSupplement: string;
+  desSupplement: string;
+}
+
+/** Payload de `POST /contracts/:id/add-certificate` (colectivos): alta de un asegurado. */
+export interface AddCertificatePayload {
+  ideProductEndorsement: string;
+  tstSupplement: string;
+  desSupplement: string;
+  idePlanProductRisk: string;
+  insured: CollectiveInsuredPayload;
+  ideCoveragePlans?: string[];
+}
+
+/** Payload de `POST /contracts/:id/remove-certificate` (colectivos): baja de un asegurado. */
+export interface RemoveCertificatePayload {
+  ideContractFile: string;
   ideProductEndorsement: string;
   tstSupplement: string;
   desSupplement: string;
@@ -602,6 +623,16 @@ export class ContractsService {
    *  caller recargue el detalle. */
   removeRisk(ideContract: string, payload: RemoveRiskPayload): Observable<ContractDetail> {
     return this.http.post<ContractDetail>(`${this.base}/${ideContract}/remove-risk`, payload);
+  }
+
+  /** `POST /contracts/:id/add-certificate` -- colectivos: alta de un asegurado (nuevo certificado). */
+  addCertificate(ideContract: string, payload: AddCertificatePayload): Observable<ContractDetail> {
+    return this.http.post<ContractDetail>(`${this.base}/${ideContract}/add-certificate`, payload);
+  }
+
+  /** `POST /contracts/:id/remove-certificate` -- colectivos: baja de un asegurado (cierra su certificado). */
+  removeCertificate(ideContract: string, payload: RemoveCertificatePayload): Observable<ContractDetail> {
+    return this.http.post<ContractDetail>(`${this.base}/${ideContract}/remove-certificate`, payload);
   }
 
   /** `POST /contracts/:id/change-person-data` -- suplemento "Cambio de

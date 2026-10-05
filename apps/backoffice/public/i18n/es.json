@@ -617,7 +617,12 @@
       "removedDetail": "Consentimiento quitado del producto.",
       "updatedDetail": "Consentimiento actualizado.",
       "rangeError": "La fecha final no puede ser anterior a la inicial."
-    }
+    },
+    "collectiveLabel": "Producto colectivo (un tomador con varios asegurados)",
+    "collectivePremiumModeLabel": "Modo de prima",
+    "collectiveModePerCertificate": "Por certificado (cada asegurado paga su prima)",
+    "collectiveModeSingle": "Prima única (próximamente)",
+    "collectiveHelp": "Los productos colectivos se cotizan con una lista de asegurados y generan un certificado por cada uno. Con prima por certificado, el total de la póliza es la suma de las primas individuales."
   },
   "quotes": {
     "backToListButton": "← Volver al listado",
@@ -732,7 +737,8 @@
     "productColumn": "Producto",
     "createdColumn": "Creada",
     "openButton": "Abrir",
-    "emptyState": "No se encontraron cotizaciones."
+    "emptyState": "No se encontraron cotizaciones.",
+    "newCollectiveButton": "Nueva cotización colectiva"
   },
   "contractsList": {
     "title": "Contratos",
@@ -995,6 +1001,22 @@
         "CANCELADO": "Cancelado"
       },
       "paidDetail": "El cliente ha pagado: el contrato está activo."
+    },
+    "collectiveHint": "Contrato colectivo: cada certificado corresponde a un asegurado. Las altas y bajas se registran como suplementos.",
+    "insuredColumn": "Asegurado",
+    "addCertDialog": {
+      "button": "Alta de asegurado",
+      "title": "Nuevo suplemento: alta de asegurado",
+      "subtitle": "Agrega un asegurado al colectivo: se crea su certificado con las coberturas obligatorias del plan y se emite el recibo del suplemento.",
+      "confirmButton": "Agregar asegurado",
+      "appliedDetail": "Se agregó el asegurado y su certificado."
+    },
+    "removeCertDialog": {
+      "button": "Baja",
+      "title": "Nuevo suplemento: baja de asegurado",
+      "subtitle": "Cierra el certificado del asegurado y devuelve la prima proporcional al tiempo no consumido.",
+      "confirmButton": "Dar de baja",
+      "appliedDetail": "Se dio de baja al asegurado."
     }
   },
   "rateTables": {
@@ -1722,5 +1744,51 @@
     "processing": "Hemos recibido tu pago y lo estamos confirmando. Puede tardar unos instantes.",
     "refresh": "Actualizar estado",
     "cancelledCheckout": "Has cancelado el pago. Puedes intentarlo de nuevo cuando quieras."
+  },
+  "collectiveQuote": {
+    "title": "Cotización colectiva",
+    "subtitle": "Un tomador con varios asegurados: prima por certificado.",
+    "backButton": "Volver",
+    "nextButton": "Continuar",
+    "noCollectiveProducts": "No hay productos marcados como colectivos. Activá la opción \"Producto colectivo\" en la configuración del producto.",
+    "riskTypeLabel": "Tipo de riesgo del asegurado",
+    "channelLabel": "Canal de distribución",
+    "wayLabel": "Vía de distribución",
+    "insuredsCount": "{{count}} asegurado(s)",
+    "invalidCount": "{{count}} con errores",
+    "downloadTemplate": "Descargar plantilla CSV",
+    "uploadFile": "Cargar archivo CSV",
+    "addInsured": "Agregar asegurado",
+    "fileHelp": "Podés cargar los asegurados a mano o desde un archivo CSV (separado por punto y coma o coma). Descargá la plantilla para ver las columnas. El correo es obligatorio y no puede repetirse.",
+    "nameColumn": "Nombre",
+    "documentColumn": "Documento",
+    "emailColumn": "Correo",
+    "birthdateColumn": "Fecha de nacimiento",
+    "statusColumn": "Estado",
+    "rowOk": "OK",
+    "noInsureds": "Todavía no hay asegurados cargados.",
+    "clearAll": "Quitar todos",
+    "quoteButton": "Cotizar",
+    "insuredDialogTitle": "Asegurado",
+    "firstNameLabel": "Nombre",
+    "lastName1Label": "Primer apellido",
+    "lastName2Label": "Segundo apellido",
+    "docTypeLabel": "Tipo de documento",
+    "docNumberLabel": "Número de documento",
+    "fieldInvalid": "Valor inválido o requerido.",
+    "calculating": "Calculando la prima de {{count}} asegurado(s)… puede tardar unos segundos.",
+    "pricingFailed": "No se pudo calcular la prima.",
+    "retryPricing": "Reintentar cálculo",
+    "plansTitle": "Cotización {{num}}",
+    "plansSubtitle": "Elegí un plan: se aplica a todos los asegurados.",
+    "totalLabel": "Total",
+    "applied": "Aplicado",
+    "perInsuredTitle": "Prima por asegurado (certificado)",
+    "premiumColumn": "Prima",
+    "applyPlan": "Aplicar plan a todos",
+    "continueButton": "Continuar con la cotización",
+    "fileErrorTitle": "No se pudo leer el archivo",
+    "fileLoadedDetail": "Se cargaron {{count}} asegurado(s) desde el archivo.",
+    "fileReadError": "El archivo no es un CSV válido."
   }
 }

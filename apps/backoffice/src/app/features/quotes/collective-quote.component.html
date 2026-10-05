@@ -1,0 +1,338 @@
+<p-toast />
+
+<div class="mx-auto flex max-w-6xl flex-col gap-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-lg font-semibold text-slate-900">{{ 'collectiveQuote.title' | transloco }}</h1>
+      <p class="text-sm text-slate-500">{{ 'collectiveQuote.subtitle' | transloco }}</p>
+    </div>
+    <button pButton type="button" [label]="'collectiveQuote.backButton' | transloco" severity="secondary" [text]="true" (click)="volver()"></button>
+  </div>
+
+  @switch (step()) {
+    @case ('setup') {
+      <form [formGroup]="setupForm" (ngSubmit)="continueToInsureds()" class="flex flex-col gap-4 rounded-lg border border-slate-200 p-4">
+        @if (products().length === 0) {
+          <p class="rounded-md bg-amber-50 p-3 text-sm text-amber-800">{{ 'collectiveQuote.noCollectiveProducts' | transloco }}</p>
+        }
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div class="flex flex-col gap-2">
+            <label class="text-sm font-medium text-slate-700">{{ 'quotes.productLabel' | transloco }}</label>
+            <p-select
+              appendTo="body"
+              formControlName="codProduct"
+              [options]="products()"
+              optionLabel="DesProduct"
+              optionValue="CodProduct"
+              [placeholder]="'quotes.selectOptionPlaceholder' | transloco"
+              styleClass="w-full"
+              (onChange)="onProductChange()"
+            />
+          </div>
+          <div class="flex flex-col gap-2">
+            <label class="text-sm font-medium text-slate-700">{{ 'collectiveQuote.riskTypeLabel' | transloco }}</label>
+            <p-select
+              appendTo="body"
+              formControlName="codRiskProduct"
+              [options]="riskProductOptions()"
+              optionValue="CodRiskProduct"
+              [placeholder]="'quotes.selectOptionPlaceholder' | transloco"
+              styleClass="w-full"
+            >
+              <ng-template pTemplate="selectedItem" let-item>{{ riskLabel(item) }}</ng-template>
+              <ng-template pTemplate="item" let-item>{{ riskLabel(item) }}</ng-template>
+            </p-select>
+          </div>
+          <div class="flex flex-col gap-2">
+            <label class="text-sm font-medium text-slate-700">{{ 'collectiveQuote.channelLabel' | transloco }}</label>
+            <p-select
+              appendTo="body"
+              formControlName="codDistributionChannel"
+              [options]="distributionChannels()"
+              optionLabel="DesDistributionChannel"
+              optionValue="CodDistributionChannel"
+              [placeholder]="'quotes.selectOptionPlaceholder' | transloco"
+              styleClass="w-full"
+            />
+          </div>
+          <div class="flex flex-col gap-2">
+            <label class="text-sm font-medium text-slate-700">{{ 'collectiveQuote.wayLabel' | transloco }}</label>
+            <p-select
+              appendTo="body"
+              formControlName="codDistributionWay"
+              [options]="distributionWays()"
+              optionLabel="DesDistributionWay"
+              optionValue="CodDistributionWay"
+              [placeholder]="'quotes.selectOptionPlaceholder' | transloco"
+              styleClass="w-full"
+            />
+          </div>
+        </div>
+        <div class="flex justify-end">
+          <button pButton type="submit" [label]="'collectiveQuote.nextButton' | transloco" [loading]="loadingFields()"></button>
+        </div>
+      </form>
+    }
+
+    @case ('insureds') {
+      <div class="flex flex-col gap-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
+            <p-tag [value]="('collectiveQuote.insuredsCount' | transloco: { count: insureds().length })" severity="info" />
+            @if (invalidCount() > 0) {
+              <p-tag [value]="('collectiveQuote.invalidCount' | transloco: { count: invalidCount() })" severity="danger" />
+            }
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button pButton type="button" icon="pi pi-download" severity="secondary" [outlined]="true" [label]="'collectiveQuote.downloadTemplate' | transloco" (click)="downloadTemplate()"></button>
+            <input #csvInput type="file" accept=".csv,text/csv" class="hidden" (change)="onFileSelected($event)" />
+            <button pButton type="button" icon="pi pi-upload" severity="secondary" [outlined]="true" [label]="'collectiveQuote.uploadFile' | transloco" (click)="csvInput.click()"></button>
+            <button pButton type="button" icon="pi pi-plus" [label]="'collectiveQuote.addInsured' | transloco" (click)="openAdd()"></button>
+          </div>
+        </div>
+
+        <p class="text-xs text-slate-500">{{ 'collectiveQuote.fileHelp' | transloco }}</p>
+
+        <p-table [value]="insureds()" dataKey="key" [paginator]="insureds().length > 20" [rows]="20" styleClass="rounded-lg border border-slate-200">
+          <ng-template pTemplate="header">
+            <tr>
+              <th>#</th>
+              <th>{{ 'collectiveQuote.nameColumn' | transloco }}</th>
+              <th>{{ 'collectiveQuote.documentColumn' | transloco }}</th>
+              <th>{{ 'collectiveQuote.emailColumn' | transloco }}</th>
+              <th>{{ 'collectiveQuote.birthdateColumn' | transloco }}</th>
+              @for (field of fields(); track field.ideAttributeProperty) {
+                <th>{{ field.label }}</th>
+              }
+              <th>{{ 'collectiveQuote.statusColumn' | transloco }}</th>
+              <th></th>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="body" let-row let-i="rowIndex">
+            <tr [class.bg-red-50]="row.errors.length > 0">
+              <td>{{ i + 1 }}</td>
+              <td>{{ fullName(row) }}</td>
+              <td>{{ row.codIdentificationType }} {{ row.numIdentification }}</td>
+              <td>{{ row.desEmail }}</td>
+              <td>{{ row.tstBirthdate }}</td>
+              @for (field of fields(); track field.ideAttributeProperty) {
+                <td>{{ attrLabel(field, row) }}</td>
+              }
+              <td>
+                @if (row.errors.length > 0) {
+                  <span class="text-xs text-red-600">{{ row.errors.join(' · ') }}</span>
+                } @else {
+                  <p-tag [value]="'collectiveQuote.rowOk' | transloco" severity="success" />
+                }
+              </td>
+              <td class="whitespace-nowrap">
+                <button pButton type="button" icon="pi pi-pencil" [text]="true" severity="secondary" (click)="openEdit(row)"></button>
+                <button pButton type="button" icon="pi pi-times" [text]="true" severity="danger" (click)="removeInsured(row)"></button>
+              </td>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="emptymessage">
+            <tr>
+              <td [attr.colspan]="fields().length + 7" class="text-center text-sm text-slate-500">{{ 'collectiveQuote.noInsureds' | transloco }}</td>
+            </tr>
+          </ng-template>
+        </p-table>
+
+        <div class="flex items-center justify-between">
+          <div class="flex gap-2">
+            <button pButton type="button" [label]="'collectiveQuote.backButton' | transloco" severity="secondary" [text]="true" (click)="backToSetup()"></button>
+            @if (insureds().length > 0) {
+              <button pButton type="button" [label]="'collectiveQuote.clearAll' | transloco" severity="danger" [text]="true" (click)="clearInsureds()"></button>
+            }
+          </div>
+          <button pButton type="button" [label]="'collectiveQuote.quoteButton' | transloco" [disabled]="!canQuote()" [loading]="creating()" (click)="quote()"></button>
+        </div>
+      </div>
+
+      <p-dialog
+        [visible]="dialogVisible()"
+        (visibleChange)="dialogVisible.set($event)"
+        [modal]="true"
+        appendTo="body"
+        [style]="{ width: '42rem' }"
+        [header]="'collectiveQuote.insuredDialogTitle' | transloco"
+      >
+        <form [formGroup]="insuredForm" class="grid grid-cols-2 gap-3">
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-slate-600">{{ 'collectiveQuote.firstNameLabel' | transloco }} *</label>
+            <input pInputText type="text" formControlName="desFirstName" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-slate-600">{{ 'collectiveQuote.lastName1Label' | transloco }}</label>
+            <input pInputText type="text" formControlName="desLastName1" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-slate-600">{{ 'collectiveQuote.lastName2Label' | transloco }}</label>
+            <input pInputText type="text" formControlName="desLastName2" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-slate-600">{{ 'collectiveQuote.emailColumn' | transloco }} *</label>
+            <input pInputText type="email" formControlName="desEmail" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-slate-600">{{ 'collectiveQuote.docTypeLabel' | transloco }}</label>
+            <p-select
+              appendTo="body"
+              formControlName="codIdentificationType"
+              [options]="identificationTypes()"
+              optionLabel="DesIdentificationType"
+              optionValue="CodIdentificationType"
+              [showClear]="true"
+              [placeholder]="'quotes.selectOptionPlaceholder' | transloco"
+              styleClass="w-full"
+            />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-slate-600">{{ 'collectiveQuote.docNumberLabel' | transloco }}</label>
+            <input pInputText type="text" formControlName="numIdentification" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-slate-600">{{ 'collectiveQuote.birthdateColumn' | transloco }}</label>
+            <input pInputText type="date" formControlName="tstBirthdate" />
+          </div>
+
+          @if (fields().length > 0) {
+            <div [formGroup]="$any(insuredForm.get('attrs'))" class="col-span-2 grid grid-cols-2 gap-3 border-t border-slate-200 pt-3">
+              @for (field of fields(); track field.ideAttributeProperty) {
+                <div class="flex flex-col gap-1">
+                  <label class="text-xs font-medium text-slate-600">{{ field.label }}</label>
+                  @switch (field.type) {
+                    @case ('select') {
+                      <p-select
+                        appendTo="body"
+                        [formControlName]="field.ideAttributeProperty"
+                        [options]="field.options ?? []"
+                        optionLabel="key"
+                        optionValue="value"
+                        [placeholder]="'quotes.selectOptionPlaceholder' | transloco"
+                        styleClass="w-full"
+                      />
+                    }
+                    @case ('radio') {
+                      <div class="flex flex-wrap gap-3 pt-1">
+                        @for (opt of field.options ?? []; track opt.key) {
+                          <label class="flex items-center gap-1 text-xs text-slate-600">
+                            <p-radiobutton [formControlName]="field.ideAttributeProperty" [value]="opt.value" />
+                            {{ opt.key }}
+                          </label>
+                        }
+                      </div>
+                    }
+                    @case ('checkbox') {
+                      <p-checkbox [binary]="true" [formControlName]="field.ideAttributeProperty" />
+                    }
+                    @case ('number') {
+                      <input pInputText type="number" [formControlName]="field.ideAttributeProperty" />
+                    }
+                    @case ('date') {
+                      <input pInputText type="date" [formControlName]="field.ideAttributeProperty" />
+                    }
+                    @default {
+                      <input pInputText type="text" [formControlName]="field.ideAttributeProperty" />
+                    }
+                  }
+                  @if (fieldInvalid(field)) {
+                    <span class="text-xs text-red-600">{{ 'collectiveQuote.fieldInvalid' | transloco }}</span>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </form>
+        <ng-template pTemplate="footer">
+          <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="dialogVisible.set(false)"></button>
+          <button pButton type="button" [label]="'common.save' | transloco" (click)="saveInsured()"></button>
+        </ng-template>
+      </p-dialog>
+    }
+
+    @case ('plan') {
+      <div class="flex flex-col gap-6">
+        @if (retryingPricing() && !pricing()) {
+          <div class="rounded-lg border border-slate-200 p-6 text-center text-sm text-slate-500">
+            {{ 'collectiveQuote.calculating' | transloco: { count: insureds().length } }}
+          </div>
+        } @else if (!pricing()) {
+          <div class="flex flex-col items-center gap-3 rounded-lg border border-slate-200 p-6">
+            <p class="text-sm text-slate-600">{{ 'collectiveQuote.pricingFailed' | transloco }}</p>
+            <button pButton type="button" [label]="'collectiveQuote.retryPricing' | transloco" (click)="calculatePricing()"></button>
+          </div>
+        } @else {
+          <div>
+            <h2 class="text-base font-semibold text-slate-900">{{ 'collectiveQuote.plansTitle' | transloco: { num: pricing()!.numQuote } }}</h2>
+            <p class="text-sm text-slate-500">{{ 'collectiveQuote.plansSubtitle' | transloco }}</p>
+          </div>
+
+          @if (planOptions().length === 0) {
+            <p class="text-sm text-slate-500">{{ 'quotes.noPlansAvailable' | transloco }}</p>
+          } @else {
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+              @for (plan of planOptions(); track plan.codPlanProduct) {
+                <button
+                  type="button"
+                  class="flex flex-col gap-1 rounded-lg border p-4 text-left"
+                  [class.border-brand-600]="chosenPlan() === plan.codPlanProduct"
+                  [class.border-slate-200]="chosenPlan() !== plan.codPlanProduct"
+                  (click)="choosePlan(plan.codPlanProduct)"
+                >
+                  <span class="font-semibold text-slate-900">{{ plan.desShortPlan }}</span>
+                  @if (plan.desLargePlan) {
+                    <span class="text-xs text-slate-500">{{ plan.desLargePlan }}</span>
+                  }
+                  <span class="mt-2 text-xs text-slate-500">{{ 'collectiveQuote.totalLabel' | transloco }}</span>
+                  <span class="text-xl font-bold text-slate-900">{{ pricing()!.symbolCurrency }}{{ plan.total | number: '1.2-2' }}</span>
+                  @if (appliedPlan() === plan.codPlanProduct) {
+                    <p-tag [value]="'collectiveQuote.applied' | transloco" severity="success" styleClass="mt-1 self-start" />
+                  }
+                </button>
+              }
+            </div>
+
+            <div>
+              <h3 class="mb-2 text-sm font-semibold text-slate-700">{{ 'collectiveQuote.perInsuredTitle' | transloco }}</h3>
+              <p-table [value]="premiumRows()" styleClass="rounded-lg border border-slate-200" [paginator]="premiumRows().length > 20" [rows]="20">
+                <ng-template pTemplate="header">
+                  <tr>
+                    <th>#</th>
+                    <th>{{ 'collectiveQuote.nameColumn' | transloco }}</th>
+                    <th>{{ 'collectiveQuote.documentColumn' | transloco }}</th>
+                    <th>{{ 'collectiveQuote.emailColumn' | transloco }}</th>
+                    <th class="text-right">{{ 'collectiveQuote.premiumColumn' | transloco }}</th>
+                  </tr>
+                </ng-template>
+                <ng-template pTemplate="body" let-row>
+                  <tr>
+                    <td>{{ row.insured.NumRisk }}</td>
+                    <td>{{ row.insured.DesFirstName }} {{ row.insured.DesLastName1 }} {{ row.insured.DesLastName2 }}</td>
+                    <td>{{ row.insured.NumIdentification }}</td>
+                    <td>{{ row.insured.DesEmail }}</td>
+                    <td class="text-right">{{ pricing()!.symbolCurrency }}{{ row.prime | number: '1.2-2' }}</td>
+                  </tr>
+                </ng-template>
+                <ng-template pTemplate="footer">
+                  <tr>
+                    <td colspan="4" class="text-right font-semibold">{{ 'collectiveQuote.totalLabel' | transloco }}</td>
+                    <td class="text-right font-semibold">{{ pricing()!.symbolCurrency }}{{ chosenTotal() | number: '1.2-2' }}</td>
+                  </tr>
+                </ng-template>
+              </p-table>
+            </div>
+
+            <div class="flex items-center justify-end gap-2">
+              @if (appliedPlan() !== chosenPlan()) {
+                <button pButton type="button" [label]="'collectiveQuote.applyPlan' | transloco" [loading]="applyingPlan()" [disabled]="!chosenPlan()" (click)="applyPlan()"></button>
+              } @else {
+                <button pButton type="button" [label]="'collectiveQuote.continueButton' | transloco" (click)="continueToQuote()"></button>
+              }
+            </div>
+          }
+        }
+      </div>
+    }
+  }
+</div>

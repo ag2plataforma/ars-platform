@@ -164,4 +164,8 @@ export class QuotesListComponent implements OnInit {
   nueva(): void {
     this.router.navigate(['/cotizacion/nueva']);
   }
+
+  nuevaColectiva(): void {
+    this.router.navigate(['/cotizacion/colectivo']);
+  }
 }

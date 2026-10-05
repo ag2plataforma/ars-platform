@@ -2,6 +2,7 @@ import {
   IsBoolean,
   IsDateString,
   IsInt,
+  IsIn,
   IsOptional,
   IsString,
   Matches,
@@ -59,4 +60,14 @@ export class CreateProductDto {
   @IsOptional()
   @IsDateString()
   tstEnd?: string;
+
+  /** Colectivos: el producto se vende como colectivo (un tomador, N asegurados). Ver `setup-collectives.js`. */
+  @IsOptional()
+  @IsBoolean()
+  indCollective?: boolean;
+
+  /** `POR_CERTIFICADO` (cada asegurado paga su prima) o `UNICA` (prima única, reservada para una etapa posterior). */
+  @IsOptional()
+  @IsIn(['POR_CERTIFICADO', 'UNICA'])
+  codCollectivePremiumMode?: 'POR_CERTIFICADO' | 'UNICA';
 }

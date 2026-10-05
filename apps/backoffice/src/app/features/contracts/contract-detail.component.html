@@ -161,6 +161,20 @@
 
         <!-- ============================== Certificados ============================== -->
         <p-tabpanel value="certificados">
+          @if (c.IndCollective) {
+            <div class="mb-3 flex items-center justify-between">
+              <p class="text-xs text-slate-500">{{ 'contractDetail.collectiveHint' | transloco }}</p>
+              <button
+                pButton
+                type="button"
+                icon="pi pi-plus"
+                size="small"
+                [disabled]="c.SState.CodState !== 'ACTIVO'"
+                [label]="'contractDetail.addCertDialog.button' | transloco"
+                (click)="openAddCertDialog()"
+              ></button>
+            </div>
+          }
           <p-table
             [value]="c.TContractFile"
             dataKey="IdeContractFile"
@@ -176,24 +190,47 @@
             <ng-template pTemplate="header">
               <tr>
                 <th pSortableColumn="NumContractFile"><span class="ars-th-flex">{{ 'contractDetail.fileNumberColumn' | transloco }} <p-sortIcon field="NumContractFile" /> <p-columnFilter type="text" field="NumContractFile" display="menu" /></span></th>
+                @if (c.IndCollective) {
+                  <th>{{ 'contractDetail.insuredColumn' | transloco }}</th>
+                }
                 <th pSortableColumn="TstInclusion"><span class="ars-th-flex">{{ 'contractDetail.inclusionColumn' | transloco }} <p-sortIcon field="TstInclusion" /></span></th>
                 <th pSortableColumn="TstInitial"><span class="ars-th-flex">{{ 'contractsList.startColumn' | transloco }} <p-sortIcon field="TstInitial" /></span></th>
                 <th pSortableColumn="TstEnd"><span class="ars-th-flex">{{ 'contractsList.endColumn' | transloco }} <p-sortIcon field="TstEnd" /></span></th>
                 <th pSortableColumn="SState.DesState"><span class="ars-th-flex">{{ 'catalogs.stateColumn' | transloco }} <p-sortIcon field="SState.DesState" /></span></th>
+                @if (c.IndCollective) {
+                  <th></th>
+                }
               </tr>
             </ng-template>
             <ng-template pTemplate="body" let-file>
               <tr [pSelectableRow]="file" class="cursor-pointer">
                 <td>{{ file.NumContractFile }}</td>
+                @if (c.IndCollective) {
+                  <td>{{ insuredOf(file) }}<span class="block text-xs text-slate-400">{{ insuredEmailOf(file) }}</span></td>
+                }
                 <td>{{ file.TstInclusion | date: 'dd/MM/yyyy' }}</td>
                 <td>{{ file.TstInitial | date: 'dd/MM/yyyy' }}</td>
                 <td>{{ file.TstEnd | date: 'dd/MM/yyyy' }}</td>
                 <td><p-tag [value]="file.SState.DesState" [severity]="stateSeverity(file.SState.CodState)" /></td>
+                @if (c.IndCollective) {
+                  <td>
+                    <button
+                      pButton
+                      type="button"
+                      size="small"
+                      severity="danger"
+                      [text]="true"
+                      [label]="'contractDetail.removeCertDialog.button' | transloco"
+                      [disabled]="c.SState.CodState !== 'ACTIVO' || file.SState.CodState !== 'ACTIVO'"
+                      (click)="openRemoveCertDialog(file); $event.stopPropagation()"
+                    ></button>
+                  </td>
+                }
               </tr>
             </ng-template>
             <ng-template pTemplate="emptymessage">
               <tr>
-                <td colspan="5" class="py-6 text-center text-sm text-slate-500">{{ 'contractDetail.filesEmpty' | transloco }}</td>
+                <td [attr.colspan]="c.IndCollective ? 7 : 5" class="py-6 text-center text-sm text-slate-500">{{ 'contractDetail.filesEmpty' | transloco }}</td>
               </tr>
             </ng-template>
           </p-table>
@@ -1022,6 +1059,192 @@
     <div class="mt-2 flex justify-end gap-2">
       <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeAddRiskDialog()"></button>
       <button pButton type="submit" [label]="'contractDetail.addRiskDialog.confirmButton' | transloco" [loading]="addRiskSubmitting()"></button>
+    </div>
+  </form>
+</p-dialog>
+
+<!-- ============================== Popup: Alta de asegurado (colectivos) ============================== -->
+<p-dialog
+  [header]="'contractDetail.addCertDialog.title' | transloco"
+  [visible]="addCertDialogVisible()"
+  (visibleChange)="!$event && closeAddCertDialog()"
+  [modal]="true"
+  [style]="{ width: '36rem' }"
+>
+  <form [formGroup]="addCertForm" (ngSubmit)="submitAddCert()" class="flex flex-col gap-4 pt-2">
+    <p class="text-sm text-slate-500">{{ 'contractDetail.addCertDialog.subtitle' | transloco }}</p>
+    @if (availablePlanProductRiskOptions().length === 0) {
+      <p class="text-sm text-slate-500">{{ 'contractDetail.addRiskDialog.noOptions' | transloco }}</p>
+    }
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.addRiskDialog.planRiskLabel' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="idePlanProductRisk"
+        [options]="availablePlanProductRiskOptions()"
+        optionValue="IdePlanProductRisk"
+        [placeholder]="'contractDetail.addRiskDialog.planRiskPlaceholder' | transloco"
+        styleClass="w-full"
+      >
+        <ng-template let-item #selectedItem>{{ planProductRiskLabel(item) }}</ng-template>
+        <ng-template let-item #item>{{ planProductRiskLabel(item) }}</ng-template>
+      </p-select>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div class="flex flex-col gap-1">
+        <label class="text-xs font-medium text-slate-600">{{ 'collectiveQuote.firstNameLabel' | transloco }} *</label>
+        <input pInputText type="text" formControlName="desFirstName" />
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="text-xs font-medium text-slate-600">{{ 'collectiveQuote.lastName1Label' | transloco }}</label>
+        <input pInputText type="text" formControlName="desLastName1" />
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="text-xs font-medium text-slate-600">{{ 'collectiveQuote.lastName2Label' | transloco }}</label>
+        <input pInputText type="text" formControlName="desLastName2" />
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="text-xs font-medium text-slate-600">{{ 'collectiveQuote.emailColumn' | transloco }} *</label>
+        <input pInputText type="email" formControlName="desEmail" />
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="text-xs font-medium text-slate-600">{{ 'collectiveQuote.docTypeLabel' | transloco }}</label>
+        <p-select
+          appendTo="body"
+          formControlName="codIdentificationType"
+          [options]="identificationTypes()"
+          optionLabel="DesIdentificationType"
+          optionValue="CodIdentificationType"
+          [showClear]="true"
+          [placeholder]="'quotes.selectOptionPlaceholder' | transloco"
+          styleClass="w-full"
+        />
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="text-xs font-medium text-slate-600">{{ 'collectiveQuote.docNumberLabel' | transloco }}</label>
+        <input pInputText type="text" formControlName="numIdentification" />
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="text-xs font-medium text-slate-600">{{ 'collectiveQuote.birthdateColumn' | transloco }}</label>
+        <input pInputText type="date" formControlName="tstBirthdate" />
+      </div>
+    </div>
+    @if (addRiskAttributesLoading()) {
+      <p class="text-xs text-slate-400">{{ 'quotes.loadingRiskData' | transloco }}</p>
+    } @else if (addRiskAttributeFields().length > 0) {
+      <div [formGroup]="addRiskAttributesForm" class="flex flex-col gap-3 border-t border-slate-200 pt-3">
+        <p class="text-xs font-medium text-slate-500">{{ 'contractDetail.attributesDialogTitle' | transloco }}</p>
+        @for (field of addRiskAttributeFields(); track field.ideAttributeProperty) {
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-slate-600">{{ field.label }}</label>
+            @switch (field.type) {
+              @case ('select') {
+                <p-select
+                  appendTo="body"
+                  [formControlName]="field.ideAttributeProperty"
+                  [options]="field.options ?? []"
+                  optionLabel="key"
+                  optionValue="value"
+                  [placeholder]="'quotes.selectOptionPlaceholder' | transloco"
+                  styleClass="w-full"
+                />
+              }
+              @case ('radio') {
+                <div class="flex flex-wrap gap-3 pt-1">
+                  @for (opt of field.options ?? []; track opt.key) {
+                    <label class="flex items-center gap-1 text-xs text-slate-600">
+                      <p-radiobutton [formControlName]="field.ideAttributeProperty" [value]="opt.value" />
+                      {{ opt.key }}
+                    </label>
+                  }
+                </div>
+              }
+              @case ('checkbox') {
+                <p-checkbox [binary]="true" [formControlName]="field.ideAttributeProperty" />
+              }
+              @case ('number') {
+                <input pInputText type="number" [formControlName]="field.ideAttributeProperty" />
+              }
+              @case ('date') {
+                <input pInputText type="date" [formControlName]="field.ideAttributeProperty" />
+              }
+              @default {
+                <input pInputText type="text" [formControlName]="field.ideAttributeProperty" />
+              }
+            }
+            @if (addRiskFieldInvalid(field)) {
+              <span class="text-xs text-red-600">{{ addRiskFirstErrorMessage(field) }}</span>
+            }
+          </div>
+        }
+      </div>
+    }
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.cancelDialog.endorsementLabel' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="ideProductEndorsement"
+        [options]="productEndorsements()"
+        optionLabel="DesProductEndorsement"
+        optionValue="IdeProductEndorsement"
+        [placeholder]="'contractDetail.cancelDialog.endorsementPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.addRiskDialog.dateLabel' | transloco }}</label>
+      <input pInputText type="date" formControlName="tstSupplement" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.addRiskDialog.reasonLabel' | transloco }}</label>
+      <textarea pTextarea formControlName="desSupplement" rows="3" class="w-full"></textarea>
+    </div>
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeAddCertDialog()"></button>
+      <button pButton type="submit" [label]="'contractDetail.addCertDialog.confirmButton' | transloco" [loading]="addCertSubmitting()"></button>
+    </div>
+  </form>
+</p-dialog>
+
+<!-- ============================== Popup: Baja de asegurado (colectivos) ============================== -->
+<p-dialog
+  [header]="'contractDetail.removeCertDialog.title' | transloco"
+  [visible]="removeCertDialogVisible()"
+  (visibleChange)="!$event && closeRemoveCertDialog()"
+  [modal]="true"
+  [style]="{ width: '28rem' }"
+>
+  <form [formGroup]="removeCertForm" (ngSubmit)="submitRemoveCert()" class="flex flex-col gap-4 pt-2">
+    <p class="text-sm text-slate-500">{{ 'contractDetail.removeCertDialog.subtitle' | transloco }}</p>
+    @if (removeCertFile(); as file) {
+      <p class="text-sm text-slate-700">
+        <span class="font-medium">{{ 'contractDetail.insuredColumn' | transloco }}:</span>
+        {{ insuredOf(file) }} (#{{ file.NumContractFile }})
+      </p>
+    }
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.cancelDialog.endorsementLabel' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="ideProductEndorsement"
+        [options]="productEndorsements()"
+        optionLabel="DesProductEndorsement"
+        optionValue="IdeProductEndorsement"
+        [placeholder]="'contractDetail.cancelDialog.endorsementPlaceholder' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.removeRiskDialog.dateLabel' | transloco }}</label>
+      <input pInputText type="date" formControlName="tstSupplement" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.removeRiskDialog.reasonLabel' | transloco }}</label>
+      <textarea pTextarea formControlName="desSupplement" rows="3" class="w-full"></textarea>
+    </div>
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeRemoveCertDialog()"></button>
+      <button pButton type="submit" severity="danger" [label]="'contractDetail.removeCertDialog.confirmButton' | transloco" [loading]="removeCertSubmitting()"></button>
     </div>
   </form>
 </p-dialog>

@@ -1040,7 +1040,7 @@ export class QuotesService {
    * la secuencia es global (no una por producto), así que `N` ya no
    * arranca en 1 para cada producto nuevo.
    */
-  private async generateNumQuote(codProduct: string): Promise<string> {
+  async generateNumQuote(codProduct: string): Promise<string> {
     const result = await this.prisma.$queryRaw<{ nextval: number }[]>`
       SELECT nextval('ars_platform."SeqTQuoteNumber"')::int AS nextval
     `;
@@ -1048,7 +1048,7 @@ export class QuotesService {
     return `${codProduct}-${year}-${result[0].nextval}`;
   }
 
-  private async resolveProduct(codProduct: string): Promise<string> {
+  async resolveProduct(codProduct: string): Promise<string> {
     const row = await this.prisma.sProduct.findFirst({ where: { CodProduct: codProduct } });
     if (!row) throw new NotFoundException(`No existe producto con código "${codProduct}"`);
     return row.IdeProduct;
@@ -1060,7 +1060,7 @@ export class QuotesService {
     return row.IdeState;
   }
 
-  private async resolveDistributionChannel(codDistributionChannel: string): Promise<string> {
+  async resolveDistributionChannel(codDistributionChannel: string): Promise<string> {
     const row = await this.prisma.sDistributionChannel.findFirst({
       where: { CodDistributionChannel: codDistributionChannel },
     });
@@ -1070,13 +1070,13 @@ export class QuotesService {
     return row.IdeDistributionChannel;
   }
 
-  private async resolveDistributionWay(codDistributionWay: string): Promise<string> {
+  async resolveDistributionWay(codDistributionWay: string): Promise<string> {
     const row = await this.prisma.sDistributionWay.findFirst({ where: { CodDistributionWay: codDistributionWay } });
     if (!row) throw new NotFoundException(`No existe vía de distribución con código "${codDistributionWay}"`);
     return row.IdeDistributionWay;
   }
 
-  private async resolveRiskProduct(codRiskProduct: string): Promise<string> {
+  async resolveRiskProduct(codRiskProduct: string): Promise<string> {
     const row = await this.prisma.sRiskProduct.findFirst({ where: { CodRiskProduct: codRiskProduct } });
     if (!row) throw new NotFoundException(`No existe producto de riesgo con código "${codRiskProduct}"`);
     return row.IdeRiskProduct;

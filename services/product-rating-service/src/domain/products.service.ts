@@ -1,5 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService, SProduct } from '@ars-platform/database';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Prisma, PrismaService, SProduct } from '@ars-platform/database';
 import { StateMachineService } from '@ars-platform/shared-common';
 import { CatalogCrudService } from '@ars-platform/shared-common';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -14,6 +14,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
  */
 @Injectable()
 export class ProductsService {
+  private readonly logger = new Logger(ProductsService.name);
   private readonly crud: CatalogCrudService<SProduct>;
 
   constructor(
@@ -30,23 +31,67 @@ export class ProductsService {
     );
   }
 
-  findAll(): Promise<SProduct[]> {
-    return this.crud.findAll();
+  async findAll(): Promise<SProduct[]> {
+    return this.withCollective(await this.crud.findAll());
   }
 
-  findOne(id: string): Promise<SProduct> {
-    return this.crud.findOne(id);
+  async findOne(id: string): Promise<SProduct> {
+    return (await this.withCollective([await this.crud.findOne(id)]))[0];
+  }
+
+  /**
+   * Colectivos (`setup-collectives.js`): `IndCollective` y `CodCollectivePremiumMode` se
+   * leen/escriben con SQL crudo hasta regenerar el cliente de Prisma. Si las columnas aún no
+   * existen (script sin correr), el producto se devuelve igual, como no colectivo.
+   */
+  private async withCollective<T extends { IdeProduct: string }>(
+    rows: T[],
+  ): Promise<Array<T & { IndCollective: boolean; CodCollectivePremiumMode: string }>> {
+    const found = new Map<string, { IndCollective: boolean; CodCollectivePremiumMode: string }>();
+    if (rows.length > 0) {
+      try {
+        const data = await this.prisma.$queryRaw<
+          Array<{ IdeProduct: string; IndCollective: boolean; CodCollectivePremiumMode: string }>
+        >`SELECT "IdeProduct", "IndCollective", "CodCollectivePremiumMode" FROM ars_platform."SProduct"
+           WHERE "IdeProduct" IN (${Prisma.join(rows.map((r) => Prisma.sql`${r.IdeProduct}::uuid`))})`;
+        for (const d of data) found.set(d.IdeProduct, d);
+      } catch (err) {
+        this.logger.warn(`No se pudo leer IndCollective (¿falta correr setup-collectives.js?): ${(err as Error).message}`);
+      }
+    }
+    return rows.map((r) => ({
+      ...r,
+      IndCollective: found.get(r.IdeProduct)?.IndCollective ?? false,
+      CodCollectivePremiumMode: found.get(r.IdeProduct)?.CodCollectivePremiumMode ?? 'POR_CERTIFICADO',
+    }));
+  }
+
+  private async saveCollective(
+    id: string,
+    dto: { indCollective?: boolean; codCollectivePremiumMode?: string },
+  ): Promise<void> {
+    if (dto.indCollective === undefined && dto.codCollectivePremiumMode === undefined) return;
+    if (dto.indCollective !== undefined) {
+      await this.prisma.$executeRaw`UPDATE ars_platform."SProduct" SET "IndCollective" = ${dto.indCollective} WHERE "IdeProduct" = ${id}::uuid`;
+    }
+    if (dto.codCollectivePremiumMode !== undefined) {
+      await this.prisma.$executeRaw`UPDATE ars_platform."SProduct" SET "CodCollectivePremiumMode" = ${dto.codCollectivePremiumMode} WHERE "IdeProduct" = ${id}::uuid`;
+    }
   }
 
   async create(dto: CreateProductDto, actor: string): Promise<SProduct> {
     const extra = await this.buildExtra(dto);
     const activeStateId = await this.stateMachine.getStateByCode('ACTIVO');
-    return this.crud.create(dto.codProduct, dto.desProduct, extra, activeStateId, actor);
+    const created = await this.crud.create(dto.codProduct, dto.desProduct, extra, activeStateId, actor);
+    await this.saveCollective(created.IdeProduct, dto);
+    return this.findOne(created.IdeProduct);
   }
 
   async update(id: string, dto: UpdateProductDto, actor: string): Promise<SProduct> {
     const extra = await this.buildExtra(dto);
-    return this.crud.update(id, dto.desProduct, extra, actor);
+    await this.crud.update(id, dto.desProduct, extra, actor);
+    await this.saveCollective(id, dto);
+    return this.findOne(id);
   }
 
   async setState(id: string, codState: string, actor: string): Promise<SProduct> {

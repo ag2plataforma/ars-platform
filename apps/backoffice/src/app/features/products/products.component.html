@@ -201,6 +201,27 @@
       <p-checkbox formControlName="indProportionalPrime" [binary]="true" inputId="indProportionalPrime" />
       <label for="indProportionalPrime" class="text-sm text-slate-700">{{ 'products.proportionalPrimeLabel' | transloco }}</label>
     </div>
+    <div class="flex items-center gap-2">
+      <p-checkbox formControlName="indCollective" [binary]="true" inputId="indCollective" />
+      <label for="indCollective" class="text-sm text-slate-700">{{ 'products.collectiveLabel' | transloco }}</label>
+    </div>
+    @if (form.controls.indCollective.value) {
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-medium text-slate-700">{{ 'products.collectivePremiumModeLabel' | transloco }}</label>
+        <p-select
+          appendTo="body"
+          formControlName="codCollectivePremiumMode"
+          [options]="collectiveModeOptions"
+          optionValue="value"
+          optionDisabled="disabled"
+          styleClass="w-full"
+        >
+          <ng-template #selectedItem let-item>{{ item.labelKey | transloco }}</ng-template>
+          <ng-template #item let-item>{{ item.labelKey | transloco }}</ng-template>
+        </p-select>
+        <p class="text-xs text-slate-500">{{ 'products.collectiveHelp' | transloco }}</p>
+      </div>
+    }
     <div class="flex gap-4">
       <div class="flex flex-1 flex-col gap-2">
         <label class="text-sm font-medium text-slate-700">{{ 'products.validFromLabel' | transloco }}</label>

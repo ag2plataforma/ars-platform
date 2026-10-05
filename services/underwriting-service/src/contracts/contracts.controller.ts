@@ -10,6 +10,7 @@ import { AddCoverageDto } from './dto/add-coverage.dto';
 import { RemoveCoverageDto } from './dto/remove-coverage.dto';
 import { AddRiskDto } from './dto/add-risk.dto';
 import { RemoveRiskDto } from './dto/remove-risk.dto';
+import { AddCertificateDto, RemoveCertificateDto } from './dto/certificate.dto';
 import { ChangePersonDataDto } from './dto/change-person-data.dto';
 import { ListContractsDto } from './dto/list-contracts.dto';
 import { ListRenewalCandidatesDto } from './dto/list-renewal-candidates.dto';
@@ -176,6 +177,21 @@ export class ContractsController {
   @Post('contracts/:id/remove-coverage')
   removeCoverage(@Param('id') id: string, @Body() dto: RemoveCoverageDto, @CurrentUser() actor: JwtPayload) {
     return this.service.removeCoverage(id, dto, actor.code);
+  }
+
+  /**
+   * Colectivos, suplemento "Alta de asegurado" -- ver el doc-comment de
+   * `ContractsService.addCertificate` para el detalle completo.
+   */
+  @Post('contracts/:id/add-certificate')
+  addCertificate(@Param('id') id: string, @Body() dto: AddCertificateDto, @CurrentUser() actor: JwtPayload) {
+    return this.service.addCertificate(id, dto, actor.code);
+  }
+
+  /** Colectivos, suplemento "Baja de asegurado" -- ver `ContractsService.removeCertificate`. */
+  @Post('contracts/:id/remove-certificate')
+  removeCertificate(@Param('id') id: string, @Body() dto: RemoveCertificateDto, @CurrentUser() actor: JwtPayload) {
+    return this.service.removeCertificate(id, dto, actor.code);
   }
 
   /**

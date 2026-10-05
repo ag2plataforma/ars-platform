@@ -80,6 +80,11 @@ export class ProductsComponent {
   private readonly confirm = inject(ConfirmationService);
   private readonly transloco = inject(TranslocoService);
 
+  /** Modos de prima de un producto colectivo; "prima única" aparece pero aún no se puede elegir. */
+  readonly collectiveModeOptions = [
+    { value: 'POR_CERTIFICADO', labelKey: 'products.collectiveModePerCertificate', disabled: false },
+    { value: 'UNICA', labelKey: 'products.collectiveModeSingle', disabled: true },
+  ];
   readonly rows = signal<CatalogRow[]>([]);
   readonly loading = signal(false);
   readonly dialogVisible = signal(false);
@@ -113,6 +118,8 @@ export class ProductsComponent {
       validityDays: [row ? Number(row['ValidityDays'] ?? 0) || null : null],
       indGenerateAllFraction: [row ? Boolean(row['IndGenerateAllFraction']) : false],
       indProportionalPrime: [row ? Boolean(row['IndProportionalPrime'] ?? true) : true],
+      indCollective: [row ? Boolean(row['IndCollective']) : false],
+      codCollectivePremiumMode: [row ? String(row['CodCollectivePremiumMode'] ?? 'POR_CERTIFICADO') : 'POR_CERTIFICADO'],
       tstInitial: [row ? this.toDateInput(row['TstInitial']) : '', Validators.required],
       tstEnd: [row ? this.toDateInput(row['TstEnd']) : ''],
     });
@@ -217,6 +224,8 @@ export class ProductsComponent {
       codStartTime: raw.codStartTime,
       indGenerateAllFraction: raw.indGenerateAllFraction,
       indProportionalPrime: raw.indProportionalPrime,
+      indCollective: raw.indCollective,
+      codCollectivePremiumMode: raw.codCollectivePremiumMode,
       tstInitial: raw.tstInitial,
     };
     if (raw.validityDays !== null && raw.validityDays !== undefined) body['validityDays'] = raw.validityDays;

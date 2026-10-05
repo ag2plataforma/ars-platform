@@ -107,6 +107,39 @@ export interface CreateQuoteRiskPayload {
   riskAttributeValue?: Record<string, unknown>;
 }
 
+/** Un asegurado de un colectivo (ver `CollectiveInsuredDto` en el backend). */
+export interface CollectiveInsuredPayload {
+  codIdentificationType?: string;
+  numIdentification?: string;
+  desFirstName: string;
+  desLastName1?: string;
+  desLastName2?: string;
+  desEmail: string;
+  /** `YYYY-MM-DD`. */
+  tstBirthdate?: string;
+  riskAttributeValue?: Record<string, unknown>;
+}
+
+export interface CreateCollectiveQuotePayload {
+  codProduct: string;
+  codDistributionChannel: string;
+  codDistributionWay: string;
+  codRiskProduct: string;
+  insureds: CollectiveInsuredPayload[];
+}
+
+/** Asegurado de una cotización colectiva ya creada (`GET /quotes/:id/insureds`). */
+export interface CollectiveInsuredRow {
+  IdeQuoteRisk: string;
+  NumRisk: number;
+  IdePerson: string;
+  DesFirstName: string;
+  DesLastName1: string | null;
+  DesLastName2: string | null;
+  NumIdentification: string | null;
+  DesEmail: string;
+}
+
 export interface CreateQuotePayload {
   codProduct: string;
   codDistributionChannel: string;
@@ -366,6 +399,20 @@ export class QuotingService {
    *  el listado (ver `QuotesComponent.resumeQuote`). */
   getQuote(ideQuote: string): Observable<QuotePricingResult> {
     return this.http.get<QuotePricingResult>(`${this.base}/${ideQuote}`);
+  }
+
+  /** Cotización colectiva: un tomador con N asegurados (un riesgo por asegurado). */
+  createCollective(payload: CreateCollectiveQuotePayload): Observable<{ ideQuote: string; numQuote: string; insuredCount: number }> {
+    return this.http.post<{ ideQuote: string; numQuote: string; insuredCount: number }>(`${this.base}/collective`, payload);
+  }
+
+  listInsureds(ideQuote: string): Observable<CollectiveInsuredRow[]> {
+    return this.http.get<CollectiveInsuredRow[]>(`${this.base}/${ideQuote}/insureds`);
+  }
+
+  /** Aplica un único plan a todos los asegurados del colectivo. */
+  selectCollectivePlan(ideQuote: string, codPlanProduct: string): Observable<QuotePricingResult> {
+    return this.http.patch<QuotePricingResult>(`${this.base}/${ideQuote}/collective-plan`, { codPlanProduct });
   }
 
   price(ideQuote: string): Observable<QuotePricingResult> {

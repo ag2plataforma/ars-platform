@@ -44,6 +44,7 @@ import { downloadBlob } from '../../core/files/file.util';
 const PRODUCT_ENDORSEMENTS_PATH = '/product-rating/product-endorsements';
 const COVERAGE_PLANS_PATH = '/product-rating/coverage-plans';
 const PLAN_PRODUCT_RISKS_PATH = '/product-rating/plan-product-risks';
+const IDENTIFICATION_TYPES_PATH = '/reference-data/identification-types';
 
 /** Fila de `GET /product-rating/coverage-plans?idePlanProductRisk=...`
  *  (ver `CoveragePlansService.findAll`/`INCLUDE` en el backend real,
@@ -1396,6 +1397,195 @@ export class ContractDetailComponent implements OnInit {
       const refreshedRisk = refreshedFile?.TFileRisk.find((r) => r.IdeFileRisk === risk.IdeFileRisk) ?? null;
       this.selectedRisk.set(refreshedRisk);
     }
+  }
+
+  // ---------------------------------------------------------------- Colectivos: certificados
+
+  /** Diálogos "Alta de asegurado" / "Baja de asegurado" (colectivos, etapa 1). */
+  readonly addCertDialogVisible = signal(false);
+  readonly addCertSubmitting = signal(false);
+  readonly identificationTypes = signal<CatalogRow[]>([]);
+  addCertForm = this.buildAddCertForm();
+  readonly removeCertDialogVisible = signal(false);
+  readonly removeCertSubmitting = signal(false);
+  readonly removeCertFile = signal<ContractFile | null>(null);
+  removeCertForm = this.buildRemoveCertForm();
+
+  private buildAddCertForm() {
+    return this.fb.nonNullable.group({
+      idePlanProductRisk: ['', Validators.required],
+      desFirstName: ['', Validators.required],
+      desLastName1: [''],
+      desLastName2: [''],
+      desEmail: ['', [Validators.required, Validators.email]],
+      codIdentificationType: [''],
+      numIdentification: [''],
+      tstBirthdate: [''],
+      ideProductEndorsement: ['', Validators.required],
+      tstSupplement: ['', Validators.required],
+      desSupplement: ['', Validators.required],
+    });
+  }
+
+  private buildRemoveCertForm() {
+    return this.fb.nonNullable.group({
+      ideProductEndorsement: ['', Validators.required],
+      tstSupplement: ['', Validators.required],
+      desSupplement: ['', Validators.required],
+    });
+  }
+
+  /** Nombre del asegurado de un certificado (rol ASEGURADO) para la tabla. */
+  insuredOf(file: ContractFile): string {
+    const person = file.TContractFilePerson?.find((p) => p.SPersonRol?.CodPersonRol === 'ASEGURADO')?.TPerson;
+    return person ? [person.DesFirstName, person.DesLastName1].filter(Boolean).join(' ') : '';
+  }
+
+  insuredEmailOf(file: ContractFile): string {
+    return file.TContractFilePerson?.find((p) => p.SPersonRol?.CodPersonRol === 'ASEGURADO')?.TPerson?.DesEmail ?? '';
+  }
+
+  openAddCertDialog(): void {
+    const c = this.contract();
+    if (!c) return;
+    this.addCertForm = this.buildAddCertForm();
+    this.resetAddRiskAttributeFields();
+    this.addCertForm.controls.idePlanProductRisk.valueChanges.subscribe((idePlanProductRisk) => {
+      if (idePlanProductRisk) {
+        this.loadAddRiskAttributeFields(idePlanProductRisk);
+      } else {
+        this.resetAddRiskAttributeFields();
+      }
+    });
+    this.planProductRiskOptions.set([]);
+    this.catalogService.list(PLAN_PRODUCT_RISKS_PATH).subscribe({
+      next: (rows) => {
+        const codProduct = c.SProduct.CodProduct;
+        this.planProductRiskOptions.set(
+          (rows as unknown as PlanProductRiskOption[]).filter((row) => row.SPlanProduct.SProduct.CodProduct === codProduct),
+        );
+      },
+      error: (err: HttpErrorResponse) => this.showError(err),
+    });
+    this.catalogService.list(IDENTIFICATION_TYPES_PATH).subscribe({
+      next: (rows) => this.identificationTypes.set(rows),
+      error: (err: HttpErrorResponse) => this.showError(err),
+    });
+    this.loadProductEndorsements(c);
+    this.addCertDialogVisible.set(true);
+  }
+
+  private loadProductEndorsements(c: ContractDetail): void {
+    this.productEndorsements.set([]);
+    this.catalogService.list(PRODUCT_ENDORSEMENTS_PATH, { codProduct: c.SProduct.CodProduct }).subscribe({
+      next: (rows) => this.productEndorsements.set(rows.filter((row) => row.SState?.CodState === 'ACTIVO')),
+      error: (err: HttpErrorResponse) => this.showError(err),
+    });
+  }
+
+  closeAddCertDialog(): void {
+    this.addCertDialogVisible.set(false);
+  }
+
+  submitAddCert(): void {
+    const c = this.contract();
+    if (!c) return;
+    if (this.addCertForm.invalid || this.addRiskAttributesForm.invalid || this.addRiskAttributesLoading()) {
+      this.addCertForm.markAllAsTouched();
+      this.addRiskAttributesForm.markAllAsTouched();
+      return;
+    }
+    const raw = this.addCertForm.getRawValue();
+    const hasAttributeFields = this.addRiskAttributeFields().length > 0;
+    this.addCertSubmitting.set(true);
+    this.contracts
+      .addCertificate(c.IdeContract, {
+        ideProductEndorsement: raw.ideProductEndorsement,
+        tstSupplement: raw.tstSupplement,
+        desSupplement: raw.desSupplement,
+        idePlanProductRisk: raw.idePlanProductRisk,
+        insured: {
+          desFirstName: raw.desFirstName,
+          desLastName1: raw.desLastName1 || undefined,
+          desLastName2: raw.desLastName2 || undefined,
+          desEmail: raw.desEmail,
+          codIdentificationType: raw.codIdentificationType || undefined,
+          numIdentification: raw.numIdentification || undefined,
+          tstBirthdate: raw.tstBirthdate || undefined,
+          riskAttributeValue: hasAttributeFields
+            ? (this.addRiskAttributesForm.getRawValue() as Record<string, unknown>)
+            : undefined,
+        },
+      })
+      .subscribe({
+        next: (result) => {
+          this.contract.set(result);
+          this.addCertSubmitting.set(false);
+          this.closeAddCertDialog();
+          this.messages.add({
+            severity: 'success',
+            summary: this.transloco.translate('common.done'),
+            detail: this.transloco.translate('contractDetail.addCertDialog.appliedDetail'),
+          });
+        },
+        error: (err: HttpErrorResponse) => {
+          this.addCertSubmitting.set(false);
+          this.showError(err);
+        },
+      });
+  }
+
+  openRemoveCertDialog(file: ContractFile): void {
+    const c = this.contract();
+    if (!c) return;
+    this.removeCertFile.set(file);
+    this.removeCertForm = this.buildRemoveCertForm();
+    this.loadProductEndorsements(c);
+    this.removeCertDialogVisible.set(true);
+  }
+
+  closeRemoveCertDialog(): void {
+    this.removeCertDialogVisible.set(false);
+    this.removeCertFile.set(null);
+  }
+
+  submitRemoveCert(): void {
+    const c = this.contract();
+    const file = this.removeCertFile();
+    if (!c || !file) return;
+    if (this.removeCertForm.invalid) {
+      this.removeCertForm.markAllAsTouched();
+      return;
+    }
+    const raw = this.removeCertForm.getRawValue();
+    this.removeCertSubmitting.set(true);
+    this.contracts
+      .removeCertificate(c.IdeContract, {
+        ideContractFile: file.IdeContractFile,
+        ideProductEndorsement: raw.ideProductEndorsement,
+        tstSupplement: raw.tstSupplement,
+        desSupplement: raw.desSupplement,
+      })
+      .subscribe({
+        next: (result) => {
+          this.contract.set(result);
+          if (this.selectedFile()?.IdeContractFile === file.IdeContractFile) {
+            this.selectedFile.set(result.TContractFile.find((f) => f.IdeContractFile === file.IdeContractFile) ?? null);
+            this.selectedRisk.set(null);
+          }
+          this.removeCertSubmitting.set(false);
+          this.closeRemoveCertDialog();
+          this.messages.add({
+            severity: 'success',
+            summary: this.transloco.translate('common.done'),
+            detail: this.transloco.translate('contractDetail.removeCertDialog.appliedDetail'),
+          });
+        },
+        error: (err: HttpErrorResponse) => {
+          this.removeCertSubmitting.set(false);
+          this.showError(err);
+        },
+      });
   }
 
   stateSeverity(codState: string): 'info' | 'warn' | 'success' | 'secondary' {

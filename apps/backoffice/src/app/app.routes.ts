@@ -53,6 +53,12 @@ export const routes: Routes = [
               import('./features/quotes/quotes.component').then((m) => m.QuotesComponent),
           },
           {
+            // Colectivos (un tomador con N asegurados) -- ANTES que ':id'.
+            path: 'colectivo',
+            loadComponent: () =>
+              import('./features/quotes/collective-quote.component').then((m) => m.CollectiveQuoteComponent),
+          },
+          {
             path: ':id',
             loadComponent: () =>
               import('./features/quotes/quotes.component').then((m) => m.QuotesComponent),

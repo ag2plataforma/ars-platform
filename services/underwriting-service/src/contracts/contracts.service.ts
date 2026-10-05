@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, Logger, NotFoundExc
 import { Prisma, PrismaService, TaskQueueRepository } from '@ars-platform/database';
 import { RulesEngineService, StateMachineService } from '@ars-platform/shared-common';
 import { QuotesService } from '../quoting/quotes.service';
+import { CollectiveQuotesService } from '../quoting/collective-quotes.service';
 import { RequirementsService } from '../requirements/requirements.service';
 import { PaymentsService } from '../payments/payments.service';
 import { PaymentLinksService } from '../payments/payment-links.service';
@@ -11,6 +12,7 @@ import { CancelContractDto } from './dto/cancel-contract.dto';
 import { ChangeInsuredAmountDto } from './dto/change-insured-amount.dto';
 import { AddCoverageDto } from './dto/add-coverage.dto';
 import { RemoveCoverageDto } from './dto/remove-coverage.dto';
+import { AddCertificateDto, RemoveCertificateDto } from './dto/certificate.dto';
 import { AddRiskDto } from './dto/add-risk.dto';
 import { RemoveRiskDto } from './dto/remove-risk.dto';
 import { ChangePersonDataDto } from './dto/change-person-data.dto';
@@ -133,6 +135,7 @@ export class ContractsService {
     private readonly taskQueue: TaskQueueRepository,
     private readonly payments: PaymentsService,
     private readonly paymentLinks: PaymentLinksService,
+    private readonly collectiveQuotes: CollectiveQuotesService,
   ) {}
 
   /**
@@ -173,25 +176,73 @@ export class ContractsService {
     await this.assertPersonsReadyForIssuance(quote.IdeQuote);
     await this.requirementsService.assertQuoteRequirementsReady(quote.IdeQuote, actor);
 
+    // Colectivos (etapa 1): una cotización con asegurados (`TQuoteRiskPerson`) genera un
+    // certificado (`TContractFile`) por asegurado en vez de uno solo para todos los riesgos.
+    const collective = await this.collectiveQuotes.isCollectiveQuote(quote.IdeQuote);
+    if (collective) {
+      const config = await this.collectiveQuotes.getProductConfig(quote.IdeProduct);
+      if (config.CodCollectivePremiumMode !== 'POR_CERTIFICADO') {
+        throw new ConflictException(
+          `El modo de prima "${config.CodCollectivePremiumMode}" todavía no está disponible para colectivos`,
+        );
+      }
+    }
+
     const ideContract = await this.prisma.$transaction(
       async (tx) => {
-        const contract = await this.buildContract(quote, dto, actor, tx);
+        const contract = await this.buildContract(quote, dto, actor, tx, collective);
         await this.setContractPersons(quote.IdeQuote, contract.IdeContract, actor, tx);
         await this.setContractDistributionChannel(quote.IdeDistributionChannel, quote.IdeProduct, contract, actor, tx);
         await this.setContractBilling(contract, actor, tx);
 
-        const contractFile = await this.createContractFile(contract, actor, tx);
-        await this.createInitialContractOperation(contract.IdeContract, actor, tx);
+        if (collective) {
+          await this.createInitialContractOperation(contract.IdeContract, actor, tx);
+          const quoteRisks = await tx.tQuoteRisk.findMany({
+            where: { IdeQuote: quote.IdeQuote },
+            orderBy: { NumRisk: 'asc' },
+            select: { IdeQuoteRisk: true, NumRisk: true },
+          });
+          const allRiskCoverages: Awaited<ReturnType<ContractsService['copyRisksAndCoverages']>> = [];
+          const fileIds: string[] = [];
+          for (const [index, quoteRisk] of quoteRisks.entries()) {
+            const contractFile = await this.createContractFile(contract, actor, tx, index + 1);
+            fileIds.push(contractFile.IdeContractFile);
+            try {
+              allRiskCoverages.push(
+                ...(await this.copyRisksAndCoverages(
+                  quote.IdeQuote,
+                  contract.IdeProduct,
+                  contractFile.IdeContractFile,
+                  actor,
+                  tx,
+                  quoteRisk.IdeQuoteRisk,
+                )),
+              );
+            } catch (err) {
+              throw new BadRequestException(
+                `Asegurado nº ${quoteRisk.NumRisk}: ${(err as Error).message}`,
+              );
+            }
+            await this.setCertificateInsured(quoteRisk.IdeQuoteRisk, contractFile.IdeContractFile, actor, tx);
+          }
+          await this.createInitialMovements(allRiskCoverages, actor, tx);
+          for (const ideContractFile of fileIds) {
+            await this.setNetPrime(ideContractFile, actor, tx);
+          }
+        } else {
+          const contractFile = await this.createContractFile(contract, actor, tx);
+          await this.createInitialContractOperation(contract.IdeContract, actor, tx);
 
-        const riskCoverages = await this.copyRisksAndCoverages(
-          quote.IdeQuote,
-          contract.IdeProduct,
-          contractFile.IdeContractFile,
-          actor,
-          tx,
-        );
-        await this.createInitialMovements(riskCoverages, actor, tx);
-        await this.setNetPrime(contractFile.IdeContractFile, actor, tx);
+          const riskCoverages = await this.copyRisksAndCoverages(
+            quote.IdeQuote,
+            contract.IdeProduct,
+            contractFile.IdeContractFile,
+            actor,
+            tx,
+          );
+          await this.createInitialMovements(riskCoverages, actor, tx);
+          await this.setNetPrime(contractFile.IdeContractFile, actor, tx);
+        }
         await this.generateReceipts(contract.IdeContract, null, actor, tx);
         await this.issueRemainingInstallmentsIfConfigured(contract.IdeContract, actor, tx);
 
@@ -852,6 +903,235 @@ export class ContractsService {
         }
 
         await this.closeFileRisk(dto.ideFileRisk, tstSupplement, dto.desSupplement, actor, tx);
+      },
+      { timeout: SUPPLEMENT_TRANSACTION_TIMEOUT_MS, maxWait: 10_000 },
+    );
+
+    return this.findOne(ideContract);
+  }
+
+  /**
+   * Colectivos, suplemento "Alta de asegurado": agrega un certificado nuevo (`TContractFile`
+   * con su persona asegurada, su riesgo y sus coberturas) a un contrato colectivo activo. Es
+   * la suma de lo que ya hacen "Alta de riesgo" y "Alta de cobertura", con el mismo motor:
+   * persona (se reutiliza o se crea) -> operación del endoso -> certificado nuevo (vigente
+   * desde la fecha del suplemento hasta el fin del contrato) -> riesgo -> coberturas (las
+   * obligatorias del plan, o las indicadas) -> movimientos y conceptos -> recibo SUP
+   * consolidado -> activación. La prima del asegurado nuevo es la de la fecha del suplemento
+   * hasta el fin de la vigencia, prorrateada igual que en un alta de cobertura.
+   */
+  async addCertificate(ideContract: string, dto: AddCertificateDto, actor: string) {
+    const existing = await this.prisma.tContract.findUnique({ where: { IdeContract: ideContract } });
+    if (!existing) {
+      throw new NotFoundException(`No existe contrato con id "${ideContract}"`);
+    }
+    if (!existing.IndCollective) {
+      throw new ConflictException('Solo los contratos colectivos admiten alta de asegurados');
+    }
+
+    const tstSupplement = new Date(dto.tstSupplement);
+
+    await this.prisma.$transaction(
+      async (tx) => {
+        const ideActivo = await this.stateMachine.getStateByCode('Activo');
+        const contract = await tx.tContract.findFirst({
+          where: {
+            IdeContract: ideContract,
+            IdeState: ideActivo,
+            TstInitial: { lte: tstSupplement },
+            TstEnd: { gte: tstSupplement },
+          },
+        });
+        if (!contract) {
+          throw new ConflictException(
+            'No se pudo procesar el suplemento: el contrato no está en estado "Activo" o la fecha del suplemento no está dentro de su vigencia',
+          );
+        }
+        const planProductRisk = await tx.sPlanProductRisk.findFirst({
+          where: {
+            IdePlanProductRisk: dto.idePlanProductRisk,
+            IdeState: ideActivo,
+            SPlanProduct: { IdeProduct: existing.IdeProduct },
+          },
+        });
+        if (!planProductRisk) {
+          throw new NotFoundException(`El plan de riesgo "${dto.idePlanProductRisk}" no está disponible para este producto`);
+        }
+
+        const coveragePlans = await tx.sCoveragePlan.findMany({
+          where: {
+            IdePlanProductRisk: planProductRisk.IdePlanProductRisk,
+            IdeState: ideActivo,
+            ...(dto.ideCoveragePlans?.length ? { IdeCoveragePlan: { in: dto.ideCoveragePlans } } : { IndMandatory: true }),
+          },
+        });
+        if (coveragePlans.length === 0) {
+          throw new BadRequestException('El plan elegido no tiene coberturas para dar de alta');
+        }
+
+        const idePerson = await this.collectiveQuotes.findOrCreateInsuredPerson(dto.insured, actor, tx);
+        const alreadyInsured = await tx.tContractFilePerson.findFirst({
+          where: { IdePerson: idePerson, TContractFile: { IdeContract: ideContract, IdeState: ideActivo } },
+        });
+        if (alreadyInsured) {
+          throw new ConflictException('Esa persona ya es asegurada (con certificado activo) en este colectivo');
+        }
+
+        const codOperation = await this.resolveOperationCodeByEndorsement(dto.ideProductEndorsement, tx);
+        await this.createContractOperation(ideContract, existing.IdeProduct, codOperation, actor, tx);
+
+        const maxFile = await tx.tContractFile.aggregate({
+          where: { IdeContract: ideContract },
+          _max: { NumContractFile: true },
+        });
+        const newFile = await this.createContractFile(
+          { IdeContract: ideContract, TstInitial: tstSupplement, TstEnd: contract.TstEnd },
+          actor,
+          tx,
+          (maxFile._max.NumContractFile ?? 0) + 1,
+        );
+        const nextFileState = await this.stateMachine.getNextState('TContractFile', newFile.IdeState, 'Activar');
+        await tx.tContractFile.update({
+          where: { IdeContractFile: newFile.IdeContractFile },
+          data: { IdeState: nextFileState, UsrModification: actor, TstModification: new Date() },
+        });
+        await this.attachInsuredToFile(idePerson, newFile.IdeContractFile, actor, tx);
+
+        const desFileRisk = [dto.insured.desFirstName, dto.insured.desLastName1].filter(Boolean).join(' ').slice(0, 200);
+        const fileRisk = await this.createNewFileRisk(
+          newFile,
+          planProductRisk,
+          desFileRisk,
+          dto.insured.riskAttributeValue,
+          tstSupplement,
+          actor,
+          tx,
+        );
+
+        const newCoverages: { ideRiskCoverage: string; ideCoveragePlan: string }[] = [];
+        for (const coveragePlan of coveragePlans) {
+          const riskCoverage = await this.createNewRiskCoverage(fileRisk, coveragePlan, undefined, tstSupplement, actor, tx);
+          newCoverages.push({ ideRiskCoverage: riskCoverage.IdeRiskCoverage, ideCoveragePlan: coveragePlan.IdeCoveragePlan });
+        }
+
+        await this.createInitialMovements(
+          newCoverages.map((c) => ({
+            ideRiskCoverage: c.ideRiskCoverage,
+            ideFileRisk: fileRisk.IdeFileRisk,
+            ideCoveragePlan: c.ideCoveragePlan,
+            idePlanProductRisk: fileRisk.IdePlanProductRisk,
+            ideProduct: existing.IdeProduct,
+            prime: 0,
+          })),
+          actor,
+          tx,
+        );
+        await this.setNetPrime(newFile.IdeContractFile, actor, tx);
+        await this.generateReceipts(ideContract, dto.ideProductEndorsement, actor, tx);
+
+        for (const coverage of newCoverages) {
+          const movement = await tx.tCoverageMovement.findFirstOrThrow({ where: { IdeRiskCoverage: coverage.ideRiskCoverage } });
+          await this.activateNewCoverage(coverage.ideRiskCoverage, movement.IdeCoverageMovement, actor, tx);
+        }
+      },
+      { timeout: SUPPLEMENT_TRANSACTION_TIMEOUT_MS, maxWait: 10_000 },
+    );
+
+    return this.findOne(ideContract);
+  }
+
+  /**
+   * Colectivos, suplemento "Baja de asegurado": cierra un certificado. Por cada riesgo activo
+   * del certificado repite lo de "Baja de riesgo" (todas sus coberturas a monto 0 con devolución
+   * proporcional al tiempo) con UN solo recibo SUP consolidado para todo el certificado y,
+   * al final, cierra el certificado (`TContractFile`, mismo operativo `'Modificar'` que usa la
+   * anulación total). No permite dar de baja el último certificado activo: para eso está la
+   * anulación del contrato.
+   */
+  async removeCertificate(ideContract: string, dto: RemoveCertificateDto, actor: string) {
+    const existing = await this.prisma.tContract.findUnique({ where: { IdeContract: ideContract } });
+    if (!existing) {
+      throw new NotFoundException(`No existe contrato con id "${ideContract}"`);
+    }
+    if (!existing.IndCollective) {
+      throw new ConflictException('Solo los contratos colectivos admiten baja de asegurados');
+    }
+
+    const tstSupplement = new Date(dto.tstSupplement);
+
+    await this.prisma.$transaction(
+      async (tx) => {
+        const ideActivo = await this.stateMachine.getStateByCode('Activo');
+        const contract = await tx.tContract.findFirst({
+          where: {
+            IdeContract: ideContract,
+            IdeState: ideActivo,
+            TstInitial: { lte: tstSupplement },
+            TstEnd: { gte: tstSupplement },
+          },
+        });
+        if (!contract) {
+          throw new ConflictException(
+            'No se pudo procesar el suplemento: el contrato no está en estado "Activo" o la fecha del suplemento no está dentro de su vigencia',
+          );
+        }
+        const file = await tx.tContractFile.findFirst({
+          where: { IdeContractFile: dto.ideContractFile, IdeContract: ideContract, IdeState: ideActivo },
+        });
+        if (!file) {
+          throw new NotFoundException(`No existe un certificado activo "${dto.ideContractFile}" en el contrato "${ideContract}"`);
+        }
+        const activeFiles = await tx.tContractFile.count({ where: { IdeContract: ideContract, IdeState: ideActivo } });
+        if (activeFiles <= 1) {
+          throw new ConflictException('No se puede dar de baja el último asegurado: anule el contrato');
+        }
+
+        const codOperation = await this.resolveOperationCodeByEndorsement(dto.ideProductEndorsement, tx);
+        await this.createContractOperation(ideContract, existing.IdeProduct, codOperation, actor, tx);
+
+        const fileRisks = await tx.tFileRisk.findMany({
+          where: { IdeContractFile: dto.ideContractFile, IdeState: ideActivo },
+          select: { IdeFileRisk: true },
+        });
+        const riskCoverages = await tx.tRiskCoverage.findMany({
+          where: { IdeFileRisk: { in: fileRisks.map((r) => r.IdeFileRisk) }, IdeState: ideActivo },
+          select: { IdeRiskCoverage: true },
+        });
+
+        const newMovementIds: string[] = [];
+        for (const { IdeRiskCoverage: ideRiskCoverage } of riskCoverages) {
+          const { lastMovement } = await this.validateSupplementDate(ideContract, ideRiskCoverage, tstSupplement, tx);
+          if (Number(lastMovement.Amount) === 0) continue;
+          const newMovement = await this.createSupplementMovement(ideRiskCoverage, lastMovement, tstSupplement, 0, actor, tx);
+          await this.setSupplementConcepts(ideRiskCoverage, lastMovement, newMovement, 0, actor, tx);
+          await this.setSupplementPrime(ideRiskCoverage, newMovement.IdeCoverageMovement, 0, actor, tx);
+          newMovementIds.push(newMovement.IdeCoverageMovement);
+        }
+
+        if (newMovementIds.length > 0) {
+          await this.generateReceipts(ideContract, dto.ideProductEndorsement, actor, tx);
+          for (const ideCoverageMovement of newMovementIds) {
+            await this.activateSupplementMovement(ideCoverageMovement, actor, tx);
+          }
+        }
+        for (const { IdeRiskCoverage: ideRiskCoverage } of riskCoverages) {
+          await this.closeRiskCoverage(ideRiskCoverage, actor, tx);
+        }
+        for (const { IdeFileRisk: ideFileRisk } of fileRisks) {
+          await this.closeFileRisk(ideFileRisk, tstSupplement, dto.desSupplement, actor, tx);
+        }
+
+        const nextFileState = await this.stateMachine.getNextState('TContractFile', file.IdeState, 'Modificar');
+        await tx.tContractFile.update({
+          where: { IdeContractFile: dto.ideContractFile },
+          data: {
+            TstCancellation: tstSupplement,
+            DesCancellation: dto.desSupplement,
+            IdeState: nextFileState,
+            UsrModification: actor,
+            TstModification: new Date(),
+          },
+        });
       },
       { timeout: SUPPLEMENT_TRANSACTION_TIMEOUT_MS, maxWait: 10_000 },
     );
@@ -1744,6 +2024,7 @@ export class ContractsService {
     dto: CreateContractDto,
     actor: string,
     tx: Prisma.TransactionClient = this.prisma,
+    collective = false,
   ) {
     const productValidityType = await tx.sProductValidityType.findFirst({
       where: { IdeProduct: quote.IdeProduct },
@@ -1773,7 +2054,7 @@ export class ContractsService {
         TstInitial: tstInitial,
         TstEnd: tstEnd,
         TstSubscription: now,
-        IndCollective: false, // ver comentario de cabecera: colectivos reales quedan para una fase futura.
+        IndCollective: collective, // colectivos (etapa 1): un certificado por asegurado, ver `create()`.
         IdeValidityType: productValidityType.IdeValidityType,
         ContractAge: 1, // Confirmado literal contra el INSERT real de TContract en CONTRACTNEW -- ver doc-comment de cabecera de la clase.
         IndInternalBillingManagement: true,
@@ -2177,13 +2458,14 @@ export class ContractsService {
     contract: { IdeContract: string; TstInitial: Date; TstEnd: Date | null },
     actor: string,
     tx: Prisma.TransactionClient = this.prisma,
+    numContractFile = 1,
   ) {
     const ideStateInitial = await this.stateMachine.getInitialState('TContractFile');
     const now = new Date();
     return tx.tContractFile.create({
       data: {
         IdeContract: contract.IdeContract,
-        NumContractFile: 1,
+        NumContractFile: numContractFile,
         TstInclusion: now,
         TstInitial: contract.TstInitial,
         TstEnd: contract.TstEnd ?? contract.TstInitial,
@@ -2224,15 +2506,64 @@ export class ContractsService {
    * cotización) y copia los `TQuoteRequirement` asociados (a nivel de
    * riesgo y de cobertura) a `TContractRequirement`.
    */
+  /**
+   * Colectivos: deja a la persona asegurada del riesgo de la cotización (`TQuoteRiskPerson`)
+   * como asegurada del certificado (`TContractFilePerson`, rol `ASEGURADO`) y la convierte en
+   * cliente, igual criterio que Tomador/Titular en `setContractPersons`.
+   */
+  private async setCertificateInsured(
+    ideQuoteRisk: string,
+    ideContractFile: string,
+    actor: string,
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
+    const rows = await tx.$queryRaw<{ IdePerson: string }[]>`
+      SELECT "IdePerson" FROM ars_platform."TQuoteRiskPerson" WHERE "IdeQuoteRisk" = ${ideQuoteRisk}::uuid`;
+    const idePerson = rows[0]?.IdePerson;
+    if (!idePerson) return;
+    await this.attachInsuredToFile(idePerson, ideContractFile, actor, tx);
+  }
+
+  private async attachInsuredToFile(
+    idePerson: string,
+    ideContractFile: string,
+    actor: string,
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
+    const [rol, ideActivo] = await Promise.all([
+      tx.sPersonRol.findFirst({ where: { CodPersonRol: 'ASEGURADO' } }),
+      this.stateMachine.getStateByCode('ACTIVO'),
+    ]);
+    if (!rol) throw new NotFoundException('No existe el rol de persona "ASEGURADO" (SPersonRol)');
+    const now = new Date();
+    await tx.tContractFilePerson.create({
+      data: {
+        IdeContractFile: ideContractFile,
+        IdePerson: idePerson,
+        IdePersonRol: rol.IdePersonRol,
+        IdeState: ideActivo,
+        UsrCreation: actor,
+        TstCreation: now,
+        UsrModification: actor,
+        TstModification: now,
+      },
+    });
+    await tx.tPerson.update({
+      where: { IdePerson: idePerson },
+      data: { IndClient: true, IndLead: false, TstRelationshipStart: now, UsrModification: actor, TstModification: now },
+    });
+  }
+
   private async copyRisksAndCoverages(
     ideQuote: string,
     ideProduct: string,
     ideContractFile: string,
     actor: string,
     tx: Prisma.TransactionClient = this.prisma,
+    onlyIdeQuoteRisk?: string,
   ) {
     const quoteRisks = await tx.tQuoteRisk.findMany({
-      where: { IdeQuote: ideQuote },
+      where: { IdeQuote: ideQuote, ...(onlyIdeQuoteRisk ? { IdeQuoteRisk: onlyIdeQuoteRisk } : {}) },
       include: {
         TQuoteRiskPlan: {
           where: { IndSelected: true },
@@ -4361,15 +4692,33 @@ export class ContractsService {
         TRiskCoverage: {
           select: {
             IdeCoveragePlan: true,
-            TFileRisk: { select: { IdeContractFile: true, IdePlanProductRisk: true } },
+            TFileRisk: {
+              select: {
+                IdeContractFile: true,
+                IdePlanProductRisk: true,
+                TContractFile: { select: { NumContractFile: true } },
+              },
+            },
           },
         },
       },
     });
 
+    // Colectivos: UN recibo consolidado por contrato y operación (la suma de todos los
+    // certificados), anclado al primer certificado (`TReceipt.IdeContractFile` es obligatorio).
+    // Cada línea del recibo sigue apuntando a su movimiento, así que el detalle por certificado
+    // se conserva. Un contrato individual mantiene un recibo por archivo, como siempre.
+    const anchorFile = contract.IndCollective
+      ? movements.reduce<{ id: string; num: number } | null>((best, m) => {
+          const file = m.TRiskCoverage.TFileRisk;
+          const num = file.TContractFile.NumContractFile;
+          return !best || num < best.num ? { id: file.IdeContractFile, num } : best;
+        }, null)?.id
+      : undefined;
+
     const movementsByFile = new Map<string, typeof movements>();
     for (const movement of movements) {
-      const ideContractFile = movement.TRiskCoverage.TFileRisk.IdeContractFile;
+      const ideContractFile = anchorFile ?? movement.TRiskCoverage.TFileRisk.IdeContractFile;
       const bucket = movementsByFile.get(ideContractFile) ?? [];
       bucket.push(movement);
       movementsByFile.set(ideContractFile, bucket);

@@ -1,6 +1,8 @@
 import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { CurrentUser, JwtPayload } from '@ars-platform/shared-common';
 import { QuotesService } from './quotes.service';
+import { CollectiveQuotesService } from './collective-quotes.service';
+import { CreateCollectiveQuoteDto, SelectCollectivePlanDto } from './dto/create-collective-quote.dto';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { ToggleCoverageDto } from './dto/toggle-coverage.dto';
 import { SetQuotePersonDto } from './dto/set-quote-person.dto';
@@ -25,11 +27,35 @@ import { SetQuoteAdjustmentsDto } from './dto/set-quote-adjustments.dto';
  */
 @Controller('quotes')
 export class QuotesController {
-  constructor(private readonly service: QuotesService) {}
+  constructor(
+    private readonly service: QuotesService,
+    private readonly collective: CollectiveQuotesService,
+  ) {}
 
   @Post()
   create(@Body() dto: CreateQuoteDto, @CurrentUser() actor: JwtPayload) {
     return this.service.create(dto, actor.code);
+  }
+
+  /**
+   * Cotización colectiva (etapa 1): un tomador con N asegurados, un riesgo por asegurado. Ver
+   * `CollectiveQuotesService`.
+   */
+  @Post('collective')
+  createCollective(@Body() dto: CreateCollectiveQuoteDto, @CurrentUser() actor: JwtPayload) {
+    return this.collective.create(dto, actor.code);
+  }
+
+  /** Asegurados de una cotización colectiva. */
+  @Get(':id/insureds')
+  listInsureds(@Param('id') id: string) {
+    return this.collective.listInsureds(id);
+  }
+
+  /** Aplica un único plan a todos los asegurados del colectivo. */
+  @Patch(':id/collective-plan')
+  selectCollectivePlan(@Param('id') id: string, @Body() dto: SelectCollectivePlanDto, @CurrentUser() actor: JwtPayload) {
+    return this.collective.selectPlanForAll(id, dto.codPlanProduct, actor.code);
   }
 
   /**

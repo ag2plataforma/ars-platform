@@ -6,7 +6,10 @@
       <h1 class="text-lg font-semibold text-slate-900">{{ 'quotesList.title' | transloco }}</h1>
       <p class="text-sm text-slate-500">{{ 'quotesList.subtitle' | transloco }}</p>
     </div>
-    <button pButton type="button" [label]="'quotes.newQuoteButton' | transloco" (click)="nueva()"></button>
+    <div class="flex gap-2">
+      <button pButton type="button" severity="secondary" [outlined]="true" [label]="'quotesList.newCollectiveButton' | transloco" (click)="nuevaColectiva()"></button>
+      <button pButton type="button" [label]="'quotes.newQuoteButton' | transloco" (click)="nueva()"></button>
+    </div>
   </div>
 
   <form [formGroup]="filters" class="flex flex-wrap items-end gap-6 rounded-lg border border-slate-200 p-4">
