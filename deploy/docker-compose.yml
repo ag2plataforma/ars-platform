@@ -1,0 +1,319 @@
+# ARS Platform -- despliegue en VPS (Docker Compose + Caddy + Postgres).
+# Guia paso a paso: docs/05-despliegue-vps-contabo.md
+#
+# Uso (desde deploy/, con .env creado a partir de .env.example):
+#   COMPOSE_PARALLEL_LIMIT=2 docker compose build   # primera vez, 15-25 min
+#   docker compose up -d
+#   docker compose ps
+#
+# Solo el contenedor "web" (Caddy) publica puertos (80/443). Postgres y los
+# servicios viven en la red interna "internal", sin exposicion al exterior.
+name: ars
+
+x-service: &service
+  restart: unless-stopped
+  networks: [internal]
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+x-db-url: &db-url postgresql://ars:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ars}?schema=ars_platform
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    networks: [internal]
+    environment:
+      POSTGRES_USER: ars
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-ars}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Sin "ports": solo accesible desde la red interna. Para psql a mano:
+    #   docker compose exec postgres psql -U ars -d ars
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ars -d ${POSTGRES_DB:-ars}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  iam:
+    <<: *service
+    build:
+      context: ..
+      dockerfile: services/iam-service/Dockerfile
+    image: ars/iam:latest
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      PORT: 3001
+      DATABASE_URL: *db-url
+      NODE_ENV: production
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      JWT_EXTENDED_EXPIRES_IN: ${JWT_EXTENDED_EXPIRES_IN:-90d}
+      BREVO_API_KEY: ${BREVO_API_KEY}
+      EMAIL_SENDER_ADDRESS: ${EMAIL_SENDER_ADDRESS}
+      EMAIL_SENDER_NAME: ${EMAIL_SENDER_NAME:-ARS Platform}
+      PASSWORD_RESET_URL_BASE: https://${DOMAIN}/reset-password
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  product-rating:
+    <<: *service
+    build:
+      context: ..
+      dockerfile: services/product-rating-service/Dockerfile
+    image: ars/product-rating:latest
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      PORT: 3002
+      DATABASE_URL: *db-url
+      NODE_ENV: production
+      JWT_SECRET: ${JWT_SECRET}
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3002/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  party:
+    <<: *service
+    build:
+      context: ..
+      dockerfile: services/party-service/Dockerfile
+    image: ars/party:latest
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      PORT: 3003
+      DATABASE_URL: *db-url
+      NODE_ENV: production
+      JWT_SECRET: ${JWT_SECRET}
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3003/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  reference-data:
+    <<: *service
+    build:
+      context: ..
+      dockerfile: services/reference-data-service/Dockerfile
+    image: ars/reference-data:latest
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      PORT: 3004
+      DATABASE_URL: *db-url
+      NODE_ENV: production
+      JWT_SECRET: ${JWT_SECRET}
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3004/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  underwriting:
+    <<: *service
+    build:
+      context: ..
+      dockerfile: services/underwriting-service/Dockerfile
+    image: ars/underwriting:latest
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      PORT: 3005
+      DATABASE_URL: *db-url
+      NODE_ENV: production
+      JWT_SECRET: ${JWT_SECRET}
+      SOCIAL_IMPACT_SERVICE_URL: http://social-impact:3008
+      DOCUMENTS_SERVICE_URL: http://documents:3009
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-sandbox}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      PUBLIC_APP_URL: https://${DOMAIN}
+      PAYMENT_LINK_TTL_DAYS: ${PAYMENT_LINK_TTL_DAYS:-7}
+      AI_ENABLED: ${AI_ENABLED:-true}
+      AI_PROVIDER: ${AI_PROVIDER:-mock}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-}
+      AI_MAX_FILE_MB: ${AI_MAX_FILE_MB:-10}
+      COLLECTIVE_MAX_INSUREDS: ${COLLECTIVE_MAX_INSUREDS:-100}
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3005/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  claims:
+    <<: *service
+    build:
+      context: ..
+      dockerfile: services/claims-service/Dockerfile
+    image: ars/claims:latest
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      PORT: 3006
+      DATABASE_URL: *db-url
+      NODE_ENV: production
+      JWT_SECRET: ${JWT_SECRET}
+      AI_ENABLED: ${AI_ENABLED:-true}
+      AI_PROVIDER: ${AI_PROVIDER:-mock}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-}
+      AI_MAX_FILE_MB: ${AI_MAX_FILE_MB:-10}
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3006/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  billing:
+    <<: *service
+    build:
+      context: ..
+      dockerfile: services/billing-service/Dockerfile
+    image: ars/billing:latest
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      PORT: 3007
+      DATABASE_URL: *db-url
+      NODE_ENV: production
+      JWT_SECRET: ${JWT_SECRET}
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3007/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  social-impact:
+    <<: *service
+    build:
+      context: ..
+      dockerfile: services/social-impact-service/Dockerfile
+    image: ars/social-impact:latest
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      PORT: 3008
+      DATABASE_URL: *db-url
+      NODE_ENV: production
+      JWT_SECRET: ${JWT_SECRET}
+      EMISSIONS_DEV_API_KEY: ${EMISSIONS_DEV_API_KEY:-}
+      EMISSIONS_DEV_BASE_URL: ${EMISSIONS_DEV_BASE_URL:-https://api.emissions.dev/v1}
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3008/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  documents:
+    <<: *service
+    build:
+      context: ..
+      dockerfile: services/documents-service/Dockerfile
+    image: ars/documents:latest
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      PORT: 3009
+      DATABASE_URL: *db-url
+      NODE_ENV: production
+      JWT_SECRET: ${JWT_SECRET}
+      DOCUMENTS_TMP_DIR: /tmp
+      BREVO_API_KEY: ${BREVO_API_KEY}
+      EMAIL_SENDER_ADDRESS: ${EMAIL_SENDER_ADDRESS}
+      EMAIL_SENDER_NAME: ${EMAIL_SENDER_NAME:-ARS Platform}
+      SMS_PROVIDER: ${SMS_PROVIDER:-twilio}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM: ${TWILIO_FROM:-}
+      TWILIO_TRIAL_TEMPLATE: ${TWILIO_TRIAL_TEMPLATE:-}
+      SMS_SENDER_NAME: ${SMS_SENDER_NAME:-ARS}
+      SMS_DEFAULT_COUNTRY_CODE: ${SMS_DEFAULT_COUNTRY_CODE:-}
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3009/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  gateway:
+    <<: *service
+    build:
+      context: ..
+      dockerfile: services/gateway/Dockerfile
+    image: ars/gateway:latest
+    depends_on: [iam, product-rating, party, reference-data, underwriting, claims, billing, social-impact, documents]
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      JWT_SECRET: ${JWT_SECRET}
+      IAM_SERVICE_URL: http://iam:3001
+      PRODUCT_RATING_SERVICE_URL: http://product-rating:3002
+      PARTY_SERVICE_URL: http://party:3003
+      REFERENCE_DATA_SERVICE_URL: http://reference-data:3004
+      UNDERWRITING_SERVICE_URL: http://underwriting:3005
+      CLAIMS_SERVICE_URL: http://claims:3006
+      BILLING_SERVICE_URL: http://billing:3007
+      SOCIAL_IMPACT_SERVICE_URL: http://social-impact:3008
+      DOCUMENTS_SERVICE_URL: http://documents:3009
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # Caddy: sirve el frontend Angular (build estatico dentro de la imagen),
+  # reenvia /api/* al gateway (quitando el prefijo /api) y gestiona el
+  # certificado HTTPS de Let's Encrypt solo.
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/web/Dockerfile
+    image: ars/web:latest
+    restart: unless-stopped
+    networks: [internal]
+    depends_on: [gateway]
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+networks:
+  internal:
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
