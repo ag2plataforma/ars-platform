@@ -3,6 +3,7 @@ import { GenerationModule } from '../generation/generation.module';
 import { GenerateDocumentHandler } from './handlers/generate-document.handler';
 import { WelcomeEmailHandler } from './handlers/welcome-email.handler';
 import {
+  PaymentLinkEmailHandler,
   RenewalNoticeEmailHandler,
   RenewalNoticeSmsHandler,
   WelcomeSmsHandler,
@@ -28,6 +29,7 @@ import { TasksController } from './tasks.controller';
     WelcomeSmsHandler,
     RenewalNoticeEmailHandler,
     RenewalNoticeSmsHandler,
+    PaymentLinkEmailHandler,
     {
       provide: TASK_HANDLERS,
       useFactory: (...handlers: TaskHandler[]) => handlers,
@@ -37,6 +39,7 @@ import { TasksController } from './tasks.controller';
         WelcomeSmsHandler,
         RenewalNoticeEmailHandler,
         RenewalNoticeSmsHandler,
+        PaymentLinkEmailHandler,
       ],
     },
     TaskWorkerService,

@@ -54,6 +54,55 @@ export class NotificationsService {
     return { sent: true, sentTo: ctx.mobile };
   }
 
+  /**
+   * Correo con el enlace de pago (encolado por `PaymentLinksService.createAndSend`
+   * al elegir "Enviar landing de pago" en el popup "Activar"). Si entre el
+   * encolado y el envío el enlace se canceló, venció o ya se pagó, se omite.
+   */
+  async sendPaymentLinkEmail(ideContract: string, payload: Record<string, unknown>): Promise<NotificationResult> {
+    const ideLink = typeof payload['ideLink'] === 'string' ? payload['ideLink'] : null;
+    const url = typeof payload['url'] === 'string' ? payload['url'] : null;
+    if (!ideLink || !url) throw new PermanentTaskError('La tarea no trae el enlace de pago (ideLink/url)');
+
+    const rows = await this.prisma.$queryRaw<
+      Array<{ CodStatus: string; DesEmail: string | null; TstExpires: Date; IdePerson: string | null }>
+    >`
+      SELECT "CodStatus", "DesEmail", "TstExpires", "IdePerson"
+        FROM ars_platform."TPaymentLink" WHERE "IdePaymentLink" = ${ideLink}::uuid`;
+    const link = rows[0];
+    if (!link) throw new PermanentTaskError(`No existe el enlace de pago "${ideLink}"`);
+    if (!['ENVIADO', 'ABIERTO', 'CONSENTIDO'].includes(link.CodStatus) || link.TstExpires.getTime() < Date.now()) {
+      return { sent: false, skipped: true, reason: `El enlace de pago ya no está vigente (${link.CodStatus})` };
+    }
+    if (!link.DesEmail) throw new PermanentTaskError('El enlace de pago no tiene correo de destino');
+
+    const contract = await this.prisma.tContract.findUnique({
+      where: { IdeContract: ideContract },
+      select: { NumContract: true, SProduct: { select: { DesProduct: true } } },
+    });
+    if (!contract) throw new PermanentTaskError(`No existe el contrato "${ideContract}"`);
+    const person = link.IdePerson
+      ? await this.prisma.tPerson.findUnique({
+          where: { IdePerson: link.IdePerson },
+          select: { DesFirstName: true, DesLastName1: true },
+        })
+      : null;
+    const name = person ? [person.DesFirstName, person.DesLastName1].filter(Boolean).join(' ') : '';
+
+    await this.emailSender.send({
+      to: link.DesEmail,
+      subject: `Completa el pago de tu póliza ${contract.NumContract} — ARS Platform`,
+      html: `
+        <p>Hola ${name || 'cliente'},</p>
+        <p>Tu póliza <strong>${contract.NumContract}</strong> (${contract.SProduct.DesProduct}) está lista para activarse.</p>
+        <p>Para activarla, revisa y acepta las condiciones y realiza el pago desde este enlace seguro:</p>
+        <p><a href="${url}" style="display:inline-block;padding:10px 18px;background:#0369a1;color:#ffffff;border-radius:6px;text-decoration:none">Ir al pago</a></p>
+        <p style="color:#64748b;font-size:12px">El enlace es personal y vence el ${this.formatDate(link.TstExpires)}. Si no esperabas este correo, ignóralo.</p>
+      `,
+    });
+    return { sent: true, sentTo: link.DesEmail };
+  }
+
   async sendRenewalNoticeEmail(ideContract: string): Promise<NotificationResult> {
     const ctx = await this.loadContext(ideContract);
     const stale = this.renewalSkipReason(ctx);

@@ -118,6 +118,12 @@ export class ContractsController {
     return this.service.renew(id, actor.code);
   }
 
+  /** Botón "Cancelar enlace" del enlace de pago vigente (ver `ContractsService.cancelPaymentLink`). */
+  @Post('contracts/:id/payment-link/cancel')
+  cancelPaymentLink(@Param('id') id: string, @CurrentUser() actor: JwtPayload) {
+    return this.service.cancelPaymentLink(id, actor.code);
+  }
+
   /**
    * Botón "Emitir próxima cuota": emite el recibo de la siguiente cuota
    * pendiente del ciclo (ver `ContractsService.issueNextInstallment`).

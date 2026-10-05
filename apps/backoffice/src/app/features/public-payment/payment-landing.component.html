@@ -1,0 +1,94 @@
+<div class="flex min-h-screen items-start justify-center bg-slate-100 p-4 sm:p-8">
+  <div class="w-full max-w-xl rounded-xl bg-white p-6 shadow-sm sm:p-8">
+    <h1 class="text-xl font-semibold text-slate-900">{{ 'publicPayment.title' | transloco }}</h1>
+
+    @if (loading()) {
+      <div class="flex justify-center py-12"><p-progressSpinner strokeWidth="4" styleClass="w-10 h-10" /></div>
+    } @else if (notFound()) {
+      <p-message severity="error" class="mt-4 block">{{ 'publicPayment.notFound' | transloco }}</p-message>
+    } @else if (view(); as v) {
+      <p class="mt-1 text-sm text-slate-500">{{ 'publicPayment.contractNumber' | transloco: { num: v.numContract } }}</p>
+
+      @switch (v.status) {
+        @case ('PAGADO') {
+          <p-message severity="success" class="mt-4 block">{{ 'publicPayment.paid' | transloco }}</p-message>
+        }
+        @case ('VENCIDO') {
+          <p-message severity="warn" class="mt-4 block">{{ 'publicPayment.expired' | transloco }}</p-message>
+        }
+        @case ('CANCELADO') {
+          <p-message severity="warn" class="mt-4 block">{{ 'publicPayment.cancelled' | transloco }}</p-message>
+        }
+        @default {
+          @if (v.contract && v.payment) {
+            <dl class="mt-5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-lg bg-slate-50 p-4 text-sm">
+              <dt class="text-slate-500">{{ 'publicPayment.product' | transloco }}</dt>
+              <dd class="text-slate-900">{{ v.contract.desProduct }}</dd>
+              @if (v.contract.desPayer) {
+                <dt class="text-slate-500">{{ 'publicPayment.payer' | transloco }}</dt>
+                <dd class="text-slate-900">{{ v.contract.desPayer }}</dd>
+              }
+              <dt class="text-slate-500">{{ 'publicPayment.validity' | transloco }}</dt>
+              <dd class="text-slate-900">
+                {{ v.contract.tstInitial | date: 'dd/MM/yyyy' }} -
+                {{ v.contract.tstEnd ? (v.contract.tstEnd | date: 'dd/MM/yyyy') : ('publicPayment.noEnd' | transloco) }}
+              </dd>
+              @if (v.contract.numFraction > 1) {
+                <dt class="text-slate-500">{{ 'publicPayment.installments' | transloco }}</dt>
+                <dd class="text-slate-900">{{ v.contract.numFraction }}</dd>
+              }
+            </dl>
+
+            <div class="mt-5 flex items-baseline justify-between rounded-lg border border-sky-200 bg-sky-50 p-4">
+              <span class="text-sm text-slate-700">{{ 'publicPayment.amountToPay' | transloco }}</span>
+              <span class="text-2xl font-semibold text-slate-900">{{ v.payment.amount | number: '1.2-2' }} {{ v.payment.symbol }}</span>
+            </div>
+          }
+
+          @if (v.consents && v.consents.length > 0) {
+            <h2 class="mt-6 text-sm font-semibold text-slate-800">{{ 'publicPayment.consentsTitle' | transloco }}</h2>
+            <div class="mt-2 flex flex-col gap-3">
+              @for (c of v.consents; track c.ideConsent) {
+                <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-3">
+                  <p-checkbox
+                    [binary]="true"
+                    [ngModel]="checked()[c.ideConsent]"
+                    (ngModelChange)="toggle(c.ideConsent, $event)"
+                    [inputId]="'consent-' + c.ideConsent"
+                  />
+                  <span class="text-sm text-slate-700">
+                    <span class="font-medium text-slate-900">{{ c.title }}</span>
+                    @if (c.mandatory) { <span class="text-red-600"> *</span> }
+                    @if (c.text) { <span class="mt-1 block text-xs text-slate-600">{{ c.text }}</span> }
+                    @if (c.url) {
+                      <a [href]="c.url" target="_blank" rel="noopener noreferrer" class="mt-1 block text-xs text-sky-700 underline" (click)="$event.stopPropagation()">{{ 'publicPayment.readDocument' | transloco }}</a>
+                    }
+                  </span>
+                </label>
+              }
+            </div>
+            <p class="mt-2 text-xs text-slate-500">{{ 'publicPayment.mandatoryHint' | transloco }}</p>
+          }
+
+          @if (errorMessage()) {
+            <p-message severity="error" class="mt-4 block">{{ errorMessage() }}</p-message>
+          }
+
+          <button
+            pButton
+            type="button"
+            class="mt-6 w-full"
+            icon="pi pi-credit-card"
+            [label]="'publicPayment.payButton' | transloco"
+            [disabled]="!canPay()"
+            [loading]="submitting()"
+            (click)="pay()"
+          ></button>
+          <p class="mt-3 text-center text-xs text-slate-500">{{ 'publicPayment.expiresAt' | transloco: { date: (v.expiresAt | date: 'dd/MM/yyyy HH:mm') } }}</p>
+        }
+      }
+    } @else if (errorMessage()) {
+      <p-message severity="error" class="mt-4 block">{{ errorMessage() }}</p-message>
+    }
+  </div>
+</div>

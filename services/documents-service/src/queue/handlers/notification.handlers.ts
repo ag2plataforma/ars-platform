@@ -6,6 +6,7 @@ import { PermanentTaskError, TaskHandler } from '../task-handler';
 export const WELCOME_SMS_TASK = 'WELCOME_SMS';
 export const RENEWAL_NOTICE_EMAIL_TASK = 'RENEWAL_NOTICE_EMAIL';
 export const RENEWAL_NOTICE_SMS_TASK = 'RENEWAL_NOTICE_SMS';
+export const PAYMENT_LINK_EMAIL_TASK = 'PAYMENT_LINK_EMAIL';
 
 function contractOf(task: QueuedTask): string {
   if (!task.ideEntity) throw new PermanentTaskError('La tarea no tiene contrato asociado');
@@ -41,5 +42,15 @@ export class RenewalNoticeSmsHandler implements TaskHandler {
   constructor(private readonly notifications: NotificationsService) {}
   async handle(task: QueuedTask) {
     return toResult(await this.notifications.sendRenewalNoticeSms(contractOf(task)));
+  }
+}
+
+/** Correo con el enlace de pago (encolado por `PaymentLinksService.createAndSend`). */
+@Injectable()
+export class PaymentLinkEmailHandler implements TaskHandler {
+  readonly codTaskType = PAYMENT_LINK_EMAIL_TASK;
+  constructor(private readonly notifications: NotificationsService) {}
+  async handle(task: QueuedTask) {
+    return toResult(await this.notifications.sendPaymentLinkEmail(contractOf(task), task.payload));
   }
 }

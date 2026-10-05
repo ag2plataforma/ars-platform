@@ -547,6 +547,39 @@
       "refundTaxLabel": "Devuelve impuesto",
       "createdDetail": "Se agregó el endoso al producto.",
       "updatedDetail": "Se actualizó el endoso del producto."
+    },
+    "consentsTab": "Consentimientos",
+    "consents": {
+      "subtitle": "Consentimientos que el tomador debe aceptar en la landing de pago de este producto. Se eligen del catálogo genérico de consentimientos.",
+      "assignButton": "Asignar del catálogo",
+      "newButton": "Nuevo consentimiento",
+      "orderColumn": "Orden",
+      "codeColumn": "Código",
+      "descriptionColumn": "Descripción",
+      "mandatoryColumn": "Obligatoriedad",
+      "validityColumn": "Vigencia",
+      "mandatory": "Obligatorio",
+      "optional": "Opcional",
+      "emptyState": "Este producto no tiene consentimientos asignados. La landing de pago no pedirá ninguno.",
+      "assignDialogTitle": "Asignar consentimiento",
+      "consentLabel": "Consentimiento",
+      "consentPlaceholder": "Selecciona un consentimiento del catálogo",
+      "catalogEmpty": "No quedan consentimientos del catálogo por asignar. Crea uno nuevo.",
+      "assignConfirm": "Asignar",
+      "createDialogTitle": "Nuevo consentimiento",
+      "editDialogTitle": "Editar consentimiento",
+      "createHint": "Se crea en el catálogo genérico y se asigna automáticamente a este producto.",
+      "textLabel": "Texto que verá el tomador",
+      "urlLabel": "Enlace al documento (opcional)",
+      "fromLabel": "Vigente desde",
+      "toLabel": "Vigente hasta",
+      "mandatoryLabel": "Obligatorio para poder pagar",
+      "assignedDetail": "Consentimiento asignado al producto.",
+      "removeHeader": "Quitar consentimiento",
+      "removeConfirm": "¿Quitar \"{{item}}\" de este producto? Seguirá existiendo en el catálogo.",
+      "removedDetail": "Consentimiento quitado del producto.",
+      "updatedDetail": "Consentimiento actualizado.",
+      "rangeError": "La fecha final no puede ser anterior a la inicial."
     }
   },
   "quotes": {
@@ -760,15 +793,14 @@
     },
     "activateDialog": {
       "title": "Activar contrato",
-      "subtitle": "Elegí cómo se activa. El contrato pasa a Activo y se envía la bienvenida al cliente.",
+      "subtitle": "Elige cómo se activa el contrato. Pasa a Activo y se envía la bienvenida al cliente.",
       "linkOption": "Enviar landing de pago al cliente",
-      "linkHint": "El tomador recibe un correo con un enlace para aceptar los consentimientos y pagar. El contrato se activa solo cuando se confirma el cobro.",
-      "comingSoon": "Próximamente",
+      "linkHint": "El tomador recibe un correo con un enlace (válido 7 días) para aceptar los consentimientos y pagar. El contrato se activa solo cuando se confirma el cobro.",
       "manualOption": "Activar sin pasar por la pasarela de pago",
       "manualHint": "Activa el contrato y marca el primer recibo como cobrado. Queda registrado quién lo hizo y el motivo.",
       "reasonLabel": "Motivo (obligatorio)",
-      "reasonRequired": "Escribí el motivo de la activación sin pago (mínimo 3 caracteres).",
-      "confirmButton": "Activar sin pago"
+      "reasonRequired": "Escribe el motivo de la activación sin pago (mínimo 3 caracteres).",
+      "confirmButton": "Confirmar"
     },
     "payments": {
       "title": "Cobros registrados",
@@ -908,7 +940,24 @@
       "confirmButton": "Guardar cambios",
       "appliedDetail": "Se actualizaron los datos de la persona."
     },
-    "noRenewTag": "No renovar"
+    "noRenewTag": "No renovar",
+    "paymentLink": {
+      "sentDetail": "Enlace de pago enviado al tomador.",
+      "cancelledDetail": "Enlace de pago cancelado.",
+      "waitingTitle": "Esperando el pago del cliente",
+      "waitingDetail": "Enlace enviado a {{email}}, válido hasta {{date}}.",
+      "expired": "El último enlace de pago venció el {{date}}. Puedes reenviar uno nuevo.",
+      "resend": "Reenviar",
+      "cancel": "Cancelar enlace",
+      "status": {
+        "ENVIADO": "Enviado",
+        "ABIERTO": "Abierto por el cliente",
+        "CONSENTIDO": "Consentimientos aceptados",
+        "PAGADO": "Pagado",
+        "VENCIDO": "Vencido",
+        "CANCELADO": "Cancelado"
+      }
+    }
   },
   "rateTables": {
     "title": "Tablas de tarifa",
@@ -1435,7 +1484,8 @@
       "WELCOME_EMAIL": "Correo de bienvenida",
       "WELCOME_SMS": "SMS de bienvenida",
       "RENEWAL_NOTICE_EMAIL": "Aviso de renovación (correo)",
-      "RENEWAL_NOTICE_SMS": "Aviso de renovación (SMS)"
+      "RENEWAL_NOTICE_SMS": "Aviso de renovación (SMS)",
+      "PAYMENT_LINK_EMAIL": "Enlace de pago (correo)"
     },
     "status": {
       "PENDIENTE": "En espera",
@@ -1551,5 +1601,32 @@
     "passwordHint": "Mínimo 8 caracteres. El usuario podrá cambiarla luego.",
     "createdDetail": "Usuario creado correctamente.",
     "updatedDetail": "Usuario actualizado correctamente."
+  },
+  "publicPayment": {
+    "title": "Pago de tu póliza",
+    "contractNumber": "Contrato {{num}}",
+    "notFound": "Este enlace de pago no es válido.",
+    "paid": "El pago se ha realizado correctamente. Tu póliza está activa; recibirás la confirmación por correo.",
+    "expired": "Este enlace de pago ha vencido. Solicita uno nuevo a tu gestor.",
+    "cancelled": "Este enlace de pago ya no está disponible. Solicita uno nuevo a tu gestor.",
+    "product": "Producto",
+    "payer": "Tomador",
+    "validity": "Vigencia",
+    "noEnd": "sin fecha de fin",
+    "installments": "Pagos fraccionados",
+    "amountToPay": "Importe a pagar ahora",
+    "consentsTitle": "Consentimientos",
+    "readDocument": "Leer documento",
+    "mandatoryHint": "Los campos marcados con * son obligatorios para continuar.",
+    "payButton": "Ir a pagar",
+    "expiresAt": "Enlace válido hasta {{date}}.",
+    "sandbox": {
+      "banner": "Pasarela de pago SIMULADA (entorno de pruebas). No se realiza ningún cobro real.",
+      "title": "Pasarela de pago de pruebas",
+      "alreadyProcessed": "Este pago ya fue procesado.",
+      "back": "Volver",
+      "success": "Pago correcto",
+      "failure": "Pago fallido"
+    }
   }
 }

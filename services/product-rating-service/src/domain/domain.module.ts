@@ -21,6 +21,8 @@ import { ProductEndorsementsController } from './product-endorsements.controller
 import { ProductEndorsementsService } from './product-endorsements.service';
 import { ProductPaymentFractionsController } from './product-payment-fractions.controller';
 import { ProductPaymentFractionsService } from './product-payment-fractions.service';
+import { ProductConsentsController } from './product-consents.controller';
+import { ProductConsentsService } from './product-consents.service';
 
 /**
  * Las 7 entidades "de dominio" (a diferencia de los 8 catálogos de
@@ -52,6 +54,7 @@ import { ProductPaymentFractionsService } from './product-payment-fractions.serv
     CoverageGuaranteesController,
     ProductEndorsementsController,
     ProductPaymentFractionsController,
+    ProductConsentsController,
   ],
   providers: [
     ProductsService,
@@ -64,6 +67,7 @@ import { ProductPaymentFractionsService } from './product-payment-fractions.serv
     CoverageGuaranteesService,
     ProductEndorsementsService,
     ProductPaymentFractionsService,
+    ProductConsentsService,
   ],
 })
 export class DomainModule {}

@@ -16,6 +16,7 @@ export const TASK_TYPES = [
   'WELCOME_SMS',
   'RENEWAL_NOTICE_EMAIL',
   'RENEWAL_NOTICE_SMS',
+  'PAYMENT_LINK_EMAIL',
 ];
 
 export interface QueueTask {

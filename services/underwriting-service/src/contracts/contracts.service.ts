@@ -4,6 +4,7 @@ import { RulesEngineService, StateMachineService } from '@ars-platform/shared-co
 import { QuotesService } from '../quoting/quotes.service';
 import { RequirementsService } from '../requirements/requirements.service';
 import { PaymentsService } from '../payments/payments.service';
+import { PaymentLinksService } from '../payments/payment-links.service';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { ActivateContractDto } from './dto/activate-contract.dto';
 import { CancelContractDto } from './dto/cancel-contract.dto';
@@ -131,6 +132,7 @@ export class ContractsService {
     private readonly requirementsService: RequirementsService,
     private readonly taskQueue: TaskQueueRepository,
     private readonly payments: PaymentsService,
+    private readonly paymentLinks: PaymentLinksService,
   ) {}
 
   /**
@@ -231,6 +233,67 @@ export class ContractsService {
    * preexistente, no algo que este método deba corregir.
    */
   async activate(ideContract: string, dto: ActivateContractDto, actor: string) {
+    if (dto.mode === 'PAYMENT_LINK') {
+      // "Enviar landing de pago": el contrato NO se activa acá -- sigue en
+      // Borrador hasta que la pasarela confirme el cobro (webhook, ver
+      // `PaymentEventsService`). Reenviar crea un enlace nuevo y cancela el anterior.
+      await this.paymentLinks.createAndSend(ideContract, actor);
+      return this.findOne(ideContract);
+    }
+
+    await this.runActivation(ideContract, actor, (tx) =>
+      // Activación sin pasarela (MANUAL): el primer recibo queda cobrado en la
+      // MISMA transacción, con el motivo del operador como evidencia.
+      this.payments.registerFirstReceiptPayment(
+        ideContract,
+        { codMethod: 'MANUAL', reason: dto.desReason, actor },
+        tx,
+      ),
+    );
+    // Si había un enlace de pago vigente, ya no tiene sentido.
+    await this.paymentLinks.cancelActive(ideContract, actor).catch(() => undefined);
+    return this.findOne(ideContract);
+  }
+
+  /**
+   * Activación disparada por el cobro confirmado de la pasarela (webhook). El
+   * primer recibo se cobra con el intento PENDIENTE que originó el pago;
+   * `inTx` permite al llamador actualizar su propio estado (p. ej. el enlace
+   * a PAGADO) en la MISMA transacción.
+   */
+  async activateWithPayment(
+    ideContract: string,
+    input: { codProvider: string; externalId: string; payload: Record<string, unknown> },
+    actor: string,
+    inTx?: (tx: Prisma.TransactionClient) => Promise<void>,
+  ): Promise<void> {
+    await this.runActivation(ideContract, actor, async (tx) => {
+      await this.payments.registerFirstReceiptPayment(
+        ideContract,
+        {
+          codMethod: 'PASARELA',
+          codProvider: input.codProvider,
+          externalId: input.externalId,
+          payload: input.payload,
+          actor,
+        },
+        tx,
+      );
+      if (inTx) await inTx(tx);
+    });
+  }
+
+  /**
+   * Núcleo común de la activación (manual o por pago): cascada de estado +
+   * personas + cobro del primer recibo (`collectFirstReceipt`) en UNA
+   * transacción, y después la bienvenida por la cola. El contrato tiene que
+   * seguir en Borrador.
+   */
+  private async runActivation(
+    ideContract: string,
+    actor: string,
+    collectFirstReceipt: (tx: Prisma.TransactionClient) => Promise<unknown>,
+  ): Promise<void> {
     const existing = await this.prisma.tContract.findUnique({ where: { IdeContract: ideContract } });
     if (!existing) {
       throw new NotFoundException(`No existe contrato con id "${ideContract}"`);
@@ -245,15 +308,9 @@ export class ContractsService {
       async (tx) => {
         await this.applyStateCascade(ideContract, 'Activar', actor, tx);
         await this.activateContractPersons(ideContract, actor, tx);
-        // Activación sin pasarela (MANUAL): el primer recibo queda cobrado en
-        // la MISMA transacción, con el motivo del operador como evidencia.
         // Requiere haber corrido packages/database/scripts/setup-payments.js.
         try {
-          await this.payments.registerFirstReceiptPayment(
-            ideContract,
-            { codMethod: 'MANUAL', reason: dto.desReason, actor },
-            tx,
-          );
+          await collectFirstReceipt(tx);
         } catch (err) {
           if (err instanceof Error && /TPayment|COBRADO|"Cobrar"/.test(err.message) && !(err instanceof ConflictException)) {
             throw new ConflictException(
@@ -283,7 +340,11 @@ export class ContractsService {
     } catch (err) {
       this.logger.error(`No se pudo encolar la bienvenida del contrato "${ideContract}": ${(err as Error).message}`);
     }
+  }
 
+  /** Cancela el enlace de pago vigente del contrato (botón "Cancelar enlace"). */
+  async cancelPaymentLink(ideContract: string, actor: string) {
+    await this.paymentLinks.cancelActive(ideContract, actor);
     return this.findOne(ideContract);
   }
 
@@ -1048,7 +1109,7 @@ export class ContractsService {
         }
       }
     }
-    const [enriched, paymentSchedule, payments] = await Promise.all([
+    const [enriched, paymentSchedule, payments, paymentLink] = await Promise.all([
       this.enrichDistributionChannels(contract),
       this.buildPaymentSchedule(contract),
       // Cobros registrados (`TPayment`). Si todavía no se corrió
@@ -1058,8 +1119,10 @@ export class ContractsService {
         this.logger.warn(`No se pudieron leer los cobros del contrato "${ideContract}": ${err.message}`);
         return [];
       }),
+      // Último enlace de pago (si se usó "Enviar landing de pago").
+      this.paymentLinks.getLatest(ideContract).catch(() => null),
     ]);
-    return { ...enriched, PaymentSchedule: paymentSchedule, Payments: payments };
+    return { ...enriched, PaymentSchedule: paymentSchedule, Payments: payments, PaymentLink: paymentLink };
   }
 
   /**

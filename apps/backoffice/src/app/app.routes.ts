@@ -8,6 +8,19 @@ export const routes: Routes = [
     loadComponent: () => import('./features/auth/login/login.component').then((m) => m.LoginComponent),
   },
   {
+    // Páginas PÚBLICAS de cobranza (sin login, fuera del shell): la landing
+    // que abre el tomador desde el correo y la pasarela simulada. 'sandbox'
+    // (segmento literal) va ANTES que ':token'.
+    path: 'pago/sandbox/:externalId',
+    loadComponent: () =>
+      import('./features/public-payment/sandbox-payment.component').then((m) => m.SandboxPaymentComponent),
+  },
+  {
+    path: 'pago/:token',
+    loadComponent: () =>
+      import('./features/public-payment/payment-landing.component').then((m) => m.PaymentLandingComponent),
+  },
+  {
     path: '',
     loadComponent: () => import('./core/layout/shell.component').then((m) => m.ShellComponent),
     canActivate: [authGuard],

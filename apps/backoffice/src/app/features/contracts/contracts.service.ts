@@ -150,8 +150,24 @@ export interface ContractPayment {
 
 /** Cuerpo de `POST /contracts/:id/activate` (popup "Activar"). */
 export interface ActivateContractBody {
-  mode: 'MANUAL';
-  desReason: string;
+  mode: 'MANUAL' | 'PAYMENT_LINK';
+  /** Obligatorio solo en modo MANUAL. */
+  desReason?: string;
+}
+
+/** Último enlace de pago enviado al tomador (`TPaymentLink`). El estado
+ *  VENCIDO ya viene calculado por el backend. */
+export interface ContractPaymentLink {
+  IdePaymentLink: string;
+  IdeReceipt: string;
+  DesEmail: string;
+  CodStatus: 'ENVIADO' | 'ABIERTO' | 'CONSENTIDO' | 'PAGADO' | 'VENCIDO' | 'CANCELADO';
+  TstExpires: string;
+  TstSent: string | null;
+  TstOpened: string | null;
+  TstConsented: string | null;
+  TstPaid: string | null;
+  TstCreation: string;
 }
 
 export interface ContractReceipt {
@@ -317,6 +333,7 @@ export interface ContractDetail {
   TContractBilling: ContractBillingPeriod[];
   PaymentSchedule: ContractPaymentSchedule;
   Payments: ContractPayment[];
+  PaymentLink: ContractPaymentLink | null;
   TReceipt: ContractReceipt[];
   TContractDistributionChannel: ContractDistributionChannel[];
   TContractOperation: ContractOperation[];
@@ -492,6 +509,11 @@ export class ContractsService {
    *  y se deja que el caller recargue el detalle. */
   activate(ideContract: string, body: ActivateContractBody): Observable<ContractDetail> {
     return this.http.post<ContractDetail>(`${this.base}/${ideContract}/activate`, body);
+  }
+
+  /** `POST /contracts/:id/payment-link/cancel` -- cancela el enlace de pago activo. */
+  cancelPaymentLink(ideContract: string): Observable<ContractDetail> {
+    return this.http.post<ContractDetail>(`${this.base}/${ideContract}/payment-link/cancel`, {});
   }
 
   /** `POST /contracts/:id/renew` -- renueva el contrato (acción

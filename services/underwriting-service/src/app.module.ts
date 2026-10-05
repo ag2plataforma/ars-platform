@@ -9,6 +9,7 @@ import { QuotingModule } from './quoting/quoting.module';
 import { ContractsModule } from './contracts/contracts.module';
 import { BackgroundJobsModule } from './background-jobs/background-jobs.module';
 import { RenewalsModule } from './renewals/renewals.module';
+import { PublicPaymentsModule } from './public-payments/public-payments.module';
 
 /**
  * Fase 1 de su migracion real ya en marcha: motor de cotizacion
@@ -41,6 +42,7 @@ import { RenewalsModule } from './renewals/renewals.module';
     ContractsModule,
     BackgroundJobsModule,
     RenewalsModule,
+    PublicPaymentsModule,
   ],
   controllers: [HealthController],
 })

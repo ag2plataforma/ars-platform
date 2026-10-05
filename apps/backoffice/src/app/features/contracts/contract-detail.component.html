@@ -79,6 +79,27 @@
       </div>
     </div>
 
+    @if (activePaymentLink(); as link) {
+      <div class="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">
+        <i class="pi pi-clock text-amber-600"></i>
+        <div class="flex-1">
+          <div class="font-medium text-slate-800">{{ 'contractDetail.paymentLink.waitingTitle' | transloco }}</div>
+          <div class="text-xs text-slate-600">
+            {{ 'contractDetail.paymentLink.waitingDetail' | transloco: { email: link.DesEmail, date: (link.TstExpires | date: 'dd/MM/yyyy HH:mm') } }}
+            · {{ 'contractDetail.paymentLink.status.' + link.CodStatus | transloco }}
+          </div>
+        </div>
+        <button pButton type="button" icon="pi pi-send" severity="info" [text]="true" [loading]="paymentLinkSubmitting()" [label]="'contractDetail.paymentLink.resend' | transloco" (click)="resendPaymentLink()"></button>
+        <button pButton type="button" icon="pi pi-times" severity="danger" [text]="true" [loading]="paymentLinkSubmitting()" [label]="'contractDetail.paymentLink.cancel' | transloco" (click)="cancelPaymentLink()"></button>
+      </div>
+    } @else if (c.PaymentLink && c.PaymentLink.CodStatus === 'VENCIDO' && canActivate()) {
+      <div class="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-300 bg-slate-50 p-3 text-sm">
+        <i class="pi pi-exclamation-circle text-slate-500"></i>
+        <div class="flex-1 text-slate-700">{{ 'contractDetail.paymentLink.expired' | transloco: { date: (c.PaymentLink.TstExpires | date: 'dd/MM/yyyy HH:mm') } }}</div>
+        <button pButton type="button" icon="pi pi-send" severity="info" [text]="true" [loading]="paymentLinkSubmitting()" [label]="'contractDetail.paymentLink.resend' | transloco" (click)="resendPaymentLink()"></button>
+      </div>
+    }
+
     <p-tabs [value]="activeTab()" (valueChange)="activeTab.set($event ?? 'personas')">
       <p-tablist>
         <p-tab value="personas">{{ 'contractDetail.tabs.persons' | transloco }}</p-tab>
@@ -660,25 +681,30 @@
   <form class="flex flex-col gap-4" (submit)="$event.preventDefault(); activateContract()">
     <p class="text-sm text-slate-500">{{ 'contractDetail.activateDialog.subtitle' | transloco }}</p>
 
-    <div class="rounded-lg border border-slate-200 p-3 opacity-60">
-      <div class="flex items-center justify-between gap-2">
-        <span class="text-sm font-medium text-slate-700"><i class="pi pi-send mr-2"></i>{{ 'contractDetail.activateDialog.linkOption' | transloco }}</span>
-        <p-tag [value]="'contractDetail.activateDialog.comingSoon' | transloco" severity="secondary" />
-      </div>
-      <p class="mt-1 text-xs text-slate-500">{{ 'contractDetail.activateDialog.linkHint' | transloco }}</p>
-    </div>
+    <label class="flex cursor-pointer items-start gap-3 rounded-lg border p-3" [class.border-sky-300]="activateMode() === 'PAYMENT_LINK'" [class.bg-sky-50]="activateMode() === 'PAYMENT_LINK'" [class.border-slate-200]="activateMode() !== 'PAYMENT_LINK'">
+      <p-radiobutton name="activateMode" value="PAYMENT_LINK" [ngModel]="activateMode()" (ngModelChange)="activateMode.set($event)" [ngModelOptions]="{ standalone: true }" />
+      <span>
+        <span class="text-sm font-medium text-slate-800"><i class="pi pi-send mr-2"></i>{{ 'contractDetail.activateDialog.linkOption' | transloco }}</span>
+        <p class="mt-1 text-xs text-slate-600">{{ 'contractDetail.activateDialog.linkHint' | transloco }}</p>
+      </span>
+    </label>
 
-    <div class="rounded-lg border border-sky-300 bg-sky-50 p-3">
-      <span class="text-sm font-medium text-slate-800"><i class="pi pi-check-circle mr-2"></i>{{ 'contractDetail.activateDialog.manualOption' | transloco }}</span>
-      <p class="mt-1 text-xs text-slate-600">{{ 'contractDetail.activateDialog.manualHint' | transloco }}</p>
-      <div class="mt-3 flex flex-col gap-1">
-        <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.activateDialog.reasonLabel' | transloco }}</label>
-        <textarea pTextarea rows="3" [formControl]="activateReason" class="w-full"></textarea>
-        @if (activateReason.touched && activateReason.invalid) {
-          <small class="text-red-600">{{ 'contractDetail.activateDialog.reasonRequired' | transloco }}</small>
+    <label class="flex cursor-pointer items-start gap-3 rounded-lg border p-3" [class.border-sky-300]="activateMode() === 'MANUAL'" [class.bg-sky-50]="activateMode() === 'MANUAL'" [class.border-slate-200]="activateMode() !== 'MANUAL'">
+      <p-radiobutton name="activateMode" value="MANUAL" [ngModel]="activateMode()" (ngModelChange)="activateMode.set($event)" [ngModelOptions]="{ standalone: true }" />
+      <span class="flex-1">
+        <span class="text-sm font-medium text-slate-800"><i class="pi pi-check-circle mr-2"></i>{{ 'contractDetail.activateDialog.manualOption' | transloco }}</span>
+        <p class="mt-1 text-xs text-slate-600">{{ 'contractDetail.activateDialog.manualHint' | transloco }}</p>
+        @if (activateMode() === 'MANUAL') {
+          <div class="mt-3 flex flex-col gap-1">
+            <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.activateDialog.reasonLabel' | transloco }}</label>
+            <textarea pTextarea rows="3" [formControl]="activateReason" class="w-full"></textarea>
+            @if (activateReason.touched && activateReason.invalid) {
+              <small class="text-red-600">{{ 'contractDetail.activateDialog.reasonRequired' | transloco }}</small>
+            }
+          </div>
         }
-      </div>
-    </div>
+      </span>
+    </label>
 
     <div class="flex justify-end gap-2">
       <button pButton type="button" severity="secondary" [text]="true" [label]="'common.cancel' | transloco" (click)="closeActivateDialog()"></button>

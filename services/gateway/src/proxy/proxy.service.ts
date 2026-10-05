@@ -52,6 +52,14 @@ export class ProxyService {
       }
     }
 
+    // IP real del cliente para el servicio de destino (p. ej. evidencia de
+    // consentimientos): se conserva lo que ya traiga `x-forwarded-for` y se
+    // agrega la IP del socket que le habló a este gateway.
+    const peer = req.socket?.remoteAddress;
+    if (peer) {
+      headers['x-forwarded-for'] = headers['x-forwarded-for'] ? `${headers['x-forwarded-for']}, ${peer}` : peer;
+    }
+
     const hasBody =
       !['GET', 'HEAD'].includes(req.method) &&
       req.body &&

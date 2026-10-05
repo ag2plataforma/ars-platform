@@ -5,11 +5,11 @@ import { IsIn, IsString, MaxLength, MinLength, ValidateIf } from 'class-validato
  * - `MANUAL`: "Activar sin pasar por pasarela de pago" -- activa el contrato
  *   y marca el primer recibo como cobrado. El operador deja un motivo
  *   (obligatorio: queda en `TPayment.DesReason` como evidencia de auditoría).
- * - `PAYMENT_LINK` (etapa 2, todavía no disponible): "Enviar landing de pago
- *   al cliente" -- el contrato sigue en Borrador hasta que la pasarela
- *   confirme el cobro.
+ * - `PAYMENT_LINK`: "Enviar landing de pago al cliente" -- el tomador recibe
+ *   un correo con un enlace público; el contrato sigue en Borrador hasta que
+ *   la pasarela confirme el cobro.
  */
-export const ACTIVATE_MODES = ['MANUAL'] as const;
+export const ACTIVATE_MODES = ['MANUAL', 'PAYMENT_LINK'] as const;
 export type ActivateMode = (typeof ACTIVATE_MODES)[number];
 
 export class ActivateContractDto {

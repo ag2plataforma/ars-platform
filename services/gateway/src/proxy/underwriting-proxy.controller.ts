@@ -4,9 +4,11 @@ import { Public } from '@ars-platform/shared-common';
 import { ProxyService } from './proxy.service';
 
 /**
- * Proxy fiel hacia `underwriting` (ver `ProxyService`) -- solo `health` es
- * público, igual que en el servicio real; todo lo demás exige el mismo
- * JWT que ya exige `underwriting-service` directamente.
+ * Proxy fiel hacia `underwriting` (ver `ProxyService`) -- solo `health` y
+ * `public/*` (landing de pago y webhook de la pasarela, protegidos por el
+ * token del enlace/la firma de la pasarela, no por JWT) son públicos, igual
+ * que en el servicio real; todo lo demás exige el mismo JWT que ya exige
+ * `underwriting-service` directamente.
  */
 @Controller('underwriting')
 export class UnderwritingProxyController {
@@ -15,6 +17,12 @@ export class UnderwritingProxyController {
   @Public()
   @All('health')
   health(@Req() req: Request, @Res() res: Response) {
+    return this.proxy.forward('underwriting', req, res);
+  }
+
+  @Public()
+  @All('public/*')
+  publicRoutes(@Req() req: Request, @Res() res: Response) {
     return this.proxy.forward('underwriting', req, res);
   }
 

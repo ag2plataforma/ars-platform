@@ -55,16 +55,11 @@ export class PaymentsService {
   ) {}
 
   /**
-   * Marca como COBRADO el recibo de la PRIMERA cuota del contrato (el de
-   * `NEW`/`REN` no anulado con la fecha de inicio más temprana; si el
-   * contrato tiene un recibo por archivo de póliza, todos los de esa misma
-   * operación) y registra el cobro. Devuelve los recibos cobrados.
+   * Recibos de la PRIMERA cuota del contrato: el `NEW`/`REN` no anulado con
+   * la fecha de inicio más temprana (si hay un recibo por archivo de póliza,
+   * todos los de esa misma operación) y la moneda del producto.
    */
-  async registerFirstReceiptPayment(
-    ideContract: string,
-    input: RegisterPaymentInput,
-    tx: Prisma.TransactionClient = this.prisma,
-  ): Promise<Array<{ ideReceipt: string; numReceipt: string; amount: number }>> {
+  async findFirstReceiptGroup(ideContract: string, tx: Prisma.TransactionClient = this.prisma) {
     const receipts = await tx.tReceipt.findMany({
       where: {
         IdeContract: ideContract,
@@ -76,13 +71,29 @@ export class PaymentsService {
     if (receipts.length === 0) {
       throw new ConflictException(`El contrato "${ideContract}" no tiene un recibo inicial para cobrar`);
     }
-    const first = receipts.filter((r) => r.IdeContractOperation === receipts[0].IdeContractOperation);
-
     const contract = await tx.tContract.findUniqueOrThrow({
       where: { IdeContract: ideContract },
-      select: { SProduct: { select: { SCurrency: { select: { CodCurrency: true } } } } },
+      select: { SProduct: { select: { SCurrency: { select: { CodCurrency: true, SymbolCurrency: true } } } } },
     });
-    const codCurrency = contract.SProduct.SCurrency.CodCurrency;
+    return {
+      receipts: receipts.filter((r) => r.IdeContractOperation === receipts[0].IdeContractOperation),
+      codCurrency: contract.SProduct.SCurrency.CodCurrency,
+      symbolCurrency: contract.SProduct.SCurrency.SymbolCurrency,
+    };
+  }
+
+  /**
+   * Marca como COBRADO el recibo de la PRIMERA cuota del contrato (el de
+   * `NEW`/`REN` no anulado con la fecha de inicio más temprana; si el
+   * contrato tiene un recibo por archivo de póliza, todos los de esa misma
+   * operación) y registra el cobro. Devuelve los recibos cobrados.
+   */
+  async registerFirstReceiptPayment(
+    ideContract: string,
+    input: RegisterPaymentInput,
+    tx: Prisma.TransactionClient = this.prisma,
+  ): Promise<Array<{ ideReceipt: string; numReceipt: string; amount: number }>> {
+    const { receipts: first, codCurrency } = await this.findFirstReceiptGroup(ideContract, tx);
     const ideCobrado = await this.stateMachine.getStateByCode('COBRADO');
     const now = new Date();
 
@@ -96,18 +107,31 @@ export class PaymentsService {
         where: { IdeReceipt: receipt.IdeReceipt },
         data: { IdeState: nextState, UsrModification: input.actor, TstModification: now },
       });
-      await tx.$executeRaw`
-        INSERT INTO ars_platform."TPayment"
-          ("IdeReceipt", "IdeContract", "Amount", "CodCurrency", "CodMethod", "CodProvider", "CodStatus",
-           "DesExternalId", "DesReason", "DesPayload", "TstPaid",
-           "UsrCreation", "TstCreation", "UsrModification", "TstModification")
-        VALUES
-          (${receipt.IdeReceipt}::uuid, ${ideContract}::uuid, ${receipt.Prime.toString()}::numeric, ${codCurrency},
-           ${input.codMethod}, ${input.codProvider ?? null}, 'COBRADO',
-           ${input.externalId ?? null}, ${input.reason ?? null},
-           ${input.payload ? JSON.stringify(input.payload) : null}::jsonb, ${now},
-           ${input.actor}, ${now}, ${input.actor}, ${now})
-      `;
+      // Si el cobro nació como intento PENDIENTE (checkout de la pasarela), se
+      // confirma ESA fila; si no (activación manual), se registra una nueva.
+      const confirmed =
+        input.codProvider && input.externalId
+          ? await tx.$executeRaw`
+              UPDATE ars_platform."TPayment"
+                 SET "CodStatus" = 'COBRADO', "TstPaid" = ${now}, "DesPayload" = ${input.payload ? JSON.stringify(input.payload) : null}::jsonb,
+                     "UsrModification" = ${input.actor}, "TstModification" = ${now}
+               WHERE "IdeReceipt" = ${receipt.IdeReceipt}::uuid AND "CodProvider" = ${input.codProvider}
+                 AND "DesExternalId" = ${input.externalId} AND "CodStatus" = 'PENDIENTE'`
+          : 0;
+      if (confirmed === 0) {
+        await tx.$executeRaw`
+          INSERT INTO ars_platform."TPayment"
+            ("IdeReceipt", "IdeContract", "Amount", "CodCurrency", "CodMethod", "CodProvider", "CodStatus",
+             "DesExternalId", "DesReason", "DesPayload", "TstPaid",
+             "UsrCreation", "TstCreation", "UsrModification", "TstModification")
+          VALUES
+            (${receipt.IdeReceipt}::uuid, ${ideContract}::uuid, ${receipt.Prime.toString()}::numeric, ${codCurrency},
+             ${input.codMethod}, ${input.codProvider ?? null}, 'COBRADO',
+             ${input.externalId ?? null}, ${input.reason ?? null},
+             ${input.payload ? JSON.stringify(input.payload) : null}::jsonb, ${now},
+             ${input.actor}, ${now}, ${input.actor}, ${now})
+        `;
+      }
       paid.push({ ideReceipt: receipt.IdeReceipt, numReceipt: receipt.NumReceipt, amount: Number(receipt.Prime) });
     }
     return paid;

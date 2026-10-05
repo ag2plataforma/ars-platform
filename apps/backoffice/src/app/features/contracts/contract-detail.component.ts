@@ -2,7 +2,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
-import { FormBuilder, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
+import { FormBuilder, FormsModule, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
 import { CheckboxModule } from 'primeng/checkbox';
 import { DialogModule } from 'primeng/dialog';
@@ -21,6 +21,7 @@ import { MOBILE_PHONE_CONTACT_CLASS, PersonDetail, PersonsService } from '../../
 import { CatalogService } from '../../core/catalogs/catalog.service';
 import { CatalogRow } from '../../core/catalogs/catalog.model';
 import {
+  ActivateContractBody,
   ContractCoverage,
   ContractDetail,
   ContractFile,
@@ -154,6 +155,7 @@ interface RequirementRow {
   imports: [
     CommonModule,
     ReactiveFormsModule,
+    FormsModule,
     ButtonModule,
     CheckboxModule,
     DialogModule,
@@ -672,13 +674,15 @@ export class ContractDetailComponent implements OnInit {
   }
 
   /** Popup "Activar": elegir cómo se activa (ver `ActivateContractDto` en el
-   *  backend). Hoy solo está disponible "sin pasarela"; la landing de pago
-   *  llega en la etapa 2 de cobranza. */
+   *  backend): enviar el enlace de pago al tomador (la activación llega por
+   *  el webhook de la pasarela) o activar sin pasarela con un motivo. */
   readonly activateDialogVisible = signal(false);
+  readonly activateMode = signal<'PAYMENT_LINK' | 'MANUAL'>('PAYMENT_LINK');
   readonly activateReason = this.fb.nonNullable.control('', [Validators.required, Validators.minLength(3)]);
 
   openActivateDialog(): void {
     this.activateReason.reset('');
+    this.activateMode.set('PAYMENT_LINK');
     this.activateDialogVisible.set(true);
   }
 
@@ -689,12 +693,17 @@ export class ContractDetailComponent implements OnInit {
   activateContract(): void {
     const c = this.contract();
     if (!c) return;
-    if (this.activateReason.invalid) {
+    const mode = this.activateMode();
+    if (mode === 'MANUAL' && this.activateReason.invalid) {
       this.activateReason.markAsTouched();
       return;
     }
+    const body: ActivateContractBody =
+      mode === 'MANUAL'
+        ? { mode: 'MANUAL', desReason: this.activateReason.value.trim() }
+        : { mode: 'PAYMENT_LINK' };
     this.activateSubmitting.set(true);
-    this.contracts.activate(c.IdeContract, { mode: 'MANUAL', desReason: this.activateReason.value.trim() }).subscribe({
+    this.contracts.activate(c.IdeContract, body).subscribe({
       next: (result) => {
         this.activateSubmitting.set(false);
         this.activateDialogVisible.set(false);
@@ -702,11 +711,63 @@ export class ContractDetailComponent implements OnInit {
         this.messages.add({
           severity: 'success',
           summary: this.transloco.translate('common.done'),
-          detail: this.transloco.translate('contractDetail.activatedDetail'),
+          detail: this.transloco.translate(
+            mode === 'MANUAL' ? 'contractDetail.activatedDetail' : 'contractDetail.paymentLink.sentDetail',
+          ),
         });
       },
       error: (err: HttpErrorResponse) => {
         this.activateSubmitting.set(false);
+        this.showError(err);
+      },
+    });
+  }
+
+  /** Banner "Esperando pago": hay un enlace activo (ENVIADO/ABIERTO/CONSENTIDO) sin vencer. */
+  readonly activePaymentLink = computed(() => {
+    const link = this.contract()?.PaymentLink;
+    return link && ['ENVIADO', 'ABIERTO', 'CONSENTIDO'].includes(link.CodStatus) ? link : null;
+  });
+
+  readonly paymentLinkSubmitting = signal(false);
+
+  resendPaymentLink(): void {
+    const c = this.contract();
+    if (!c) return;
+    this.paymentLinkSubmitting.set(true);
+    this.contracts.activate(c.IdeContract, { mode: 'PAYMENT_LINK' }).subscribe({
+      next: (result) => {
+        this.paymentLinkSubmitting.set(false);
+        this.contract.set(result);
+        this.messages.add({
+          severity: 'success',
+          summary: this.transloco.translate('common.done'),
+          detail: this.transloco.translate('contractDetail.paymentLink.sentDetail'),
+        });
+      },
+      error: (err: HttpErrorResponse) => {
+        this.paymentLinkSubmitting.set(false);
+        this.showError(err);
+      },
+    });
+  }
+
+  cancelPaymentLink(): void {
+    const c = this.contract();
+    if (!c) return;
+    this.paymentLinkSubmitting.set(true);
+    this.contracts.cancelPaymentLink(c.IdeContract).subscribe({
+      next: (result) => {
+        this.paymentLinkSubmitting.set(false);
+        this.contract.set(result);
+        this.messages.add({
+          severity: 'success',
+          summary: this.transloco.translate('common.done'),
+          detail: this.transloco.translate('contractDetail.paymentLink.cancelledDetail'),
+        });
+      },
+      error: (err: HttpErrorResponse) => {
+        this.paymentLinkSubmitting.set(false);
         this.showError(err);
       },
     });

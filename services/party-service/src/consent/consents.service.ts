@@ -41,6 +41,9 @@ export class ConsentsService {
       'DesConsent',
       'IdeConsent',
       'consentimiento',
+      // El backoffice (pestaña "Consentimientos" del producto) necesita el
+      // estado para ofrecer solo los consentimientos activos del catálogo.
+      { SState: true },
     );
   }
 
