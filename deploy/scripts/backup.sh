@@ -4,8 +4,8 @@
 # esta definido y rclone instalado, sube tambien una copia fuera de la VPS.
 #
 # Programar (como deploy):  crontab -e
-#   15 3 * * * /home/deploy/ars-platform/deploy/scripts/backup.sh >> /var/log/ars-backup.log 2>&1
-# (crea antes el log:  sudo touch /var/log/ars-backup.log && sudo chown deploy /var/log/ars-backup.log)
+#   15 3 * * * /home/deploy/ars-platform/deploy/scripts/backup.sh >> $HOME/ars-backups/backup.log 2>&1
+# (el log se guarda en ~/ars-backups/backup.log)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 # Lee una variable de deploy/.env SIN ejecutar el archivo (un valor con

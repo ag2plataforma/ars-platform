@@ -160,25 +160,43 @@ Nota: el compose arranca `documents` con LibreOffice (conversión docx→PDF), e
 
 ## Paso 7 — Backups
 
-```bash
-sudo touch /var/log/ars-backup.log && sudo chown deploy /var/log/ars-backup.log
-crontab -e
-# 15 3 * * * /home/deploy/ars-platform/deploy/scripts/backup.sh >> /var/log/ars-backup.log 2>&1
-bash ~/ars-platform/deploy/scripts/backup.sh       # prueba manual
-```
+`backup.sh` hace un `pg_dump` de **toda la base** (formato custom, comprimido, incluye esquemas y extensiones), lo guarda en `~/ars-backups` y conserva 14 días. Opcionalmente sube una copia con rclone si `BACKUP_RCLONE_REMOTE` está definido en `.env`.
 
-Guarda en `~/ars-backups` (14 días). Un backup en la misma máquina no protege si la VPS se pierde: configura una copia externa (`BACKUP_RCLONE_REMOTE`, p. ej. Backblaze B2 o cualquier S3) o descarga el último `.dump` a tu Mac con `scp` de forma periódica. Revisa también si Contabo ofrece snapshots en tu plan.
-
-Restaurar (BD vacía o recreando el esquema):
+1. Prueba manual y programación diaria (03:15), como `deploy`:
 
 ```bash
-docker compose stop gateway
-docker compose exec -T postgres psql -U ars -d ars -c 'DROP SCHEMA IF EXISTS ars_platform CASCADE'
-docker compose exec -T postgres pg_restore -U ars -d ars --no-owner --exit-on-error < ~/ars-backups/ars-XXXX.dump
-docker compose start gateway
+bash ~/ars-platform/deploy/scripts/backup.sh
+ls -lh ~/ars-backups
+( crontab -l 2>/dev/null; echo '15 3 * * * /home/deploy/ars-platform/deploy/scripts/backup.sh >> /home/deploy/ars-backups/backup.log 2>&1' ) | crontab -
+crontab -l
 ```
 
-Haz una prueba de restauración al menos una vez; un backup sin probar no cuenta.
+2. **Prueba de restauración** (obligatoria al menos una vez; no toca la base real, usa una base temporal):
+
+```bash
+cd ~/ars-platform/deploy
+LAST=$(ls -t ~/ars-backups/ars-*.dump | head -1)
+docker compose exec -T postgres psql -U ars -d postgres -c 'CREATE DATABASE ars_restore_test'
+docker compose exec -T postgres pg_restore -U ars -d ars_restore_test --no-owner < "$LAST"
+docker compose exec -T postgres psql -U ars -d ars_restore_test -Atc "select count(*) from information_schema.tables where table_schema='ars_platform'"
+docker compose exec -T postgres psql -U ars -d postgres -c 'DROP DATABASE ars_restore_test'
+```
+
+Debe imprimir el mismo número de tablas que la base real (149 a día de hoy).
+
+3. **Copia fuera de la VPS.** Un backup en la misma máquina no protege si el servidor se pierde. Configura una copia externa con rclone (Backblaze B2 o cualquier almacenamiento S3) o descarga periódicamente el último `.dump` a otra máquina con `scp`. Revisa también si tu plan de Contabo ofrece snapshots.
+
+### Restaurar la base real (desastre)
+
+Se recrea la base completa (el dump trae esquemas y extensiones):
+
+```bash
+cd ~/ars-platform/deploy
+docker compose stop gateway iam product-rating party reference-data underwriting claims billing social-impact documents
+docker compose exec -T postgres psql -U ars -d postgres -c 'DROP DATABASE ars WITH (FORCE)' -c 'CREATE DATABASE ars'
+docker compose exec -T postgres pg_restore -U ars -d ars --no-owner < ~/ars-backups/ars-XXXX.dump
+docker compose up -d
+```
 
 ## Paso 8 — Stripe (webhook) y Bizum
 
