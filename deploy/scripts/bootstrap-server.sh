@@ -16,15 +16,19 @@ SSH_PORT=22
 
 if [ "${1:-}" = "lock-ssh" ]; then
   [ -s "/home/$DEPLOY_USER/.ssh/authorized_keys" ] || { echo "No hay llave para $DEPLOY_USER; no se cierra SSH." >&2; exit 1; }
-  cat > /etc/ssh/sshd_config.d/99-hardening.conf <<CONF
+  cat > /etc/ssh/sshd_config.d/00-hardening.conf <<CONF
 PermitRootLogin no
 PasswordAuthentication no
 KbdInteractiveAuthentication no
 PubkeyAuthentication yes
 MaxAuthTries 3
 CONF
+  # sshd usa el PRIMER valor que encuentra: por eso este fichero es 00-* (los
+  # de cloud-init, p. ej. 50-cloud-init.conf, traen PasswordAuthentication yes).
+  rm -f /etc/ssh/sshd_config.d/99-hardening.conf
   sshd -t
   systemctl reload ssh
+  sshd -T | grep -E '^(permitrootlogin|passwordauthentication|kbdinteractiveauthentication) '
   echo "SSH cerrado: sin root, sin contrasenas. Mantén abierta tu sesion actual y prueba entrar en otra terminal ANTES de cerrarla."
   exit 0
 fi
