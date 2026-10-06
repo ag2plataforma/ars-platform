@@ -25,6 +25,10 @@ echo "$(date -Is) OK $FILE ($(du -h "$FILE" | cut -f1))"
 
 find "$DIR" -name 'ars-*.dump' -mtime +"$KEEP" -delete
 
-if [ -n "${BACKUP_RCLONE_REMOTE:-}" ] && command -v rclone >/dev/null 2>&1; then
-  rclone copy "$FILE" "$BACKUP_RCLONE_REMOTE" && echo "$(date -Is) subido a $BACKUP_RCLONE_REMOTE"
+if [ -n "${BACKUP_RCLONE_REMOTE:-}" ]; then
+  command -v rclone >/dev/null 2>&1 || { echo "$(date -Is) ERROR: BACKUP_RCLONE_REMOTE definido pero rclone no esta instalado" >&2; exit 1; }
+  rclone copy "$FILE" "$BACKUP_RCLONE_REMOTE" || { echo "$(date -Is) ERROR: fallo la subida a $BACKUP_RCLONE_REMOTE" >&2; exit 1; }
+  echo "$(date -Is) subido a $BACKUP_RCLONE_REMOTE"
+  # Retencion remota: borra lo mas antiguo que BACKUP_KEEP_DAYS.
+  rclone delete "$BACKUP_RCLONE_REMOTE" --min-age "${KEEP}d" || echo "$(date -Is) AVISO: no se pudo limpiar el remoto" >&2
 fi

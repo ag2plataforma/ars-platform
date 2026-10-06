@@ -184,7 +184,27 @@ docker compose exec -T postgres psql -U ars -d postgres -c 'DROP DATABASE ars_re
 
 Debe imprimir el mismo número de tablas que la base real (149 a día de hoy).
 
-3. **Copia fuera de la VPS.** Un backup en la misma máquina no protege si el servidor se pierde. Configura una copia externa con rclone (Backblaze B2 o cualquier almacenamiento S3) o descarga periódicamente el último `.dump` a otra máquina con `scp`. Revisa también si tu plan de Contabo ofrece snapshots.
+3. **Copia fuera de la VPS (Backblaze B2 cifrada con rclone).** Un backup en la misma máquina no protege si el servidor se pierde, y estos datos son personales, así que se suben **cifrados** (rclone `crypt`): Backblaze solo ve ficheros ilegibles.
+
+   a. En Backblaze (web): crear cuenta, un bucket **privado** (p. ej. `ars-backups-ag2`, región EU) y una *Application Key* limitada a ese bucket con lectura y escritura. Anotar `keyID` y `applicationKey` (se muestran una sola vez). Nunca en el chat ni en el repo.
+
+   b. En la VPS, instalar rclone y crear los remotos (los secretos solo se teclean en la terminal):
+
+```bash
+sudo apt-get install -y rclone
+read -rp "keyID: " B2ID; read -rsp "applicationKey: " B2KEY; echo
+rclone config create b2ars b2 account="$B2ID" key="$B2KEY" >/dev/null; unset B2ID B2KEY
+read -rsp "Contraseña de cifrado (guárdala en tu gestor de contraseñas): " P1; echo
+rclone config create ars-crypt crypt remote=b2ars:NOMBRE-DEL-BUCKET/ars password="$P1" --obscure >/dev/null; unset P1
+```
+
+   c. Probar: `echo hola > /tmp/t.txt && rclone copy /tmp/t.txt ars-crypt: && rclone ls ars-crypt: && rclone delete ars-crypt: --include t.txt`.
+
+   d. Activar en `deploy/.env`: `BACKUP_RCLONE_REMOTE=ars-crypt:` y ejecutar `bash scripts/backup.sh` (sube y limpia lo anterior a `BACKUP_KEEP_DAYS`).
+
+   e. **Guarda en tu gestor de contraseñas** la contraseña de cifrado y el contenido de `~/.config/rclone/rclone.conf` (`rclone config show`). Sin ellos los backups cifrados no se pueden recuperar si pierdes la VPS.
+
+   Para recuperar en otra máquina: instalar rclone, recrear los dos remotos con esos datos y `rclone copy ars-crypt: ./restore/`.
 
 ### Restaurar la base real (desastre)
 
