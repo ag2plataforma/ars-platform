@@ -19,3 +19,6 @@ RUN npm run build --workspace=apps/backoffice
 FROM caddy:2-alpine AS runtime
 COPY --from=build /app/apps/backoffice/dist/backoffice/browser /srv
 COPY deploy/web/Caddyfile /etc/caddy/Caddyfile
+# Un Caddyfile roto debe romper el BUILD (y el pipeline), no dejar el sitio
+# caido en runtime. Valores ficticios solo para esta validacion.
+RUN DOMAIN=example.com ACME_EMAIL=ci@example.com caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
