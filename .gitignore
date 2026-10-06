@@ -45,3 +45,6 @@ packages/database/scripts/*.backup.json
 # Despliegue: secretos y backups locales
 deploy/.env
 deploy/backups/
+
+# Ultimo commit desplegado en la VPS (lo escribe update.sh)
+deploy/.deployed-commit

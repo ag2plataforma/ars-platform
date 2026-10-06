@@ -1,0 +1,44 @@
+name: Deploy
+
+# Despliega en la VPS cuando el CI de `main` termina en verde. También se puede
+# lanzar a mano desde la pestaña Actions ("Run workflow").
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+# Un despliegue a la vez; si llega otro, espera (no se cancelan despliegues a medias).
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Desplegar en la VPS
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Preparar SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      # En la VPS, esa llave está restringida (authorized_keys con `command=`):
+      # sea cual sea el argumento, solo ejecuta deploy/scripts/update.sh.
+      - name: Ejecutar update.sh en la VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -o BatchMode=yes \
+              -o ServerAliveInterval=30 deploy@"$VPS_HOST" deploy

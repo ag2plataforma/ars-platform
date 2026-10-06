@@ -229,9 +229,51 @@ docker compose up -d
 7. Bizum: el servicio **no fija** `payment_method_types` al crear el Checkout, así que Stripe muestra los métodos que tengas activos en el Dashboard. Entra en Settings → Payment methods y comprueba que Bizum figura disponible y activado para tu cuenta (Bizum es asíncrono: llegará por `async_payment_succeeded`, ya contemplado). Si no aparece como disponible, hay que solicitarlo a Stripe; no requiere cambios de código.
 8. Para producción: repite con las claves *live* y un endpoint nuevo en modo live.
 
+## Despliegue automático (GitHub Actions)
+
+Cada push a `main` ejecuta el CI (`.github/workflows/ci.yml`: lint + build + tests). **Si pasa**, `.github/workflows/deploy.yml` entra por SSH a la VPS y ejecuta `deploy/scripts/update.sh`, que hace `git pull`, reconstruye solo lo que cambió desde el último despliegue correcto (servicios tocados, `web` si cambia el frontend, todo si cambian `packages/`, `package.json` o el lockfile), levanta con `docker compose up -d --wait` y falla si algún servicio no queda `healthy`. También se puede lanzar a mano desde Actions → Deploy → Run workflow.
+
+Configuración inicial (una vez):
+
+1. En tu Mac, llave exclusiva para GitHub (sin passphrase, porque la usa una máquina):
+
+```bash
+ssh-keygen -t ed25519 -f ~/ars_gha_deploy -N "" -C "gh-actions-ars"
+```
+
+2. Autorizarla en la VPS **restringida a update.sh** (`restrict` quita shell interactiva, reenvíos y TTY; `command=` fuerza ese único comando):
+
+```bash
+KEYLINE="command=\"bash /home/deploy/ars-platform/deploy/scripts/update.sh\",restrict $(cat ~/ars_gha_deploy.pub)"
+ssh ars-vps "echo '$KEYLINE' >> ~/.ssh/authorized_keys"
+```
+
+3. Probar desde el Mac que la llave dispara el despliegue (debe correr update.sh y terminar en `Despliegue correcto`):
+
+```bash
+ssh -i ~/ars_gha_deploy -o IdentitiesOnly=yes deploy@178.238.225.7 deploy
+```
+
+4. Huella del servidor para `known_hosts` (verifica que coincide con `ssh ars-vps 'ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub'`):
+
+```bash
+ssh-keyscan -t ed25519 178.238.225.7
+```
+
+5. En GitHub: repo → Settings → Secrets and variables → Actions → New repository secret:
+   - `VPS_HOST` = `178.238.225.7`
+   - `VPS_SSH_KEY` = contenido completo de `~/ars_gha_deploy` (la privada, con las líneas BEGIN/END)
+   - `VPS_KNOWN_HOSTS` = la línea que imprimió `ssh-keyscan`
+
+6. Borra la privada del Mac cuando esté en GitHub: `rm ~/ars_gha_deploy ~/ars_gha_deploy.pub`.
+
+Si GitHub se viera comprometido, el daño máximo de esa llave es ejecutar `update.sh` (un `git pull` + build de lo que haya en `main`). Para revocarla, borra su línea de `~/.ssh/authorized_keys` en la VPS.
+
+**Volver atrás** un despliegue malo: `git revert <commit>` + push; el pipeline despliega el revert. Scripts de base de datos (`setup-*.js`, seeds) no forman parte del pipeline: se ejecutan aparte.
+
 ## Operación diaria
 
-- Actualizar: `bash ~/ars-platform/deploy/scripts/update.sh` (git pull + build + up -d).
+- Actualizar a mano (si el pipeline no está o falló): `bash ~/ars-platform/deploy/scripts/update.sh`.
 - Logs de un servicio: `docker compose logs -f --tail=200 underwriting`.
 - Reiniciar uno: `docker compose restart claims`.
 - Estado y recursos: `docker compose ps`, `docker stats --no-stream`, `df -h`.
