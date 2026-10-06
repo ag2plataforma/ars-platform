@@ -70,6 +70,16 @@ export class AuthService {
     this.setSession(res);
   }
 
+  /** Pública: pide el correo de recuperación (respuesta genérica, exista o no el usuario). */
+  async forgotPassword(userName: string): Promise<void> {
+    await firstValueFrom(this.http.post(`${environment.apiUrl}/iam/auth/forgot-password`, { userName }));
+  }
+
+  /** Pública: fija la contraseña nueva con el token del enlace del correo. */
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    await firstValueFrom(this.http.post(`${environment.apiUrl}/iam/auth/reset-password`, { token, newPassword }));
+  }
+
   logout(): void {
     localStorage.removeItem(TOKEN_KEY);
     this.tokenSignal.set(null);

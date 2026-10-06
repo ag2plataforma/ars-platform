@@ -23,7 +23,31 @@
     "heroTitle": "Gestión aseguradora, en un solo lugar.",
     "heroSubtitle": "Cotización, contratación, comisiones y siniestros -- todo conectado en tiempo real.",
     "credentialsError": "Usuario o contraseña incorrectos.",
-    "codeError": "Código incorrecto."
+    "codeError": "Código incorrecto.",
+    "forgotPasswordLink": "¿Olvidaste tu contraseña?"
+  },
+  "forgotPassword": {
+    "title": "Recuperar contraseña",
+    "subtitle": "Ingresá tu correo de acceso y te enviaremos un enlace para crear una contraseña nueva.",
+    "emailLabel": "Correo electrónico",
+    "submitLabel": "Enviar enlace",
+    "sentMessage": "Si el usuario existe, te enviamos un correo con instrucciones. El enlace vence en 30 minutos.",
+    "error": "No pudimos procesar la solicitud. Probá de nuevo en unos minutos.",
+    "backToLogin": "Volver a iniciar sesión"
+  },
+  "resetPassword": {
+    "title": "Crear contraseña nueva",
+    "subtitle": "Elegí una contraseña nueva para tu usuario.",
+    "newPasswordLabel": "Contraseña nueva",
+    "passwordHint": "Mínimo 8 caracteres.",
+    "confirmPasswordLabel": "Repetí la contraseña",
+    "mismatch": "Las contraseñas no coinciden.",
+    "submitLabel": "Guardar contraseña",
+    "success": "Listo, tu contraseña fue actualizada. Ya podés iniciar sesión.",
+    "goToLogin": "Ir a iniciar sesión",
+    "invalidLink": "El enlace es inválido, ya fue usado o venció.",
+    "missingToken": "Falta el enlace de recuperación. Pedí uno nuevo.",
+    "requestAnother": "Pedir un enlace nuevo"
   },
   "dashboard": {
     "greeting": "Hola, {{code}}",

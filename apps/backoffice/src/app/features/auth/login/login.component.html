@@ -27,6 +27,12 @@
             />
           </div>
 
+          <div class="-mt-2 text-right">
+            <a routerLink="/forgot-password" class="text-sm text-slate-500 hover:text-slate-900 hover:underline">
+              {{ 'login.forgotPasswordLink' | transloco }}
+            </a>
+          </div>
+
           @if (errorMessage()) {
             <p-message severity="error" [text]="errorMessage()!" />
           }
