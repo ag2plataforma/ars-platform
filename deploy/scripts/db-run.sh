@@ -11,7 +11,8 @@
 # Como funciona: levanta un contenedor TEMPORAL a partir de la imagen ars/iam
 # (trae @prisma/client y bcryptjs), en la red interna de Compose, con SOLO
 # DATABASE_URL como variable (ningun otro secreto). Los scripts se montan de solo
-# lectura desde el repo (siempre la version recien descargada con git pull). `pg`
+# lectura desde el repo (siempre la version recien descargada con git pull) y se
+# ejecutan sobre una copia dentro del contenedor. `pg`
 # no esta en las imagenes de runtime: se instala una vez en el volumen
 # `ars_dbtools` y se reutiliza (NODE_PATH). DATABASE_SSL=false desactiva el SSL
 # que los scripts forzaban (el Postgres de la VPS es interno y no lo usa).
@@ -73,12 +74,23 @@ if [[ ! "$SCRIPT" =~ ^(investigate|verify|find|list|generate)[-_] ]]; then
 fi
 
 echo "== Ejecutando $SCRIPT"
+# Varios scripts (investigate-*) escriben un <nombre>.out.txt junto a si mismos.
+# Se copian los scripts a la capa escribible del contenedor, se ejecutan alli y los
+# .out.txt nuevos se recogen en ~/ars-db-out (el repo no se toca).
+OUT_DIR="${DB_RUN_OUT_DIR:-$HOME/ars-db-out}"
+mkdir -p "$OUT_DIR"
 TTY_FLAG=""; [ -t 0 ] && TTY_FLAG="-t"
 docker run --rm -i $TTY_FLAG \
   --network "$NETWORK" \
   -e DATABASE_URL -e DATABASE_SSL=false -e NODE_PATH=/tools/node_modules \
+  -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
   -v "$TOOLS_VOLUME:/tools:ro" \
-  -v "$SCRIPTS_DIR:/app/packages/database/scripts:ro" \
+  -v "$SCRIPTS_DIR:/scripts-src:ro" \
+  -v "$OUT_DIR:/out" \
   -w /app "$IMAGE" \
-  node "packages/database/scripts/$SCRIPT" "$@"
+  sh -c 'D=packages/database/scripts; cp -r /scripts-src/. "$D"/; touch /tmp/inicio
+         node "$D/$0" "$@"; rc=$?
+         find "$D" -name "*.out.txt" -newer /tmp/inicio -exec cp {} /out/ \; -exec echo "== salida guardada: {}" \;
+         chown "$HOST_UID:$HOST_GID" /out/* 2>/dev/null || true
+         exit $rc' "$SCRIPT" "$@"
 echo "== $SCRIPT terminado"
