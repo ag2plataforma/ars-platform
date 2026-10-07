@@ -174,11 +174,12 @@ export class ContractsService {
     }
 
     await this.assertPersonsReadyForIssuance(quote.IdeQuote);
-    await this.requirementsService.assertQuoteRequirementsReady(quote.IdeQuote, actor);
 
     // Colectivos (etapa 1): una cotización con asegurados (`TQuoteRiskPerson`) genera un
     // certificado (`TContractFile`) por asegurado en vez de uno solo para todos los riesgos.
+    // Etapa 2: sus requisitos obligatorios por asegurado no bloquean la contratación.
     const collective = await this.collectiveQuotes.isCollectiveQuote(quote.IdeQuote);
+    await this.requirementsService.assertQuoteRequirementsReady(quote.IdeQuote, actor, { collective });
     if (collective) {
       const config = await this.collectiveQuotes.getProductConfig(quote.IdeProduct);
       if (config.CodCollectivePremiumMode !== 'POR_CERTIFICADO') {

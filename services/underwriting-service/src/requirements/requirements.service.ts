@@ -316,8 +316,16 @@ export class RequirementsService {
    * Re-resuelve el checklist primero (`resolveForQuote`, idempotente)
    * por si el usuario llega a "Generar contrato" sin haber abierto antes
    * el paso "Requisitos" del wizard.
+   *
+   * Colectivos (etapa 2): con `{ collective: true }` los obligatorios por asegurado NO bloquean
+   * (con decenas de asegurados es inviable adjuntarlos todos antes de contratar): el contrato
+   * se genera y los pendientes quedan visibles por certificado. Devuelve cuántos faltan.
    */
-  async assertQuoteRequirementsReady(ideQuote: string, actor: string): Promise<void> {
+  async assertQuoteRequirementsReady(
+    ideQuote: string,
+    actor: string,
+    options: { collective?: boolean } = {},
+  ): Promise<number> {
     await this.resolveForQuote(ideQuote, actor);
     const missing = await this.prisma.tQuoteRequirement.findMany({
       where: {
@@ -329,7 +337,7 @@ export class RequirementsService {
         SProductRequirement: { select: { DesShort: true, SRequirement: { select: { DesRequirement: true } } } },
       },
     });
-    if (missing.length === 0) return;
+    if (missing.length === 0 || options.collective) return missing.length;
     const names = missing.map((m) => m.SProductRequirement.DesShort ?? m.SProductRequirement.SRequirement.DesRequirement);
     throw new ConflictException(
       `No se puede generar el contrato -- faltan documentos obligatorios: ${names.join(', ')}`,
