@@ -1,4 +1,4 @@
-import { Component, Input, OnChanges, OnDestroy, inject, signal } from '@angular/core';
+import { Component, Input, OnChanges, OnDestroy, SimpleChanges, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -40,6 +40,15 @@ interface BackgroundTask {
 const ACTIVE_STATUSES = ['PENDIENTE', 'EN_PROCESO'];
 const POLL_MS = 3000;
 const MAX_TASKS_SHOWN = 10;
+
+/** Certificado (asegurado) de un contrato colectivo, para generar su documento individual. */
+export interface CertificateOption {
+  ideContractFile: string;
+  label: string;
+}
+
+const SCOPES = ['GENERAL', 'CERTIFICATE', 'ALL'] as const;
+type DocumentScope = (typeof SCOPES)[number];
 
 interface GeneratedDocument {
   ideContractOperationDocument: string;
@@ -87,6 +96,8 @@ export class ContractDocumentsComponent implements OnChanges, OnDestroy {
    *  paneles de PrimeNG ya están creados desde que carga el contrato, así
    *  que sin esto la lista quedaba con lo que había al abrir la página. */
   @Input() refreshKey = '';
+  /** Contrato colectivo: permite generar el documento por certificado (asegurado). */
+  @Input() certificates: CertificateOption[] = [];
 
   private readonly http = inject(HttpClient);
   private readonly templatesService = inject(DocumentTemplatesService);
@@ -110,12 +121,25 @@ export class ContractDocumentsComponent implements OnChanges, OnDestroy {
     idePersonRol: ['', Validators.required],
     ideReceipt: [''],
     mensaje: [''],
+    scope: ['GENERAL' as DocumentScope],
+    ideContractFile: [''],
   });
 
   constructor() {
     this.templatesService.listPersonRoles().subscribe({ next: (rows) => this.personRoles.set(rows) });
     // RECIBO exige elegir un recibo (obligatorio solo para ese tipo).
+    this.generateForm.controls.scope.valueChanges.subscribe((scope) => {
+      const fileControl = this.generateForm.controls.ideContractFile;
+      if (scope === 'CERTIFICATE') {
+        fileControl.addValidators(Validators.required);
+      } else {
+        fileControl.clearValidators();
+        fileControl.setValue('');
+      }
+      fileControl.updateValueAndValidity();
+    });
     this.generateForm.controls.codTemplateType.valueChanges.subscribe((type) => {
+      if (type !== 'CONTRATO') this.generateForm.controls.scope.setValue('GENERAL');
       const receiptControl = this.generateForm.controls.ideReceipt;
       if (type === 'RECIBO') {
         receiptControl.addValidators(Validators.required);
@@ -131,8 +155,20 @@ export class ContractDocumentsComponent implements OnChanges, OnDestroy {
     return this.generateForm.controls.codTemplateType.value;
   }
 
-  ngOnChanges(): void {
-    if (this.ideContract) this.loadAll(true);
+  get selectedScope(): DocumentScope {
+    return this.generateForm.controls.scope.value;
+  }
+
+  get isCollective(): boolean {
+    return this.certificates.length > 0;
+  }
+
+  readonly scopeOptions = SCOPES.map((value) => ({ value, key: `contractDocuments.scope.${value}` }));
+
+  ngOnChanges(changes: SimpleChanges): void {
+    // `certificates` cambia de identidad con cada recarga del contrato: solo recarga la
+    // lista de documentos si cambió el contrato o la clave de refresco.
+    if (this.ideContract && (changes['ideContract'] || changes['refreshKey'])) this.loadAll(true);
   }
 
   ngOnDestroy(): void {
@@ -192,7 +228,14 @@ export class ContractDocumentsComponent implements OnChanges, OnDestroy {
   }
 
   openGenerate(): void {
-    this.generateForm.reset({ codTemplateType: 'CONTRATO', idePersonRol: '', ideReceipt: '', mensaje: '' });
+    this.generateForm.reset({
+      codTemplateType: 'CONTRATO',
+      idePersonRol: '',
+      ideReceipt: '',
+      mensaje: '',
+      scope: 'GENERAL',
+      ideContractFile: '',
+    });
     this.receipts.set([]);
     this.templatesService.listContractReceipts(this.ideContract).subscribe({ next: (rows) => this.receipts.set(rows) });
     this.generateDialogVisible.set(true);
@@ -211,9 +254,11 @@ export class ContractDocumentsComponent implements OnChanges, OnDestroy {
       idePersonRol: raw.idePersonRol,
       ...(raw.codTemplateType === 'RECIBO' ? { ideReceipt: raw.ideReceipt } : {}),
       ...(raw.codTemplateType === 'COMUNICADO' && raw.mensaje.trim() ? { mensaje: raw.mensaje.trim() } : {}),
+      ...(raw.scope === 'CERTIFICATE' ? { ideContractFile: raw.ideContractFile } : {}),
     };
+    const endpoint = raw.scope === 'ALL' ? 'certificates' : 'documents';
     this.http
-      .post(`${environment.apiUrl}/documents/tasks/contracts/${this.ideContract}/documents`, payload)
+      .post(`${environment.apiUrl}/documents/tasks/contracts/${this.ideContract}/${endpoint}`, payload)
       .subscribe({
         next: () => {
           this.generating.set(false);

@@ -31,6 +31,7 @@ export class GenerationController {
   ) {
     return this.service.generateContractDocument(ideContract, dto.codTemplateType, dto.idePersonRol, actor.code, {
       ideReceipt: dto.ideReceipt,
+      ideContractFile: dto.ideContractFile,
       mensaje: dto.mensaje,
     });
   }

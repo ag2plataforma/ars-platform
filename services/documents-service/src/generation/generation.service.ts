@@ -75,7 +75,7 @@ export class GenerationService {
     codTemplateType: string,
     idePersonRol: string,
     actor: string,
-    extras: { ideReceipt?: string; mensaje?: string } = {},
+    extras: { ideReceipt?: string; ideContractFile?: string; mensaje?: string } = {},
   ) {
     if (codTemplateType === 'COTIZACION') {
       throw new BadRequestException(
@@ -105,7 +105,19 @@ export class GenerationService {
           },
         },
         TContractFile: {
+          orderBy: { NumContractFile: 'asc' },
           include: {
+            TContractFilePerson: {
+              where: { SPersonRol: { CodPersonRol: 'ASEGURADO' } },
+              include: {
+                TPerson: {
+                  include: {
+                    TAddress: { where: { IndMain: true }, take: 1 },
+                    TContactData: { where: { IndMain: true }, take: 1 },
+                  },
+                },
+              },
+            },
             TFileRisk: {
               include: {
                 SRiskProduct: true,
@@ -148,8 +160,20 @@ export class GenerationService {
       contract.TContractPerson.find((cp) => cp.SPersonRol.CodPersonRol === 'TITULAR')?.TPerson,
     );
 
-    const primerArchivo = contract.TContractFile[0];
+    // Colectivos: con `ideContractFile` el documento es el de ESE certificado (asegurado).
+    let primerArchivo = contract.TContractFile[0];
+    if (extras.ideContractFile) {
+      const chosen = contract.TContractFile.find((f) => f.IdeContractFile === extras.ideContractFile);
+      if (!chosen) {
+        throw new NotFoundException(
+          `El contrato "${contract.NumContract}" no tiene el certificado "${extras.ideContractFile}"`,
+        );
+      }
+      primerArchivo = chosen;
+    }
     const primerRiesgo = primerArchivo?.TFileRisk[0];
+    const asegurado = this.buildPersonVariables(primerArchivo?.TContractFilePerson[0]?.TPerson);
+    const numCertificado = extras.ideContractFile && primerArchivo ? String(primerArchivo.NumContractFile) : '';
 
     const mascotaAtributos = await this.formatRiskAttributes(
       (primerRiesgo?.RiskAttributeValue as Record<string, unknown> | null) ?? null,
@@ -215,6 +239,8 @@ export class GenerationService {
       tstSubscription: formatDate(contract.TstSubscription),
       tomador,
       titular,
+      asegurado,
+      numCertificado,
       mascotaAtributos,
       receipts,
       primaAnualizada: receipts[0]?.prime ?? '0,00',
@@ -243,7 +269,9 @@ export class GenerationService {
     const now = new Date();
     const desFileName = selectedReceipt
       ? `RECIBO_${selectedReceipt.NumReceipt.replace(/[^A-Za-z0-9_-]/g, '')}.pdf`
-      : `${template.CodTemplateType}_${contract.NumContract}.pdf`;
+      : extras.ideContractFile
+        ? `${template.CodTemplateType}_${contract.NumContract}_CERT${numCertificado}.pdf`
+        : `${template.CodTemplateType}_${contract.NumContract}.pdf`;
     const saved = await this.prisma.tContractOperationDocument.create({
       data: {
         // El recibo se guarda colgado de la operación a la que pertenece
@@ -255,6 +283,7 @@ export class GenerationService {
           ideOperationProductTemplate: template.IdeOperationProductTemplate,
           generatedBy: actor,
           ...(selectedReceipt ? { ideReceipt: selectedReceipt.IdeReceipt, numReceipt: selectedReceipt.NumReceipt } : {}),
+          ...(extras.ideContractFile ? { ideContractFile: extras.ideContractFile, numCertificado: Number(numCertificado) } : {}),
           ...(codTemplateType === 'COMUNICADO' && extras.mensaje ? { mensaje: extras.mensaje } : {}),
         },
         PdfData: pdfBytes,
@@ -269,6 +298,17 @@ export class GenerationService {
     });
 
     return { ideContractOperationDocument: saved.IdeContractOperationDocument, desFileName };
+  }
+
+  /** Colectivos: ids de los certificados activos del contrato (orden de alta). */
+  async listActiveCertificateIds(ideContract: string): Promise<string[]> {
+    const ideActivo = await this.stateMachine.getStateByCode('Activo');
+    const files = await this.prisma.tContractFile.findMany({
+      where: { IdeContract: ideContract, IdeState: ideActivo },
+      orderBy: { NumContractFile: 'asc' },
+      select: { IdeContractFile: true },
+    });
+    return files.map((f) => f.IdeContractFile);
   }
 
   /** Recibos del contrato, para el selector del diálogo "Generar

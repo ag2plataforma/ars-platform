@@ -85,6 +85,33 @@
       <p-select [options]="personRoles()" optionLabel="desPersonRol" optionValue="idePersonRol" formControlName="idePersonRol" appendTo="body" />
     </div>
 
+    @if (isCollective && selectedType === 'CONTRATO') {
+      <div class="flex flex-col gap-1">
+        <label class="text-sm text-slate-600">{{ 'contractDocuments.scopeLabel' | transloco }}</label>
+        <p-select [options]="scopeOptions" optionValue="value" formControlName="scope" appendTo="body">
+          <ng-template #selectedItem let-o>{{ o.key | transloco }}</ng-template>
+          <ng-template #item let-o>{{ o.key | transloco }}</ng-template>
+        </p-select>
+      </div>
+      @if (selectedScope === 'CERTIFICATE') {
+        <div class="flex flex-col gap-1">
+          <label class="text-sm text-slate-600">{{ 'contractDocuments.certificateLabel' | transloco }}</label>
+          <p-select
+            [options]="certificates"
+            optionLabel="label"
+            optionValue="ideContractFile"
+            formControlName="ideContractFile"
+            appendTo="body"
+            [filter]="certificates.length > 8"
+            [placeholder]="'contractDocuments.certificatePlaceholder' | transloco"
+          />
+        </div>
+      }
+      @if (selectedScope === 'ALL') {
+        <p class="text-xs text-slate-500">{{ 'contractDocuments.scopeAllHint' | transloco: { n: certificates.length } }}</p>
+      }
+    }
+
     @if (selectedType === 'RECIBO') {
       <div class="flex flex-col gap-1">
         <label class="text-sm text-slate-600">{{ 'contractDocuments.receiptLabel' | transloco }}</label>

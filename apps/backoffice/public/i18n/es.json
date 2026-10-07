@@ -1730,7 +1730,16 @@
     "receiptPlaceholder": "Elegí el recibo",
     "noReceipts": "Este contrato todavía no tiene recibos.",
     "messageLabel": "Mensaje (opcional)",
-    "messageHint": "Texto libre que se inserta en la plantilla en el lugar de la etiqueta «mensaje» (entre llaves dobles)."
+    "messageHint": "Texto libre que se inserta en la plantilla en el lugar de la etiqueta «mensaje» (entre llaves dobles).",
+    "scopeLabel": "Alcance",
+    "scope": {
+      "GENERAL": "Póliza del colectivo (general)",
+      "CERTIFICATE": "Certificado de un asegurado",
+      "ALL": "Certificados de todos los asegurados"
+    },
+    "certificateLabel": "Asegurado",
+    "certificatePlaceholder": "Elegí el certificado",
+    "scopeAllHint": "Se generará un documento por cada certificado activo ({{n}}). Aparecerán en la lista a medida que se completen."
   },
   "adjustments": {
     "title": "Recargos y descuentos",

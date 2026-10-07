@@ -19,6 +19,7 @@ export class GenerateDocumentHandler implements TaskHandler {
       codTemplateType: string;
       idePersonRol: string;
       ideReceipt?: string;
+      ideContractFile?: string;
       mensaje?: string;
     };
     const { ideContractOperationDocument } = await this.generation.generateContractDocument(
@@ -26,7 +27,7 @@ export class GenerateDocumentHandler implements TaskHandler {
       p.codTemplateType,
       p.idePersonRol,
       task.usrCreation,
-      { ideReceipt: p.ideReceipt, mensaje: p.mensaje },
+      { ideReceipt: p.ideReceipt, ideContractFile: p.ideContractFile, mensaje: p.mensaje },
     );
     return { ideContractOperationDocument };
   }

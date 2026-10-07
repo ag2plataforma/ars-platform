@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { CurrentUser, JwtPayload, Roles } from '@ars-platform/shared-common';
 import { QueuedTask, TaskQueueRepository, TaskStatus } from '@ars-platform/database';
+import { GenerationService } from '../generation/generation.service';
 import { GenerateContractDocumentDto } from '../generation/dto/generate-contract-document.dto';
 import { GENERATE_DOCUMENT_TASK } from './handlers/generate-document.handler';
 
@@ -33,7 +34,10 @@ const STATUSES: TaskStatus[] = ['PENDIENTE', 'EN_PROCESO', 'COMPLETADA', 'FALLID
  */
 @Controller('tasks')
 export class TasksController {
-  constructor(private readonly queue: TaskQueueRepository) {}
+  constructor(
+    private readonly queue: TaskQueueRepository,
+    private readonly generation: GenerationService,
+  ) {}
 
   @Get()
   async list(
@@ -73,10 +77,43 @@ export class TasksController {
         codTemplateType: dto.codTemplateType,
         idePersonRol: dto.idePersonRol,
         ...(dto.ideReceipt ? { ideReceipt: dto.ideReceipt } : {}),
+        ...(dto.ideContractFile ? { ideContractFile: dto.ideContractFile } : {}),
         ...(dto.mensaje ? { mensaje: dto.mensaje } : {}),
       },
     });
     return toDto(task);
+  }
+
+  /**
+   * Colectivos: encola UN documento por cada certificado activo del contrato (el certificado
+   * individual de cada asegurado), con la misma plantilla y rol destinatario.
+   */
+  @Post('contracts/:ideContract/certificates')
+  @HttpCode(202)
+  async enqueueCertificates(
+    @Param('ideContract', new ParseUUIDPipe()) ideContract: string,
+    @Body() dto: GenerateContractDocumentDto,
+    @CurrentUser() actor: JwtPayload,
+  ) {
+    const fileIds = await this.generation.listActiveCertificateIds(ideContract);
+    if (fileIds.length === 0) throw new ConflictException('El contrato no tiene certificados activos');
+    const tasks: QueuedTask[] = [];
+    for (const ideContractFile of fileIds) {
+      tasks.push(
+        await this.queue.enqueue({
+          codTaskType: GENERATE_DOCUMENT_TASK,
+          ideEntity: ideContract,
+          actor: actor.code,
+          payload: {
+            codTemplateType: dto.codTemplateType,
+            idePersonRol: dto.idePersonRol,
+            ideContractFile,
+            ...(dto.mensaje ? { mensaje: dto.mensaje } : {}),
+          },
+        }),
+      );
+    }
+    return { enqueued: tasks.length, tasks: tasks.map(toDto) };
   }
 
   @Get('contracts/:ideContract')

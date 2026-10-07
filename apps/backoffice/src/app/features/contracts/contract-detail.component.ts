@@ -203,6 +203,15 @@ export class ContractDetailComponent implements OnInit {
    *  y alimenta la pestaña "Coberturas". */
   readonly selectedRisk = signal<ContractRisk | null>(null);
 
+  /** Certificados activos de un colectivo (vacío si el contrato no es colectivo), para los documentos por asegurado. */
+  readonly certificateOptions = computed(() => {
+    const c = this.contract();
+    if (!c?.IndCollective) return [];
+    return c.TContractFile.filter((f) => f.SState.CodState === 'ACTIVO').map((f) => ({
+      ideContractFile: f.IdeContractFile,
+      label: `#${f.NumContractFile} · ${this.insuredOf(f) || '—'}`,
+    }));
+  });
   readonly risksDisabled = computed(() => this.selectedFile() === null);
   readonly coveragesDisabled = computed(() => this.selectedRisk() === null);
   readonly selectedFileRisks = computed(() => this.selectedFile()?.TFileRisk ?? []);
