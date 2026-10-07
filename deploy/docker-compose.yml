@@ -30,8 +30,11 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-ars}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    # Sin "ports": solo accesible desde la red interna. Para psql a mano:
-    #   docker compose exec postgres psql -U ars -d ars
+    # Solo escucha en el loopback de la VPS (127.0.0.1): NO es accesible desde internet.
+    # Para un cliente grafico (DBeaver) se entra por tunel SSH, ver docs/05 "Conectar DBeaver".
+    # Para psql a mano:  docker compose exec postgres psql -U ars -d ars
+    ports:
+      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ars -d ${POSTGRES_DB:-ars}"]
       interval: 10s

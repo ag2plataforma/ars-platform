@@ -280,6 +280,17 @@ Si GitHub se viera comprometido, el daño máximo de esa llave es ejecutar `upda
 - Estado y recursos: `docker compose ps`, `docker stats --no-stream`, `df -h`.
 - Scripts de BD (`setup-*.js`, `seed-*.js`, `fix-*.js`, `investigate-*.js`...): `bash ~/ars-platform/deploy/scripts/db-run.sh <script>.js` (tras el `git pull`/despliegue que lo trae). `--list` muestra los disponibles. Los que escriben piden confirmación y hacen antes un backup (`-y` y `--no-backup` lo omiten); los de solo lectura (`investigate-*`, `verify-*`...) se ejecutan directo. Corren en un contenedor temporal de la red interna con solo `DATABASE_URL`, usando `pg` instalado en el volumen `ars_dbtools` (la primera vez lo instala). `bash deploy/scripts/db-run.sh --sql` abre `psql`. Los scripts siguen siendo idempotentes (`IF NOT EXISTS`): repetir uno ya aplicado no rompe nada. Orden: primero despliega el código, luego corre el script de esquema, y reinicia los servicios afectados solo si el script lo indica.
 
+## Conectar DBeaver a la base de datos
+
+Postgres publica su puerto **solo en el loopback de la VPS** (`127.0.0.1:5432`), nunca en internet (ufw sigue sin abrir el 5432 y, además, Docker lo enlaza solo a 127.0.0.1). Desde el Mac se entra por **túnel SSH** que DBeaver abre solo:
+
+1. Nueva conexión → PostgreSQL. Pestaña *Main*: Host `localhost`, Puerto `5432`, Base de datos `ars`, Usuario `ars`, Contraseña = `POSTGRES_PASSWORD` de `deploy/.env` (se lee en la VPS con `grep '^POSTGRES_PASSWORD=' ~/ars-platform/deploy/.env` y se pega solo en DBeaver, nunca en chats).
+2. Pestaña *SSH* → marcar *Use SSH Tunnel*: Host `178.238.225.7`, Puerto `22`, Usuario `deploy`, Método *Public Key*, Private Key `~/.ssh/ars_vps` (la passphrase de esa llave en *Password*). Si falla con la llave ed25519, en *Advanced* cambia la implementación a `SSHJ`.
+3. *Test Connection*. El esquema de la aplicación es `ars_platform` (DBeaver → Databases → ars → Schemas).
+4. Recomendado: en *General* → *Connection type* = *Production* (confirma antes de ejecutar, sin auto-commit), y hacer un backup (`bash deploy/scripts/backup.sh`) antes de modificar datos a mano. Para solo consultar, un usuario de solo lectura es más seguro que `ars`.
+
+Si Postgres no responde en el túnel, comprueba en la VPS que el puerto está publicado: `docker compose ps postgres` debe mostrar `127.0.0.1:5432->5432/tcp`. Tras el cambio de `docker-compose.yml`, el pipeline recrea el contenedor de Postgres (unos segundos de corte; los datos están en el volumen `pgdata`).
+
 ## Estado y lecciones del primer despliegue (2026-10)
 
 Desplegado y operativo en https://backoffice.ag2aplicaciones.com: 11 contenedores sanos, base migrada desde Neon (149 tablas), endurecimiento SSH, backups diarios locales + B2 cifrado con restauración probada, correo (Brevo), recuperación de contraseña, despliegue automático por push y webhook de Stripe (modo test) en 200. Pendientes: Bizum depende de que Stripe verifique la cuenta (tipo de negocio y NIF); autenticar el dominio en Brevo (SPF/DKIM) antes de enviar a clientes reales; pasar Stripe a modo live.
