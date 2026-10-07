@@ -270,7 +270,7 @@ ssh-keyscan -t ed25519 178.238.225.7
 
 Si GitHub se viera comprometido, el daño máximo de esa llave es ejecutar `update.sh` (un `git pull` + build de lo que haya en `main`). Para revocarla, borra su línea de `~/.ssh/authorized_keys` en la VPS.
 
-**Volver atrás** un despliegue malo: `git revert <commit>` + push; el pipeline despliega el revert. Scripts de base de datos (`setup-*.js`, seeds) no forman parte del pipeline: se ejecutan aparte.
+**Volver atrás** un despliegue malo: `git revert <commit>` + push; el pipeline despliega el revert. Scripts de base de datos (`setup-*.js`, seeds) no forman parte del pipeline: se ejecutan aparte con `deploy/scripts/db-run.sh` (ver «Operación diaria»). Un `git revert` no deshace cambios de esquema ya aplicados; para eso, restaura el backup.
 
 ## Operación diaria
 
@@ -278,7 +278,7 @@ Si GitHub se viera comprometido, el daño máximo de esa llave es ejecutar `upda
 - Logs de un servicio: `docker compose logs -f --tail=200 underwriting`.
 - Reiniciar uno: `docker compose restart claims`.
 - Estado y recursos: `docker compose ps`, `docker stats --no-stream`, `df -h`.
-- Scripts de BD nuevos (`setup-*.js`) contra la BD de la VPS: desde el repo, con `DATABASE_URL` apuntando a `postgres` (ejecuta con `docker compose exec`, o abre un túnel SSH al puerto del contenedor si lo necesitas desde tu Mac). **Aún por definir cuando surja el primer script.**
+- Scripts de BD (`setup-*.js`, `seed-*.js`, `fix-*.js`, `investigate-*.js`...): `bash ~/ars-platform/deploy/scripts/db-run.sh <script>.js` (tras el `git pull`/despliegue que lo trae). `--list` muestra los disponibles. Los que escriben piden confirmación y hacen antes un backup (`-y` y `--no-backup` lo omiten); los de solo lectura (`investigate-*`, `verify-*`...) se ejecutan directo. Corren en un contenedor temporal de la red interna con solo `DATABASE_URL`, usando `pg` instalado en el volumen `ars_dbtools` (la primera vez lo instala). `bash deploy/scripts/db-run.sh --sql` abre `psql`. Los scripts siguen siendo idempotentes (`IF NOT EXISTS`): repetir uno ya aplicado no rompe nada. Orden: primero despliega el código, luego corre el script de esquema, y reinicia los servicios afectados solo si el script lo indica.
 
 ## Estado y lecciones del primer despliegue (2026-10)
 

@@ -104,7 +104,7 @@ async function dumpAll(client, schema, table, orderBy = 'TstCreation') {
 }
 
 async function main() {
-  const client = new Client({ connectionString: loadDatabaseUrl(), ssl: { rejectUnauthorized: false } });
+  const client = new Client({ connectionString: loadDatabaseUrl(), ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false } });
   await client.connect();
 
   console.log('\n########## 1. FUNCIONES PL/pgSQL reales (%person%) ##########');

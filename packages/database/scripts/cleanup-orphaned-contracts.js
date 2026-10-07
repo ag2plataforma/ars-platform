@@ -129,7 +129,7 @@ async function main() {
   const contractIdx = args.indexOf('--contract');
   const ideContractFilter = contractIdx >= 0 ? args[contractIdx + 1] : null;
 
-  const client = new Client({ connectionString: loadDatabaseUrl(), ssl: { rejectUnauthorized: false } });
+  const client = new Client({ connectionString: loadDatabaseUrl(), ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false } });
   await client.connect();
 
   const orphans = await findOrphanedContracts(client, ideContractFilter);

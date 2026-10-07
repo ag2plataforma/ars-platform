@@ -48,7 +48,7 @@ function loadDatabaseUrl() {
 }
 
 async function main() {
-  const client = new Client({ connectionString: loadDatabaseUrl(), ssl: { rejectUnauthorized: false } });
+  const client = new Client({ connectionString: loadDatabaseUrl(), ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false } });
   await client.connect();
 
   await client.query(`

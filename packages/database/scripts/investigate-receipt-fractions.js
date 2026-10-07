@@ -37,7 +37,7 @@ function log(text = '') {
 const TERMS = ['IndGenerateAllFraction', 'GenerateAllFraction', 'BILLFRACTION', 'GENERATEALL', 'NumFraction'];
 
 async function main() {
-  const client = new Client({ connectionString: loadDatabaseUrl(), ssl: { rejectUnauthorized: false } });
+  const client = new Client({ connectionString: loadDatabaseUrl(), ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false } });
   await client.connect();
   try {
     log('=== 1. Funciones cuyo código menciona los términos buscados ===');
