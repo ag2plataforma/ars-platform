@@ -221,13 +221,14 @@ docker compose up -d
 ## Paso 8 — Stripe (webhook) y Bizum
 
 1. Stripe Dashboard (modo test primero) → Developers → Webhooks → Add endpoint.
-2. URL: `https://app.tudominio.com/api/underwriting/public/payments/webhook/stripe`.
+2. URL **completa, con la ruta**: `https://backoffice.ag2aplicaciones.com/api/underwriting/public/payments/webhook/stripe` (con tu dominio). Si guardas solo el dominio, Stripe hace `POST /`, Caddy lo sirve como parte del frontend y responde **405** con cuerpo vacío (el listado de Stripe puede mostrar la ruta como texto aparte y engañar: comprueba el campo *URL del endpoint*). Se corrige editando la URL; el signing secret no cambia.
 3. Eventos a suscribir (los que procesa `stripe-payment-gateway.ts`): `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed` y `checkout.session.expired`. Cualquier otro se ignora.
 4. Copia el *signing secret* (`whsec_...`) a `STRIPE_WEBHOOK_SECRET`, la clave secreta de test a `STRIPE_SECRET_KEY`, y `PAYMENT_PROVIDER=stripe`.
 5. `docker compose up -d underwriting` (recrea solo ese servicio con el nuevo `.env`).
 6. Prueba un pago con tarjeta de test `4242 4242 4242 4242` y confirma que el contrato se activa y el recibo queda cobrado.
 7. Bizum: el servicio **no fija** `payment_method_types` al crear el Checkout, así que Stripe muestra los métodos que tengas activos en el Dashboard. Entra en Settings → Payment methods y comprueba que Bizum figura disponible y activado para tu cuenta (Bizum es asíncrono: llegará por `async_payment_succeeded`, ya contemplado). Si no aparece como disponible, hay que solicitarlo a Stripe; no requiere cambios de código.
-8. Para producción: repite con las claves *live* y un endpoint nuevo en modo live.
+8. Verificar el webhook: en el evento de Stripe pulsa «Vuelve a enviarlo»; debe dar **200** (`{"received":true,...}`; con un contrato ya activado responde `processed:false, reason:ALREADY_PROCESSED`, que es lo correcto). En la VPS, `docker compose logs --since 5m web | grep -i webhook` muestra método, ruta y estado (Caddy registra los accesos en JSON). Una prueba con `curl` sin cabecera `Stripe-Signature` devuelve **401** (`Falta la cabecera Stripe-Signature`): es lo esperado y confirma que la ruta llega a la verificación de firma.
+9. Para producción: repite con las claves *live* y un endpoint nuevo en modo live.
 
 ## Despliegue automático (GitHub Actions)
 
@@ -278,6 +279,19 @@ Si GitHub se viera comprometido, el daño máximo de esa llave es ejecutar `upda
 - Reiniciar uno: `docker compose restart claims`.
 - Estado y recursos: `docker compose ps`, `docker stats --no-stream`, `df -h`.
 - Scripts de BD nuevos (`setup-*.js`) contra la BD de la VPS: desde el repo, con `DATABASE_URL` apuntando a `postgres` (ejecuta con `docker compose exec`, o abre un túnel SSH al puerto del contenedor si lo necesitas desde tu Mac). **Aún por definir cuando surja el primer script.**
+
+## Estado y lecciones del primer despliegue (2026-10)
+
+Desplegado y operativo en https://backoffice.ag2aplicaciones.com: 11 contenedores sanos, base migrada desde Neon (149 tablas), endurecimiento SSH, backups diarios locales + B2 cifrado con restauración probada, correo (Brevo), recuperación de contraseña, despliegue automático por push y webhook de Stripe (modo test) en 200. Pendientes: Bizum depende de que Stripe verifique la cuenta (tipo de negocio y NIF); autenticar el dominio en Brevo (SPF/DKIM) antes de enviar a clientes reales; pasar Stripe a modo live.
+
+Problemas encontrados (para no repetirlos):
+
+- **`.env` con `source`**: un valor con espacios sin comillas rompe los scripts; ahora se leen con `envval()` (grep) y `.env.example` entrecomilla `EMAIL_SENDER_NAME`.
+- **Extensiones de Postgres**: en Neon vivían en esquemas propios (`entity`, `ag2ars`) y `pg_restore` fallaba; `migrate-from-neon.sh` las recrea en los mismos esquemas.
+- **sshd, primer valor gana**: `50-cloud-init.conf` mantenía `PasswordAuthentication yes` por encima de `99-hardening.conf`; el archivo de endurecimiento se llama `00-hardening.conf`. Verifica siempre con `sshd -T` y una prueba real.
+- **Caché del navegador**: `/i18n/es.json` e `index.html` no llevan hash y se servían viejos tras desplegar (claves de traducción en crudo); Caddy los sirve con `no-cache`.
+- **Webhook 405**: URL de Stripe guardada sin la ruta (ver Paso 8). Sin registro de accesos no se veía; Caddy ahora lo registra.
+- **Comentarios `#` en zsh**: no pegues comandos con comentarios inline que lleven paréntesis.
 
 ## Riesgos conocidos
 
