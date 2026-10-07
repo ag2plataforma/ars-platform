@@ -6,6 +6,13 @@
 {$DOMAIN} {
 	encode zstd gzip
 
+	# Registro de accesos en stdout (docker compose logs web): imprescindible para
+	# depurar webhooks (Stripe) y ver que ruta/metodo llega realmente.
+	log {
+		output stdout
+		format json
+	}
+
 	header {
 		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options "nosniff"
