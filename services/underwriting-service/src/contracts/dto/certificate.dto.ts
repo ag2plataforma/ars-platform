@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsDateString, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsDateString, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { CollectiveInsuredDto } from '../../quoting/dto/create-collective-quote.dto';
 
 /**
@@ -37,6 +37,54 @@ export class AddCertificateDto {
 export class RemoveCertificateDto {
   @IsString()
   ideContractFile!: string;
+
+  @IsString()
+  ideProductEndorsement!: string;
+
+  @IsDateString()
+  tstSupplement!: string;
+
+  @IsString()
+  desSupplement!: string;
+}
+
+/**
+ * Colectivos, alta MASIVA de asegurados: varios certificados nuevos en UN solo suplemento
+ * (una operación y un único recibo SUP consolidado). Todo o nada: si una fila falla no se
+ * da de alta ninguna, y el error indica la fila.
+ */
+export class AddCertificatesBulkDto {
+  @IsString()
+  ideProductEndorsement!: string;
+
+  @IsDateString()
+  tstSupplement!: string;
+
+  @IsString()
+  desSupplement!: string;
+
+  /** `SPlanProductRisk` (plan + tipo de riesgo) común a todos los asegurados de la carga. */
+  @IsString()
+  idePlanProductRisk!: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => CollectiveInsuredDto)
+  insureds!: CollectiveInsuredDto[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  ideCoveragePlans?: string[];
+}
+
+/** Colectivos, baja MASIVA: cierra varios certificados en un solo suplemento (un único recibo SUP). */
+export class RemoveCertificatesBulkDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  ideContractFiles!: string[];
 
   @IsString()
   ideProductEndorsement!: string;

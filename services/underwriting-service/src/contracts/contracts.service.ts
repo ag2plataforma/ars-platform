@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, Injectable, Logger, NotFoundExc
 import { Prisma, PrismaService, TaskQueueRepository } from '@ars-platform/database';
 import { RulesEngineService, StateMachineService } from '@ars-platform/shared-common';
 import { QuotesService } from '../quoting/quotes.service';
-import { CollectiveQuotesService } from '../quoting/collective-quotes.service';
+import { CollectiveQuotesService, collectiveMaxInsureds } from '../quoting/collective-quotes.service';
 import { RequirementsService } from '../requirements/requirements.service';
 import { PaymentsService } from '../payments/payments.service';
 import { PaymentLinksService } from '../payments/payment-links.service';
@@ -12,7 +12,12 @@ import { CancelContractDto } from './dto/cancel-contract.dto';
 import { ChangeInsuredAmountDto } from './dto/change-insured-amount.dto';
 import { AddCoverageDto } from './dto/add-coverage.dto';
 import { RemoveCoverageDto } from './dto/remove-coverage.dto';
-import { AddCertificateDto, RemoveCertificateDto } from './dto/certificate.dto';
+import {
+  AddCertificateDto,
+  AddCertificatesBulkDto,
+  RemoveCertificateDto,
+  RemoveCertificatesBulkDto,
+} from './dto/certificate.dto';
 import { AddRiskDto } from './dto/add-risk.dto';
 import { RemoveRiskDto } from './dto/remove-risk.dto';
 import { ChangePersonDataDto } from './dto/change-person-data.dto';
@@ -922,12 +927,28 @@ export class ContractsService {
    * hasta el fin de la vigencia, prorrateada igual que en un alta de cobertura.
    */
   async addCertificate(ideContract: string, dto: AddCertificateDto, actor: string) {
+    const { insured, ...rest } = dto;
+    return this.addCertificates(ideContract, { ...rest, insureds: [insured] }, actor);
+  }
+
+  /**
+   * Alta de UNO O VARIOS asegurados en un solo suplemento (alta masiva): una operación del
+   * endoso, un certificado por asegurado y UN único recibo SUP consolidado (`generateReceipts`
+   * re-apunta todos los movimientos en borrador del contrato). Todo o nada, en una transacción;
+   * antes de escribir nada se valida cada fila (persona repetida, ya asegurada) y el error
+   * indica la fila. Con un solo asegurado es exactamente el alta individual de siempre.
+   */
+  async addCertificates(ideContract: string, dto: AddCertificatesBulkDto, actor: string) {
     const existing = await this.prisma.tContract.findUnique({ where: { IdeContract: ideContract } });
     if (!existing) {
       throw new NotFoundException(`No existe contrato con id "${ideContract}"`);
     }
     if (!existing.IndCollective) {
       throw new ConflictException('Solo los contratos colectivos admiten alta de asegurados');
+    }
+    const max = collectiveMaxInsureds();
+    if (dto.insureds.length > max) {
+      throw new BadRequestException(`Un alta admite como máximo ${max} asegurados por carga (recibidos: ${dto.insureds.length})`);
     }
 
     const tstSupplement = new Date(dto.tstSupplement);
@@ -970,12 +991,33 @@ export class ContractsService {
           throw new BadRequestException('El plan elegido no tiene coberturas para dar de alta');
         }
 
-        const idePerson = await this.collectiveQuotes.findOrCreateInsuredPerson(dto.insured, actor, tx);
-        const alreadyInsured = await tx.tContractFilePerson.findFirst({
-          where: { IdePerson: idePerson, TContractFile: { IdeContract: ideContract, IdeState: ideActivo } },
-        });
-        if (alreadyInsured) {
-          throw new ConflictException('Esa persona ya es asegurada (con certificado activo) en este colectivo');
+        // Fase 1 -- validar todas las filas antes de crear certificados.
+        const idePersons: string[] = [];
+        const rowErrors: string[] = [];
+        const seen = new Set<string>();
+        for (const [index, insured] of dto.insureds.entries()) {
+          try {
+            const idePerson = await this.collectiveQuotes.findOrCreateInsuredPerson(insured, actor, tx);
+            if (seen.has(idePerson)) {
+              throw new ConflictException('Esa persona aparece repetida en la carga');
+            }
+            const alreadyInsured = await tx.tContractFilePerson.findFirst({
+              where: { IdePerson: idePerson, TContractFile: { IdeContract: ideContract, IdeState: ideActivo } },
+            });
+            if (alreadyInsured) {
+              throw new ConflictException('Esa persona ya es asegurada (con certificado activo) en este colectivo');
+            }
+            seen.add(idePerson);
+            idePersons.push(idePerson);
+          } catch (err) {
+            if (dto.insureds.length === 1) throw err;
+            rowErrors.push(`Fila ${index + 1}: ${(err as Error).message}`);
+          }
+        }
+        if (rowErrors.length > 0) {
+          throw new BadRequestException(
+            rowErrors.slice(0, 15).join(' | ') + (rowErrors.length > 15 ? ` (y ${rowErrors.length - 15} más)` : ''),
+          );
         }
 
         const codOperation = await this.resolveOperationCodeByEndorsement(dto.ideProductEndorsement, tx);
@@ -985,52 +1027,61 @@ export class ContractsService {
           where: { IdeContract: ideContract },
           _max: { NumContractFile: true },
         });
-        const newFile = await this.createContractFile(
-          { IdeContract: ideContract, TstInitial: tstSupplement, TstEnd: contract.TstEnd },
-          actor,
-          tx,
-          (maxFile._max.NumContractFile ?? 0) + 1,
-        );
-        const nextFileState = await this.stateMachine.getNextState('TContractFile', newFile.IdeState, 'Activar');
-        await tx.tContractFile.update({
-          where: { IdeContractFile: newFile.IdeContractFile },
-          data: { IdeState: nextFileState, UsrModification: actor, TstModification: new Date() },
-        });
-        await this.attachInsuredToFile(idePerson, newFile.IdeContractFile, actor, tx);
+        let nextNumFile = (maxFile._max.NumContractFile ?? 0) + 1;
+        const allNewCoverages: { ideRiskCoverage: string }[] = [];
 
-        const desFileRisk = [dto.insured.desFirstName, dto.insured.desLastName1].filter(Boolean).join(' ').slice(0, 200);
-        const fileRisk = await this.createNewFileRisk(
-          newFile,
-          planProductRisk,
-          desFileRisk,
-          dto.insured.riskAttributeValue,
-          tstSupplement,
-          actor,
-          tx,
-        );
+        for (const [index, insured] of dto.insureds.entries()) {
+          const idePerson = idePersons[index];
+          const newFile = await this.createContractFile(
+            { IdeContract: ideContract, TstInitial: tstSupplement, TstEnd: contract.TstEnd },
+            actor,
+            tx,
+            nextNumFile++,
+          );
+          const nextFileState = await this.stateMachine.getNextState('TContractFile', newFile.IdeState, 'Activar');
+          await tx.tContractFile.update({
+            where: { IdeContractFile: newFile.IdeContractFile },
+            data: { IdeState: nextFileState, UsrModification: actor, TstModification: new Date() },
+          });
+          await this.attachInsuredToFile(idePerson, newFile.IdeContractFile, actor, tx);
 
-        const newCoverages: { ideRiskCoverage: string; ideCoveragePlan: string }[] = [];
-        for (const coveragePlan of coveragePlans) {
-          const riskCoverage = await this.createNewRiskCoverage(fileRisk, coveragePlan, undefined, tstSupplement, actor, tx);
-          newCoverages.push({ ideRiskCoverage: riskCoverage.IdeRiskCoverage, ideCoveragePlan: coveragePlan.IdeCoveragePlan });
+          const desFileRisk = [insured.desFirstName, insured.desLastName1].filter(Boolean).join(' ').slice(0, 200);
+          const fileRisk = await this.createNewFileRisk(
+            newFile,
+            planProductRisk,
+            desFileRisk,
+            insured.riskAttributeValue,
+            tstSupplement,
+            actor,
+            tx,
+          );
+
+          const newCoverages: { ideRiskCoverage: string; ideCoveragePlan: string }[] = [];
+          for (const coveragePlan of coveragePlans) {
+            const riskCoverage = await this.createNewRiskCoverage(fileRisk, coveragePlan, undefined, tstSupplement, actor, tx);
+            newCoverages.push({ ideRiskCoverage: riskCoverage.IdeRiskCoverage, ideCoveragePlan: coveragePlan.IdeCoveragePlan });
+          }
+
+          await this.createInitialMovements(
+            newCoverages.map((c) => ({
+              ideRiskCoverage: c.ideRiskCoverage,
+              ideFileRisk: fileRisk.IdeFileRisk,
+              ideCoveragePlan: c.ideCoveragePlan,
+              idePlanProductRisk: fileRisk.IdePlanProductRisk,
+              ideProduct: existing.IdeProduct,
+              prime: 0,
+            })),
+            actor,
+            tx,
+          );
+          await this.setNetPrime(newFile.IdeContractFile, actor, tx);
+          allNewCoverages.push(...newCoverages);
         }
 
-        await this.createInitialMovements(
-          newCoverages.map((c) => ({
-            ideRiskCoverage: c.ideRiskCoverage,
-            ideFileRisk: fileRisk.IdeFileRisk,
-            ideCoveragePlan: c.ideCoveragePlan,
-            idePlanProductRisk: fileRisk.IdePlanProductRisk,
-            ideProduct: existing.IdeProduct,
-            prime: 0,
-          })),
-          actor,
-          tx,
-        );
-        await this.setNetPrime(newFile.IdeContractFile, actor, tx);
+        // UN solo recibo SUP para todos los certificados nuevos.
         await this.generateReceipts(ideContract, dto.ideProductEndorsement, actor, tx);
 
-        for (const coverage of newCoverages) {
+        for (const coverage of allNewCoverages) {
           const movement = await tx.tCoverageMovement.findFirstOrThrow({ where: { IdeRiskCoverage: coverage.ideRiskCoverage } });
           await this.activateNewCoverage(coverage.ideRiskCoverage, movement.IdeCoverageMovement, actor, tx);
         }
@@ -1050,6 +1101,16 @@ export class ContractsService {
    * anulación del contrato.
    */
   async removeCertificate(ideContract: string, dto: RemoveCertificateDto, actor: string) {
+    const { ideContractFile, ...rest } = dto;
+    return this.removeCertificates(ideContract, { ...rest, ideContractFiles: [ideContractFile] }, actor);
+  }
+
+  /**
+   * Baja de UNO O VARIOS certificados en un solo suplemento (baja masiva): una operación, la
+   * devolución proporcional de cada certificado y UN único recibo SUP consolidado. Todo o nada.
+   * No permite dejar el colectivo sin certificados activos (para eso está la anulación).
+   */
+  async removeCertificates(ideContract: string, dto: RemoveCertificatesBulkDto, actor: string) {
     const existing = await this.prisma.tContract.findUnique({ where: { IdeContract: ideContract } });
     if (!existing) {
       throw new NotFoundException(`No existe contrato con id "${ideContract}"`);
@@ -1057,6 +1118,7 @@ export class ContractsService {
     if (!existing.IndCollective) {
       throw new ConflictException('Solo los contratos colectivos admiten baja de asegurados');
     }
+    const uniqueFileIds = [...new Set(dto.ideContractFiles)];
 
     const tstSupplement = new Date(dto.tstSupplement);
 
@@ -1076,63 +1138,79 @@ export class ContractsService {
             'No se pudo procesar el suplemento: el contrato no está en estado "Activo" o la fecha del suplemento no está dentro de su vigencia',
           );
         }
-        const file = await tx.tContractFile.findFirst({
-          where: { IdeContractFile: dto.ideContractFile, IdeContract: ideContract, IdeState: ideActivo },
+        const files = await tx.tContractFile.findMany({
+          where: { IdeContractFile: { in: uniqueFileIds }, IdeContract: ideContract, IdeState: ideActivo },
         });
-        if (!file) {
-          throw new NotFoundException(`No existe un certificado activo "${dto.ideContractFile}" en el contrato "${ideContract}"`);
+        if (files.length !== uniqueFileIds.length) {
+          const found = new Set(files.map((f) => f.IdeContractFile));
+          const missing = uniqueFileIds.filter((id) => !found.has(id));
+          throw new NotFoundException(
+            `No existe un certificado activo ${missing.map((id) => `"${id}"`).join(', ')} en el contrato "${ideContract}"`,
+          );
         }
         const activeFiles = await tx.tContractFile.count({ where: { IdeContract: ideContract, IdeState: ideActivo } });
-        if (activeFiles <= 1) {
-          throw new ConflictException('No se puede dar de baja el último asegurado: anule el contrato');
+        if (activeFiles - files.length < 1) {
+          throw new ConflictException(
+            files.length === 1
+              ? 'No se puede dar de baja el último asegurado: anule el contrato'
+              : 'No se puede dejar el colectivo sin asegurados: deje al menos un certificado activo o anule el contrato',
+          );
         }
 
         const codOperation = await this.resolveOperationCodeByEndorsement(dto.ideProductEndorsement, tx);
         await this.createContractOperation(ideContract, existing.IdeProduct, codOperation, actor, tx);
 
-        const fileRisks = await tx.tFileRisk.findMany({
-          where: { IdeContractFile: dto.ideContractFile, IdeState: ideActivo },
-          select: { IdeFileRisk: true },
-        });
-        const riskCoverages = await tx.tRiskCoverage.findMany({
-          where: { IdeFileRisk: { in: fileRisks.map((r) => r.IdeFileRisk) }, IdeState: ideActivo },
-          select: { IdeRiskCoverage: true },
-        });
-
         const newMovementIds: string[] = [];
-        for (const { IdeRiskCoverage: ideRiskCoverage } of riskCoverages) {
-          const { lastMovement } = await this.validateSupplementDate(ideContract, ideRiskCoverage, tstSupplement, tx);
-          if (Number(lastMovement.Amount) === 0) continue;
-          const newMovement = await this.createSupplementMovement(ideRiskCoverage, lastMovement, tstSupplement, 0, actor, tx);
-          await this.setSupplementConcepts(ideRiskCoverage, lastMovement, newMovement, 0, actor, tx);
-          await this.setSupplementPrime(ideRiskCoverage, newMovement.IdeCoverageMovement, 0, actor, tx);
-          newMovementIds.push(newMovement.IdeCoverageMovement);
+        const closing: { fileRisks: { IdeFileRisk: string }[]; riskCoverages: { IdeRiskCoverage: string }[] }[] = [];
+
+        for (const file of files) {
+          const fileRisks = await tx.tFileRisk.findMany({
+            where: { IdeContractFile: file.IdeContractFile, IdeState: ideActivo },
+            select: { IdeFileRisk: true },
+          });
+          const riskCoverages = await tx.tRiskCoverage.findMany({
+            where: { IdeFileRisk: { in: fileRisks.map((r) => r.IdeFileRisk) }, IdeState: ideActivo },
+            select: { IdeRiskCoverage: true },
+          });
+          closing.push({ fileRisks, riskCoverages });
+
+          for (const { IdeRiskCoverage: ideRiskCoverage } of riskCoverages) {
+            const { lastMovement } = await this.validateSupplementDate(ideContract, ideRiskCoverage, tstSupplement, tx);
+            if (Number(lastMovement.Amount) === 0) continue;
+            const newMovement = await this.createSupplementMovement(ideRiskCoverage, lastMovement, tstSupplement, 0, actor, tx);
+            await this.setSupplementConcepts(ideRiskCoverage, lastMovement, newMovement, 0, actor, tx);
+            await this.setSupplementPrime(ideRiskCoverage, newMovement.IdeCoverageMovement, 0, actor, tx);
+            newMovementIds.push(newMovement.IdeCoverageMovement);
+          }
         }
 
+        // UN solo recibo SUP para todas las bajas.
         if (newMovementIds.length > 0) {
           await this.generateReceipts(ideContract, dto.ideProductEndorsement, actor, tx);
           for (const ideCoverageMovement of newMovementIds) {
             await this.activateSupplementMovement(ideCoverageMovement, actor, tx);
           }
         }
-        for (const { IdeRiskCoverage: ideRiskCoverage } of riskCoverages) {
-          await this.closeRiskCoverage(ideRiskCoverage, actor, tx);
+        for (const [index, file] of files.entries()) {
+          const { fileRisks, riskCoverages } = closing[index];
+          for (const { IdeRiskCoverage: ideRiskCoverage } of riskCoverages) {
+            await this.closeRiskCoverage(ideRiskCoverage, actor, tx);
+          }
+          for (const { IdeFileRisk: ideFileRisk } of fileRisks) {
+            await this.closeFileRisk(ideFileRisk, tstSupplement, dto.desSupplement, actor, tx);
+          }
+          const nextFileState = await this.stateMachine.getNextState('TContractFile', file.IdeState, 'Modificar');
+          await tx.tContractFile.update({
+            where: { IdeContractFile: file.IdeContractFile },
+            data: {
+              TstCancellation: tstSupplement,
+              DesCancellation: dto.desSupplement,
+              IdeState: nextFileState,
+              UsrModification: actor,
+              TstModification: new Date(),
+            },
+          });
         }
-        for (const { IdeFileRisk: ideFileRisk } of fileRisks) {
-          await this.closeFileRisk(ideFileRisk, tstSupplement, dto.desSupplement, actor, tx);
-        }
-
-        const nextFileState = await this.stateMachine.getNextState('TContractFile', file.IdeState, 'Modificar');
-        await tx.tContractFile.update({
-          where: { IdeContractFile: dto.ideContractFile },
-          data: {
-            TstCancellation: tstSupplement,
-            DesCancellation: dto.desSupplement,
-            IdeState: nextFileState,
-            UsrModification: actor,
-            TstModification: new Date(),
-          },
-        });
       },
       { timeout: SUPPLEMENT_TRANSACTION_TIMEOUT_MS, maxWait: 10_000 },
     );

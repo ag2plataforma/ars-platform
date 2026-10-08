@@ -10,7 +10,12 @@ import { AddCoverageDto } from './dto/add-coverage.dto';
 import { RemoveCoverageDto } from './dto/remove-coverage.dto';
 import { AddRiskDto } from './dto/add-risk.dto';
 import { RemoveRiskDto } from './dto/remove-risk.dto';
-import { AddCertificateDto, RemoveCertificateDto } from './dto/certificate.dto';
+import {
+  AddCertificateDto,
+  AddCertificatesBulkDto,
+  RemoveCertificateDto,
+  RemoveCertificatesBulkDto,
+} from './dto/certificate.dto';
 import { ChangePersonDataDto } from './dto/change-person-data.dto';
 import { ListContractsDto } from './dto/list-contracts.dto';
 import { ListRenewalCandidatesDto } from './dto/list-renewal-candidates.dto';
@@ -186,6 +191,18 @@ export class ContractsController {
   @Post('contracts/:id/add-certificate')
   addCertificate(@Param('id') id: string, @Body() dto: AddCertificateDto, @CurrentUser() actor: JwtPayload) {
     return this.service.addCertificate(id, dto, actor.code);
+  }
+
+  /** Colectivos, alta MASIVA de asegurados (un suplemento, un recibo) -- ver `ContractsService.addCertificates`. */
+  @Post('contracts/:id/add-certificates')
+  addCertificates(@Param('id') id: string, @Body() dto: AddCertificatesBulkDto, @CurrentUser() actor: JwtPayload) {
+    return this.service.addCertificates(id, dto, actor.code);
+  }
+
+  /** Colectivos, baja MASIVA de asegurados -- ver `ContractsService.removeCertificates`. */
+  @Post('contracts/:id/remove-certificates')
+  removeCertificates(@Param('id') id: string, @Body() dto: RemoveCertificatesBulkDto, @CurrentUser() actor: JwtPayload) {
+    return this.service.removeCertificates(id, dto, actor.code);
   }
 
   /** Colectivos, suplemento "Baja de asegurado" -- ver `ContractsService.removeCertificate`. */
