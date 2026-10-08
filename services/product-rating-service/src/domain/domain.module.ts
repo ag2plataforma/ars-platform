@@ -26,6 +26,8 @@ import { ProductValidityTypesService } from './product-validity-types.service';
 import { ProductOperationsController } from './product-operations.controller';
 import { ProductOperationsService } from './product-operations.service';
 import { ProductConsentsController } from './product-consents.controller';
+import { CollectiveTiersController } from './collective-tiers.controller';
+import { CollectiveTiersService } from './collective-tiers.service';
 import { ProductConsentsService } from './product-consents.service';
 
 /**
@@ -61,6 +63,7 @@ import { ProductConsentsService } from './product-consents.service';
     ProductValidityTypesController,
     ProductOperationsController,
     ProductConsentsController,
+    CollectiveTiersController,
   ],
   providers: [
     ProductsService,
@@ -76,6 +79,7 @@ import { ProductConsentsService } from './product-consents.service';
     ProductValidityTypesService,
     ProductOperationsService,
     ProductConsentsService,
+    CollectiveTiersService,
   ],
 })
 export class DomainModule {}
