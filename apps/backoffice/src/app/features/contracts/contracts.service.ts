@@ -447,6 +447,25 @@ export interface AddCertificatePayload {
 }
 
 /** Payload de `POST /contracts/:id/add-certificates` (colectivos): alta masiva, un solo suplemento. */
+/** Desglose de un recibo colectivo por certificado (`GET /contracts/:id/receipts/:ideReceipt/breakdown`). */
+export interface ReceiptBreakdown {
+  ideReceipt: string;
+  numReceipt: string;
+  totalFee: number;
+  totalPrime: number;
+  totalNetPrime: number;
+  totalCommission: number;
+  certificates: Array<{
+    ideContractFile: string;
+    numCertificate: number;
+    insured: string;
+    identification: string | null;
+    netPrime: number;
+    commission: number;
+    commissionPercentage: number;
+  }>;
+}
+
 export interface AddCertificatesBulkPayload {
   ideProductEndorsement: string;
   tstSupplement: string;
@@ -646,6 +665,11 @@ export class ContractsService {
   /** `POST /contracts/:id/add-certificate` -- colectivos: alta de un asegurado (nuevo certificado). */
   addCertificate(ideContract: string, payload: AddCertificatePayload): Observable<ContractDetail> {
     return this.http.post<ContractDetail>(`${this.base}/${ideContract}/add-certificate`, payload);
+  }
+
+  /** `GET /contracts/:id/receipts/:ideReceipt/breakdown` -- colectivos: prima neta y comisión por certificado. */
+  receiptBreakdown(ideContract: string, ideReceipt: string): Observable<ReceiptBreakdown> {
+    return this.http.get<ReceiptBreakdown>(`${this.base}/${ideContract}/receipts/${ideReceipt}/breakdown`);
   }
 
   /** `POST /contracts/:id/add-certificates` -- colectivos: alta masiva (un suplemento, un recibo). */

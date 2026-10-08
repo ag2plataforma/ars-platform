@@ -1116,7 +1116,14 @@
       "subtitle": "Cierra el certificado del asegurado y devuelve la prima proporcional al tiempo no consumido.",
       "confirmButton": "Dar de baja",
       "appliedDetail": "Se dio de baja al asegurado."
-    }
+    },
+    "breakdownButton": "Desglose",
+    "breakdownTitle": "Desglose del recibo {{num}} por certificado",
+    "breakdownHint": "Prima neta y comisión que aporta cada certificado al recibo consolidado.",
+    "breakdownCertificate": "Certificado",
+    "breakdownNetPrime": "Prima neta",
+    "breakdownTotal": "Total",
+    "renewedDetailCollective": "Se renovó el contrato con {{count}} certificados activos en un único recibo de renovación. Los certificados dados de baja no se renuevan."
   },
   "rateTables": {
     "title": "Tablas de tarifa",

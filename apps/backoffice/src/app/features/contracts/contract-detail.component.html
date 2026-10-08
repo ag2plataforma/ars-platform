@@ -677,6 +677,9 @@
         <th>{{ 'contractDetail.commissionColumn' | transloco }}</th>
         <th>{{ 'contractDetail.primeColumn' | transloco }}</th>
         <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+        @if (contract()?.IndCollective) {
+          <th></th>
+        }
       </tr>
     </ng-template>
     <ng-template pTemplate="body" let-receipt>
@@ -688,14 +691,73 @@
         <td>{{ receipt.Fee | number: '1.2-2' }}</td>
         <td>{{ receipt.Prime | number: '1.2-2' }}</td>
         <td><p-tag [value]="receipt.SState.DesState" [severity]="stateSeverity(receipt.SState.CodState)" /></td>
+        @if (contract()?.IndCollective) {
+          <td>
+            <p-button
+              [label]="'contractDetail.breakdownButton' | transloco"
+              icon="pi pi-list"
+              size="small"
+              [text]="true"
+              (onClick)="openBreakdown(receipt.IdeReceipt)"
+            />
+          </td>
+        }
       </tr>
     </ng-template>
     <ng-template pTemplate="emptymessage">
       <tr>
-        <td colspan="7" class="py-6 text-center text-sm text-slate-500">{{ 'contractDetail.receiptsEmpty' | transloco }}</td>
+        <td colspan="8" class="py-6 text-center text-sm text-slate-500">{{ 'contractDetail.receiptsEmpty' | transloco }}</td>
       </tr>
     </ng-template>
   </p-table>
+</p-dialog>
+
+<!-- ============================== Popup: Desglose del recibo por certificado ============================== -->
+<p-dialog
+  [header]="'contractDetail.breakdownTitle' | transloco: { num: breakdown()?.numReceipt ?? '' }"
+  [visible]="breakdownVisible()"
+  (visibleChange)="breakdownVisible.set($event)"
+  [modal]="true"
+  [style]="{ width: '48rem' }"
+>
+  @if (breakdownLoading()) {
+    <p class="text-sm text-slate-500">{{ 'common.loading' | transloco }}</p>
+  } @else if (breakdown(); as b) {
+    <p class="mb-3 text-sm text-slate-500">{{ 'contractDetail.breakdownHint' | transloco }}</p>
+    <p-table [value]="b.certificates" dataKey="ideContractFile" styleClass="text-sm">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>{{ 'contractDetail.breakdownCertificate' | transloco }}</th>
+          <th>{{ 'contractDetail.insuredColumn' | transloco }}</th>
+          <th class="text-right">{{ 'contractDetail.breakdownNetPrime' | transloco }}</th>
+          <th class="text-right">{{ 'contractDetail.commissionColumn' | transloco }}</th>
+          <th class="text-right">%</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-row>
+        <tr>
+          <td>{{ row.numCertificate }}</td>
+          <td>
+            {{ row.insured }}
+            @if (row.identification) {
+              <span class="text-xs text-slate-500"> · {{ row.identification }}</span>
+            }
+          </td>
+          <td class="text-right">{{ row.netPrime | number: '1.2-2' }}</td>
+          <td class="text-right">{{ row.commission | number: '1.2-2' }}</td>
+          <td class="text-right">{{ row.commissionPercentage | number: '1.2-2' }}</td>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="footer">
+        <tr class="font-semibold">
+          <td colspan="2">{{ 'contractDetail.breakdownTotal' | transloco }}</td>
+          <td class="text-right">{{ b.totalNetPrime | number: '1.2-2' }}</td>
+          <td class="text-right">{{ b.totalCommission | number: '1.2-2' }}</td>
+          <td></td>
+        </tr>
+      </ng-template>
+    </p-table>
+  }
 </p-dialog>
 
 <!-- ============================== Popup: Atributos personalizados ============================== -->

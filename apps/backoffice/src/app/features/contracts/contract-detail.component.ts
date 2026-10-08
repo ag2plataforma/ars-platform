@@ -37,6 +37,7 @@ import {
   ContractRequirement,
   ContractRisk,
   ContractsService,
+  ReceiptBreakdown,
 } from './contracts.service';
 import { ContractDocumentsComponent } from '../documents/contract-documents.component';
 import { BulkCertificatesComponent } from './bulk-certificates.component';
@@ -684,6 +685,29 @@ export class ContractDetailComponent implements OnInit {
     this.receiptsDialogVisible.set(true);
   }
 
+  /** Desglose por certificado de un recibo colectivo. */
+  readonly breakdown = signal<ReceiptBreakdown | null>(null);
+  readonly breakdownVisible = signal(false);
+  readonly breakdownLoading = signal(false);
+
+  openBreakdown(ideReceipt: string): void {
+    const c = this.contract();
+    if (!c) return;
+    this.breakdown.set(null);
+    this.breakdownVisible.set(true);
+    this.breakdownLoading.set(true);
+    this.contracts.receiptBreakdown(c.IdeContract, ideReceipt).subscribe({
+      next: (b) => {
+        this.breakdown.set(b);
+        this.breakdownLoading.set(false);
+      },
+      error: () => {
+        this.breakdownLoading.set(false);
+        this.breakdownVisible.set(false);
+      },
+    });
+  }
+
   closeReceiptsDialog(): void {
     this.receiptsDialogVisible.set(false);
   }
@@ -880,6 +904,8 @@ export class ContractDetailComponent implements OnInit {
   renewContract(): void {
     const c = this.contract();
     if (!c) return;
+    // Colectivo: se renuevan solo los certificados activos (los dados de baja no vuelven), en un único recibo REN.
+    const activeCertificates = this.certificateOptions().length;
     this.renewSubmitting.set(true);
     this.contracts.renew(c.IdeContract).subscribe({
       next: (result) => {
@@ -888,7 +914,9 @@ export class ContractDetailComponent implements OnInit {
         this.messages.add({
           severity: 'success',
           summary: this.transloco.translate('common.done'),
-          detail: this.transloco.translate('contractDetail.renewedDetail'),
+          detail: c.IndCollective
+            ? this.transloco.translate('contractDetail.renewedDetailCollective', { count: activeCertificates })
+            : this.transloco.translate('contractDetail.renewedDetail'),
         });
       },
       error: (err: HttpErrorResponse) => {
