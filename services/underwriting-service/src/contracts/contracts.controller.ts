@@ -193,6 +193,12 @@ export class ContractsController {
     return this.service.addCertificate(id, dto, actor.code);
   }
 
+  /** Colectivos: desglose de un recibo por certificado (prima neta y comisión de cada asegurado). */
+  @Get('contracts/:id/receipts/:ideReceipt/breakdown')
+  receiptBreakdown(@Param('id') id: string, @Param('ideReceipt') ideReceipt: string) {
+    return this.service.receiptBreakdown(id, ideReceipt);
+  }
+
   /** Colectivos, alta MASIVA de asegurados (un suplemento, un recibo) -- ver `ContractsService.addCertificates`. */
   @Post('contracts/:id/add-certificates')
   addCertificates(@Param('id') id: string, @Body() dto: AddCertificatesBulkDto, @CurrentUser() actor: JwtPayload) {

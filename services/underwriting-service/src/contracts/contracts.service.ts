@@ -1359,6 +1359,108 @@ export class ContractsService {
   }
 
   /**
+   * Colectivos: desglose de un recibo por certificado. Un recibo colectivo consolida las líneas
+   * de todos los certificados (ver `generateReceipts`); acá se agrupan por certificado para ver
+   * cuánta prima neta y cuánta comisión (y qué % efectivo) aporta cada asegurado. Es solo una
+   * vista: no cambia el cálculo de comisiones, que ya se hace línea a línea.
+   */
+  async receiptBreakdown(ideContract: string, ideReceipt: string) {
+    const receipt = await this.prisma.tReceipt.findFirst({
+      where: { IdeReceipt: ideReceipt, IdeContract: ideContract },
+      select: { IdeReceipt: true, NumReceipt: true, Fee: true, Prime: true },
+    });
+    if (!receipt) {
+      throw new NotFoundException(`No existe el recibo "${ideReceipt}" en el contrato "${ideContract}"`);
+    }
+    const details = await this.prisma.tReceiptDetail.findMany({
+      where: { IdeReceipt: ideReceipt },
+      select: {
+        ConceptValue: true,
+        SConcept: { select: { CodConcept: true } },
+        TCoverageMovement: {
+          select: {
+            TRiskCoverage: {
+              select: {
+                TFileRisk: {
+                  select: {
+                    TContractFile: {
+                      select: {
+                        IdeContractFile: true,
+                        NumContractFile: true,
+                        TContractFilePerson: {
+                          where: { SPersonRol: { CodPersonRol: 'ASEGURADO' } },
+                          select: {
+                            TPerson: {
+                              select: {
+                                NumIdentification: true,
+                                DesFirstName: true,
+                                DesMiddleName: true,
+                                DesLastName1: true,
+                                DesLastName2: true,
+                              },
+                            },
+                          },
+                          take: 1,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const byFile = new Map<
+      string,
+      { ideContractFile: string; numCertificate: number; insured: string; identification: string | null; netPrime: number; commission: number }
+    >();
+    for (const d of details) {
+      const file = d.TCoverageMovement.TRiskCoverage.TFileRisk.TContractFile;
+      let row = byFile.get(file.IdeContractFile);
+      if (!row) {
+        const person = file.TContractFilePerson[0]?.TPerson;
+        row = {
+          ideContractFile: file.IdeContractFile,
+          numCertificate: file.NumContractFile,
+          insured: person
+            ? [person.DesFirstName, person.DesMiddleName, person.DesLastName1, person.DesLastName2]
+                .filter(Boolean)
+                .join(' ')
+            : '',
+          identification: person?.NumIdentification ?? null,
+          netPrime: 0,
+          commission: 0,
+        };
+        byFile.set(file.IdeContractFile, row);
+      }
+      const value = Number(d.ConceptValue);
+      if (d.SConcept.CodConcept === 'PrimaNeta') row.netPrime += value;
+      else if (d.SConcept.CodConcept === 'Comision') row.commission += value;
+    }
+
+    const rows = [...byFile.values()]
+      .sort((a, b) => a.numCertificate - b.numCertificate)
+      .map((r) => ({
+        ...r,
+        netPrime: round2(r.netPrime),
+        commission: round2(r.commission),
+        commissionPercentage: r.netPrime !== 0 ? round2((r.commission / r.netPrime) * 100) : 0,
+      }));
+    return {
+      ideReceipt: receipt.IdeReceipt,
+      numReceipt: receipt.NumReceipt,
+      totalFee: Number(receipt.Fee),
+      totalPrime: Number(receipt.Prime),
+      totalNetPrime: round2(rows.reduce((s, r) => s + r.netPrime, 0)),
+      totalCommission: round2(rows.reduce((s, r) => s + r.commission, 0)),
+      certificates: rows,
+    };
+  }
+
+  /**
    * `GET /contracts/:id` -- pantalla de detalle de contrato (ver
    * docs/02-roadmap.md, pendiente cerrado a pedido explícito del
    * usuario). Además de producto/riesgos/coberturas (ya existente),
