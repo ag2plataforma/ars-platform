@@ -69,7 +69,20 @@ interface ActiveCertificateRow {
   templateUrl: './bulk-certificates.component.html',
 })
 export class BulkCertificatesComponent {
-  @Input({ required: true }) contract!: ContractDetail;
+  private contractValue!: ContractDetail;
+  /** Certificados activos YA calculados: la tabla de bajas necesita una referencia estable (un getter que
+   *  devolviera un array nuevo en cada ciclo de detección de cambios haría recalcular la tabla sin parar). */
+  activeCertificates: ActiveCertificateRow[] = [];
+
+  @Input({ required: true })
+  set contract(value: ContractDetail) {
+    this.contractValue = value;
+    this.activeCertificates = this.buildActiveCertificates(value);
+    this.selected = [];
+  }
+  get contract(): ContractDetail {
+    return this.contractValue;
+  }
   /** Emite el contrato actualizado tras aplicar el suplemento. */
   @Output() applied = new EventEmitter<ContractDetail>();
 
@@ -116,8 +129,8 @@ export class BulkCertificatesComponent {
     return this.contract?.SState.CodState === 'ACTIVO';
   }
 
-  get activeCertificates(): ActiveCertificateRow[] {
-    return (this.contract?.TContractFile ?? [])
+  private buildActiveCertificates(contract: ContractDetail | undefined): ActiveCertificateRow[] {
+    return (contract?.TContractFile ?? [])
       .filter((f) => f.SState.CodState === 'ACTIVO')
       .map((file) => {
         const person = file.TContractFilePerson?.find((p) => p.SPersonRol?.CodPersonRol === 'ASEGURADO')?.TPerson;
