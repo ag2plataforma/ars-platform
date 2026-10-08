@@ -164,6 +164,8 @@
           @if (c.IndCollective) {
             <div class="mb-3 flex items-center justify-between">
               <p class="text-xs text-slate-500">{{ 'contractDetail.collectiveHint' | transloco }}</p>
+              <div class="flex items-center gap-2">
+              <app-bulk-certificates [contract]="c" (applied)="contract.set($event)" />
               <button
                 pButton
                 type="button"
@@ -173,6 +175,7 @@
                 [label]="'contractDetail.addCertDialog.button' | transloco"
                 (click)="openAddCertDialog()"
               ></button>
+              </div>
             </div>
           }
           <p-table

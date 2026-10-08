@@ -446,6 +446,24 @@ export interface AddCertificatePayload {
   ideCoveragePlans?: string[];
 }
 
+/** Payload de `POST /contracts/:id/add-certificates` (colectivos): alta masiva, un solo suplemento. */
+export interface AddCertificatesBulkPayload {
+  ideProductEndorsement: string;
+  tstSupplement: string;
+  desSupplement: string;
+  idePlanProductRisk: string;
+  insureds: CollectiveInsuredPayload[];
+  ideCoveragePlans?: string[];
+}
+
+/** Payload de `POST /contracts/:id/remove-certificates` (colectivos): baja masiva, un solo suplemento. */
+export interface RemoveCertificatesBulkPayload {
+  ideContractFiles: string[];
+  ideProductEndorsement: string;
+  tstSupplement: string;
+  desSupplement: string;
+}
+
 /** Payload de `POST /contracts/:id/remove-certificate` (colectivos): baja de un asegurado. */
 export interface RemoveCertificatePayload {
   ideContractFile: string;
@@ -628,6 +646,16 @@ export class ContractsService {
   /** `POST /contracts/:id/add-certificate` -- colectivos: alta de un asegurado (nuevo certificado). */
   addCertificate(ideContract: string, payload: AddCertificatePayload): Observable<ContractDetail> {
     return this.http.post<ContractDetail>(`${this.base}/${ideContract}/add-certificate`, payload);
+  }
+
+  /** `POST /contracts/:id/add-certificates` -- colectivos: alta masiva (un suplemento, un recibo). */
+  addCertificates(ideContract: string, payload: AddCertificatesBulkPayload): Observable<ContractDetail> {
+    return this.http.post<ContractDetail>(`${this.base}/${ideContract}/add-certificates`, payload);
+  }
+
+  /** `POST /contracts/:id/remove-certificates` -- colectivos: baja masiva (un suplemento, un recibo). */
+  removeCertificates(ideContract: string, payload: RemoveCertificatesBulkPayload): Observable<ContractDetail> {
+    return this.http.post<ContractDetail>(`${this.base}/${ideContract}/remove-certificates`, payload);
   }
 
   /** `POST /contracts/:id/remove-certificate` -- colectivos: baja de un asegurado (cierra su certificado). */

@@ -39,6 +39,7 @@ import {
   ContractsService,
 } from './contracts.service';
 import { ContractDocumentsComponent } from '../documents/contract-documents.component';
+import { BulkCertificatesComponent } from './bulk-certificates.component';
 import { downloadBlob } from '../../core/files/file.util';
 
 const PRODUCT_ENDORSEMENTS_PATH = '/product-rating/product-endorsements';
@@ -177,6 +178,7 @@ interface RequirementRow {
     ToastModule,
     TranslocoPipe,
     ContractDocumentsComponent,
+    BulkCertificatesComponent,
   ],
   providers: [MessageService],
   templateUrl: './contract-detail.component.html',

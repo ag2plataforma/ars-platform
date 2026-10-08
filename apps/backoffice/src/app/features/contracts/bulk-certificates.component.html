@@ -1,0 +1,189 @@
+<p-toast />
+
+<div class="flex gap-2">
+  <button pButton type="button" icon="pi pi-upload" size="small" severity="secondary" [outlined]="true" [disabled]="!isActive"
+    [label]="'bulkCertificates.addButton' | transloco" (click)="openAdd()"></button>
+  <button pButton type="button" icon="pi pi-user-minus" size="small" severity="secondary" [outlined]="true" [disabled]="!isActive"
+    [label]="'bulkCertificates.removeButton' | transloco" (click)="openRemove()"></button>
+</div>
+
+<!-- ============================== Alta masiva ============================== -->
+<p-dialog
+  [header]="'bulkCertificates.addTitle' | transloco"
+  [visible]="addVisible()"
+  (visibleChange)="!$event && addVisible.set(false)"
+  [modal]="true"
+  appendTo="body"
+  [style]="{ width: '60rem' }"
+>
+  <form [formGroup]="addForm" (ngSubmit)="submitAdd()" class="flex flex-col gap-4 pt-2">
+    <p class="text-sm text-slate-500">{{ 'bulkCertificates.addSubtitle' | transloco }}</p>
+
+    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.addRiskDialog.planRiskLabel' | transloco }}</label>
+        <p-select
+          appendTo="body"
+          formControlName="idePlanProductRisk"
+          [options]="planOptions()"
+          optionValue="IdePlanProductRisk"
+          [placeholder]="'contractDetail.addRiskDialog.planRiskPlaceholder' | transloco"
+          styleClass="w-full"
+          (onChange)="onPlanChange()"
+        >
+          <ng-template let-item #selectedItem>{{ planLabel(item) }}</ng-template>
+          <ng-template let-item #item>{{ planLabel(item) }}</ng-template>
+        </p-select>
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.cancelDialog.endorsementLabel' | transloco }}</label>
+        <p-select
+          appendTo="body"
+          formControlName="ideProductEndorsement"
+          [options]="productEndorsements()"
+          optionLabel="DesProductEndorsement"
+          optionValue="IdeProductEndorsement"
+          [placeholder]="'contractDetail.cancelDialog.endorsementPlaceholder' | transloco"
+          styleClass="w-full"
+        />
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.addRiskDialog.dateLabel' | transloco }}</label>
+        <input pInputText type="date" formControlName="tstSupplement" class="w-full" />
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.addRiskDialog.reasonLabel' | transloco }}</label>
+        <input pInputText type="text" formControlName="desSupplement" class="w-full" />
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3">
+      <div class="flex items-center gap-2">
+        <p-tag [value]="'collectiveQuote.insuredsCount' | transloco: { count: insureds().length }" severity="info" />
+        @if (invalidCount() > 0) {
+          <p-tag [value]="'collectiveQuote.invalidCount' | transloco: { count: invalidCount() }" severity="danger" />
+        }
+      </div>
+      <div class="flex gap-2">
+        <button pButton type="button" icon="pi pi-download" severity="secondary" [outlined]="true" size="small"
+          [disabled]="loadingFields() || !addForm.controls.idePlanProductRisk.value"
+          [label]="'collectiveQuote.downloadTemplate' | transloco" (click)="downloadTemplate()"></button>
+        <input #csvInput type="file" accept=".csv,text/csv" class="hidden" (change)="onFileSelected($event)" />
+        <button pButton type="button" icon="pi pi-upload" size="small"
+          [disabled]="loadingFields() || !addForm.controls.idePlanProductRisk.value"
+          [label]="'collectiveQuote.uploadFile' | transloco" (click)="csvInput.click()"></button>
+      </div>
+    </div>
+    @if (!addForm.controls.idePlanProductRisk.value) {
+      <p class="text-xs text-slate-500">{{ 'bulkCertificates.pickPlanFirst' | transloco }}</p>
+    }
+
+    <p-table [value]="insureds()" dataKey="key" [paginator]="insureds().length > 10" [rows]="10" styleClass="rounded-lg border border-slate-200 text-sm">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>#</th>
+          <th>{{ 'collectiveQuote.nameColumn' | transloco }}</th>
+          <th>{{ 'collectiveQuote.documentColumn' | transloco }}</th>
+          <th>{{ 'collectiveQuote.emailColumn' | transloco }}</th>
+          <th>{{ 'collectiveQuote.statusColumn' | transloco }}</th>
+          <th></th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-row let-i="rowIndex">
+        <tr [class.bg-red-50]="row.errors.length > 0">
+          <td>{{ i + 1 }}</td>
+          <td>{{ fullName(row) }}</td>
+          <td>{{ row.codIdentificationType }} {{ row.numIdentification }}</td>
+          <td>{{ row.desEmail }}</td>
+          <td>
+            @if (row.errors.length > 0) {
+              <span class="text-xs text-red-600">{{ row.errors.join(' · ') }}</span>
+            } @else {
+              <p-tag [value]="'collectiveQuote.rowOk' | transloco" severity="success" />
+            }
+          </td>
+          <td><button pButton type="button" icon="pi pi-times" [text]="true" severity="danger" (click)="removeRow(row)"></button></td>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="emptymessage">
+        <tr><td colspan="6" class="py-4 text-center text-sm text-slate-500">{{ 'collectiveQuote.noInsureds' | transloco }}</td></tr>
+      </ng-template>
+    </p-table>
+
+    <div class="flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="addVisible.set(false)"></button>
+      <button pButton type="submit" [disabled]="!canSubmitAdd() || addForm.invalid" [loading]="addSubmitting()"
+        [label]="'bulkCertificates.addConfirm' | transloco: { count: insureds().length }"></button>
+    </div>
+  </form>
+</p-dialog>
+
+<!-- ============================== Baja masiva ============================== -->
+<p-dialog
+  [header]="'bulkCertificates.removeTitle' | transloco"
+  [visible]="removeVisible()"
+  (visibleChange)="!$event && removeVisible.set(false)"
+  [modal]="true"
+  appendTo="body"
+  [style]="{ width: '50rem' }"
+>
+  <form [formGroup]="removeForm" (ngSubmit)="submitRemove()" class="flex flex-col gap-4 pt-2">
+    <p class="text-sm text-slate-500">{{ 'bulkCertificates.removeSubtitle' | transloco }}</p>
+
+    <p-table
+      [value]="activeCertificates"
+      dataKey="file.IdeContractFile"
+      [(selection)]="selected"
+      [paginator]="activeCertificates.length > 10"
+      [rows]="10"
+      styleClass="rounded-lg border border-slate-200 text-sm"
+    >
+      <ng-template pTemplate="header">
+        <tr>
+          <th style="width: 3rem"><p-tableHeaderCheckbox /></th>
+          <th>#</th>
+          <th>{{ 'contractDetail.insuredColumn' | transloco }}</th>
+          <th>{{ 'collectiveQuote.emailColumn' | transloco }}</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-row>
+        <tr>
+          <td><p-tableCheckbox [value]="row" /></td>
+          <td>{{ row.file.NumContractFile }}</td>
+          <td>{{ row.name }}</td>
+          <td>{{ row.email }}</td>
+        </tr>
+      </ng-template>
+    </p-table>
+    <p class="text-xs text-slate-500">{{ 'bulkCertificates.selectedCount' | transloco: { count: selected.length } }}</p>
+
+    <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.cancelDialog.endorsementLabel' | transloco }}</label>
+        <p-select
+          appendTo="body"
+          formControlName="ideProductEndorsement"
+          [options]="productEndorsements()"
+          optionLabel="DesProductEndorsement"
+          optionValue="IdeProductEndorsement"
+          [placeholder]="'contractDetail.cancelDialog.endorsementPlaceholder' | transloco"
+          styleClass="w-full"
+        />
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.addRiskDialog.dateLabel' | transloco }}</label>
+        <input pInputText type="date" formControlName="tstSupplement" class="w-full" />
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.addRiskDialog.reasonLabel' | transloco }}</label>
+        <input pInputText type="text" formControlName="desSupplement" class="w-full" />
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="removeVisible.set(false)"></button>
+      <button pButton type="submit" severity="danger" [disabled]="selected.length === 0 || removeForm.invalid" [loading]="removeSubmitting()"
+        [label]="'bulkCertificates.removeConfirm' | transloco: { count: selected.length }"></button>
+    </div>
+  </form>
+</p-dialog>

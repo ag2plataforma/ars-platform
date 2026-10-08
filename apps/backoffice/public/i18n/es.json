@@ -1707,6 +1707,20 @@
       "CANCELADA": "Cancelada"
     }
   },
+  "bulkCertificates": {
+    "addButton": "Alta masiva",
+    "removeButton": "Baja masiva",
+    "addTitle": "Alta masiva de asegurados",
+    "addSubtitle": "Cargá un archivo CSV con los asegurados a incorporar. Se genera un único suplemento y un único recibo consolidado.",
+    "pickPlanFirst": "Elegí primero el plan para ver los campos del archivo.",
+    "addConfirm": "Dar de alta {{count}} asegurados",
+    "addApplied": "Los asegurados fueron incorporados en un único suplemento.",
+    "removeTitle": "Baja masiva de asegurados",
+    "removeSubtitle": "Seleccioná los certificados a dar de baja. Se genera un único suplemento y un único recibo de devolución.",
+    "selectedCount": "{{count}} certificados seleccionados",
+    "removeConfirm": "Dar de baja {{count}} asegurados",
+    "removeApplied": "Los certificados fueron dados de baja en un único suplemento."
+  },
   "contractDocuments": {
     "generateButton": "Generar documento",
     "generateDialogTitle": "Generar documento",
