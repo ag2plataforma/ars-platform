@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, Logger, NotFoundExc
 import { Prisma, PrismaService } from '@ars-platform/database';
 import { StateMachineService } from '@ars-platform/shared-common';
 import { QuotesService } from './quotes.service';
+import { UnicaTiersService } from './unica-tiers.service';
 import { CollectiveInsuredDto, CreateCollectiveQuoteDto } from './dto/create-collective-quote.dto';
 
 /** Tope de asegurados por colectivo (etapa 1); configurable con `COLLECTIVE_MAX_INSUREDS`. */
@@ -30,7 +31,8 @@ export interface ProductCollectiveConfig {
  * Cotización de un colectivo (etapa 1): un tomador con N asegurados, cada asegurado = un
  * riesgo (`TQuoteRisk`) con su persona (`TQuoteRiskPerson`). El resto del flujo (precio,
  * personas Tomador/Titular, resumen, aceptar, contratar) es el de siempre: la cotización ya
- * soportaba varios riesgos. Solo el modo de prima `POR_CERTIFICADO` está implementado.
+ * soportaba varios riesgos. Modos de prima: `POR_CERTIFICADO` (la del motor de reglas) y `UNICA`
+ * (tarifa por tramos de nº de asegurados, ver `UnicaTiersService`).
  */
 @Injectable()
 export class CollectiveQuotesService {
@@ -40,6 +42,7 @@ export class CollectiveQuotesService {
     private readonly prisma: PrismaService,
     private readonly stateMachine: StateMachineService,
     private readonly quotes: QuotesService,
+    private readonly unicaTiers: UnicaTiersService,
   ) {}
 
   /** Lee la configuración de colectivo del producto (SQL crudo; si falta el script, no es colectivo). */
@@ -71,10 +74,11 @@ export class CollectiveQuotesService {
     if (!config.IndCollective) {
       throw new ConflictException(`El producto "${dto.codProduct}" no está configurado como colectivo`);
     }
-    if (config.CodCollectivePremiumMode !== 'POR_CERTIFICADO') {
-      throw new ConflictException(
-        `El modo de prima "${config.CodCollectivePremiumMode}" todavía no está disponible: por ahora solo se admite "POR_CERTIFICADO"`,
-      );
+    if (config.CodCollectivePremiumMode === 'UNICA') {
+      // Falla pronto (antes de crear nada) si los tramos no están configurados o no cubren el nº de asegurados.
+      await this.unicaTiers.resolveTier(ideProduct, dto.insureds.length);
+    } else if (config.CodCollectivePremiumMode !== 'POR_CERTIFICADO') {
+      throw new ConflictException(`El modo de prima "${config.CodCollectivePremiumMode}" no está disponible`);
     }
 
     this.assertNoDuplicatesInFile(dto.insureds);

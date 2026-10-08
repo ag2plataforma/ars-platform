@@ -3,6 +3,7 @@ import { Prisma, PrismaService, TaskQueueRepository } from '@ars-platform/databa
 import { RulesEngineService, StateMachineService } from '@ars-platform/shared-common';
 import { QuotesService } from '../quoting/quotes.service';
 import { CollectiveQuotesService, collectiveMaxInsureds } from '../quoting/collective-quotes.service';
+import { UnicaTiersService } from '../quoting/unica-tiers.service';
 import { RequirementsService } from '../requirements/requirements.service';
 import { PaymentsService } from '../payments/payments.service';
 import { PaymentLinksService } from '../payments/payment-links.service';
@@ -141,6 +142,7 @@ export class ContractsService {
     private readonly payments: PaymentsService,
     private readonly paymentLinks: PaymentLinksService,
     private readonly collectiveQuotes: CollectiveQuotesService,
+    private readonly unicaTiers: UnicaTiersService,
   ) {}
 
   /**
@@ -187,10 +189,8 @@ export class ContractsService {
     await this.requirementsService.assertQuoteRequirementsReady(quote.IdeQuote, actor, { collective });
     if (collective) {
       const config = await this.collectiveQuotes.getProductConfig(quote.IdeProduct);
-      if (config.CodCollectivePremiumMode !== 'POR_CERTIFICADO') {
-        throw new ConflictException(
-          `El modo de prima "${config.CodCollectivePremiumMode}" todavía no está disponible para colectivos`,
-        );
+      if (config.CodCollectivePremiumMode !== 'POR_CERTIFICADO' && config.CodCollectivePremiumMode !== 'UNICA') {
+        throw new ConflictException(`El modo de prima "${config.CodCollectivePremiumMode}" no está disponible para colectivos`);
       }
     }
 
@@ -232,6 +232,13 @@ export class ContractsService {
             await this.setCertificateInsured(quoteRisk.IdeQuoteRisk, contractFile.IdeContractFile, actor, tx);
           }
           await this.createInitialMovements(allRiskCoverages, actor, tx);
+          // Prima ÚNICA (etapa 2c): tarifa del tramo según el nº de asegurados del colectivo.
+          if (await this.unicaTiers.isUnica(contract.IdeProduct, tx)) {
+            const tier = await this.unicaTiers.resolveTier(contract.IdeProduct, fileIds.length, tx);
+            for (const ideContractFile of fileIds) {
+              await this.unicaTiers.scaleDraftFile(tx, ideContractFile, tier.amtPerInsured);
+            }
+          }
           for (const ideContractFile of fileIds) {
             await this.setNetPrime(ideContractFile, actor, tx);
           }
@@ -1020,6 +1027,14 @@ export class ContractsService {
           );
         }
 
+        // Prima ÚNICA (etapa 2c): el nº de asegurados tras el alta decide la tarifa del tramo.
+        const unica = await this.unicaTiers.isUnica(existing.IdeProduct, tx);
+        let unicaRate: number | null = null;
+        if (unica) {
+          const activeNow = await tx.tContractFile.count({ where: { IdeContract: ideContract, IdeState: ideActivo } });
+          unicaRate = (await this.unicaTiers.resolveTier(existing.IdeProduct, activeNow + dto.insureds.length, tx)).amtPerInsured;
+        }
+
         const codOperation = await this.resolveOperationCodeByEndorsement(dto.ideProductEndorsement, tx);
         await this.createContractOperation(ideContract, existing.IdeProduct, codOperation, actor, tx);
 
@@ -1029,6 +1044,7 @@ export class ContractsService {
         });
         let nextNumFile = (maxFile._max.NumContractFile ?? 0) + 1;
         const allNewCoverages: { ideRiskCoverage: string }[] = [];
+        const newFileIds: string[] = [];
 
         for (const [index, insured] of dto.insureds.entries()) {
           const idePerson = idePersons[index];
@@ -1074,9 +1090,17 @@ export class ContractsService {
             actor,
             tx,
           );
+          if (unicaRate !== null) await this.unicaTiers.scaleDraftFile(tx, newFile.IdeContractFile, unicaRate);
           await this.setNetPrime(newFile.IdeContractFile, actor, tx);
           allNewCoverages.push(...newCoverages);
+          newFileIds.push(newFile.IdeContractFile);
         }
+
+        // Si el alta cambia de tramo, los certificados vigentes se reprecian (suplemento de diferencia).
+        const repricedMovementIds =
+          unicaRate !== null
+            ? await this.applyTierRateChange(ideContract, newFileIds, unicaRate, tstSupplement, actor, tx)
+            : [];
 
         // UN solo recibo SUP para todos los certificados nuevos.
         await this.generateReceipts(ideContract, dto.ideProductEndorsement, actor, tx);
@@ -1084,6 +1108,9 @@ export class ContractsService {
         for (const coverage of allNewCoverages) {
           const movement = await tx.tCoverageMovement.findFirstOrThrow({ where: { IdeRiskCoverage: coverage.ideRiskCoverage } });
           await this.activateNewCoverage(coverage.ideRiskCoverage, movement.IdeCoverageMovement, actor, tx);
+        }
+        for (const ideCoverageMovement of repricedMovementIds) {
+          await this.activateSupplementMovement(ideCoverageMovement, actor, tx);
         }
       },
       { timeout: SUPPLEMENT_TRANSACTION_TIMEOUT_MS, maxWait: 10_000 },
@@ -1182,6 +1209,15 @@ export class ContractsService {
             await this.setSupplementPrime(ideRiskCoverage, newMovement.IdeCoverageMovement, 0, actor, tx);
             newMovementIds.push(newMovement.IdeCoverageMovement);
           }
+        }
+
+        // Prima ÚNICA (etapa 2c): si la baja cambia de tramo, los certificados que quedan se reprecian.
+        if (await this.unicaTiers.isUnica(existing.IdeProduct, tx)) {
+          const remaining = activeFiles - files.length;
+          const tier = await this.unicaTiers.resolveTier(existing.IdeProduct, remaining, tx);
+          newMovementIds.push(
+            ...(await this.applyTierRateChange(ideContract, uniqueFileIds, tier.amtPerInsured, tstSupplement, actor, tx)),
+          );
         }
 
         // UN solo recibo SUP para todas las bajas.
@@ -1739,6 +1775,13 @@ export class ContractsService {
             data: { TstInitial: newTstInitial, TstEnd: newTstEnd, UsrModification: actor, TstModification: now },
           });
           await this.renewContractFile(file.IdeContractFile, existing.IdeProduct, newTstInitial, newTstEnd, actor, tx);
+        }
+        // Prima ÚNICA (etapa 2c): la renovación usa la tarifa del tramo según los certificados que siguen activos.
+        if (await this.unicaTiers.isUnica(existing.IdeProduct, tx)) {
+          const tier = await this.unicaTiers.resolveTier(existing.IdeProduct, files.length, tx);
+          for (const file of files) {
+            await this.unicaTiers.scaleDraftFile(tx, file.IdeContractFile, tier.amtPerInsured);
+          }
         }
 
         const lastPeriod = await tx.tContractBilling.findFirst({
@@ -3879,6 +3922,66 @@ export class ContractsService {
   // orden completo. Comparte `resolveOperationCodeByEndorsement`/
   // `createContractOperation`/`generateReceipts` con la cascada de
   // anulación (ver más abajo).
+  /**
+   * Prima ÚNICA (etapa 2c): cuando un alta/baja cambia el tramo de tarifa, cada certificado
+   * VIGENTE (menos `excludeFileIds`) se reprecia: un movimiento de suplemento por cobertura con
+   * la prima escalada para que el certificado pase a costar `newRate` al año. La diferencia
+   * prorrateada por los días restantes sale en el mismo recibo SUP (positiva cobra, negativa
+   * devuelve) -- misma mecánica que el suplemento de monto asegurado. Si el certificado ya está
+   * a `newRate` no hace nada. Devuelve los movimientos creados (hay que activarlos DESPUÉS de
+   * `generateReceipts`).
+   */
+  private async applyTierRateChange(
+    ideContract: string,
+    excludeFileIds: string[],
+    newRate: number,
+    tstSupplement: Date,
+    actor: string,
+    tx: Prisma.TransactionClient,
+  ): Promise<string[]> {
+    const ideActivo = await this.stateMachine.getStateByCode('Activo');
+    const files = await tx.tContractFile.findMany({
+      where: { IdeContract: ideContract, IdeState: ideActivo, IdeContractFile: { notIn: excludeFileIds } },
+      select: { IdeContractFile: true },
+    });
+    const created: string[] = [];
+    for (const file of files) {
+      const riskCoverages = await tx.tRiskCoverage.findMany({
+        where: { IdeState: ideActivo, TFileRisk: { IdeContractFile: file.IdeContractFile, IdeState: ideActivo } },
+        select: { IdeRiskCoverage: true },
+      });
+      const current: { ideRiskCoverage: string; lastMovement: Awaited<ReturnType<typeof tx.tCoverageMovement.findFirstOrThrow>>; gross: number }[] = [];
+      for (const { IdeRiskCoverage } of riskCoverages) {
+        const lastMovement = await tx.tCoverageMovement.findFirst({
+          where: { IdeRiskCoverage, IdeState: ideActivo },
+          orderBy: { NumCoverageMovement: 'desc' },
+        });
+        if (!lastMovement) continue;
+        const gross = await tx.tMovementConcept.findFirst({
+          where: { IdeCoverageMovement: lastMovement.IdeCoverageMovement, SConcept: { CodConcept: 'PrimaTotal' } },
+        });
+        current.push({ ideRiskCoverage: IdeRiskCoverage, lastMovement, gross: gross ? Number(gross.ConceptValue) : 0 });
+      }
+      const base = current.reduce((sum, c) => sum + c.gross, 0);
+      if (base <= 0) continue;
+      const ratio = newRate / base;
+      if (Math.abs(ratio - 1) < 1e-6) continue;
+
+      for (const { ideRiskCoverage, lastMovement } of current) {
+        // Un certificado que arranca después de la fecha del suplemento se reprecia desde su propio inicio.
+        const effective =
+          tstSupplement.getTime() < lastMovement.TstInitial.getTime() ? lastMovement.TstInitial : tstSupplement;
+        if (effective.getTime() > lastMovement.TstEnd.getTime()) continue;
+        const amount = Number(lastMovement.Amount);
+        const newMovement = await this.createSupplementMovement(ideRiskCoverage, lastMovement, effective, amount, actor, tx);
+        await this.setSupplementConcepts(ideRiskCoverage, lastMovement, newMovement, amount, actor, tx, ratio);
+        await this.setSupplementPrime(ideRiskCoverage, newMovement.IdeCoverageMovement, amount, actor, tx);
+        created.push(newMovement.IdeCoverageMovement);
+      }
+    }
+    return created;
+  }
+
   // ==========================================================================
 
   /**
@@ -4011,9 +4114,10 @@ export class ContractsService {
     newAmount: number,
     actor: string,
     tx: Prisma.TransactionClient = this.prisma,
+    ratioOverride?: number,
   ): Promise<void> {
     const oldAmount = Number(lastMovement.Amount);
-    const ratio = oldAmount !== 0 ? newAmount / oldAmount : 1;
+    const ratio = ratioOverride ?? (oldAmount !== 0 ? newAmount / oldAmount : 1);
 
     const oldConcepts = await tx.tMovementConcept.findMany({
       where: { IdeCoverageMovement: lastMovement.IdeCoverageMovement },

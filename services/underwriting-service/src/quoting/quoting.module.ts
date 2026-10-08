@@ -7,6 +7,7 @@ import { RequirementsModule } from '../requirements/requirements.module';
 import { QuotesController } from './quotes.controller';
 import { QuotesService } from './quotes.service';
 import { CollectiveQuotesService } from './collective-quotes.service';
+import { UnicaTiersService } from './unica-tiers.service';
 
 /**
  * Fase 1 del motor de cotización real (`FQuote`/`FQuoteRiskPlan`/
@@ -24,7 +25,7 @@ import { CollectiveQuotesService } from './collective-quotes.service';
     RequirementsModule,
   ],
   controllers: [QuotesController],
-  providers: [QuotesService, CollectiveQuotesService],
-  exports: [QuotesService, CollectiveQuotesService],
+  providers: [QuotesService, CollectiveQuotesService, UnicaTiersService],
+  exports: [QuotesService, CollectiveQuotesService, UnicaTiersService],
 })
 export class QuotingModule {}

@@ -1,4 +1,5 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { UnicaTiersService } from './unica-tiers.service';
 import { Prisma, PrismaService } from '@ars-platform/database';
 import {
   ADJUSTMENT_VALUE_RESOLVER,
@@ -74,6 +75,7 @@ export class QuotesService {
     private readonly adjustmentValueResolver: AdjustmentValueResolver,
     @Inject(PROCESS_FLOW_RESOLVER)
     private readonly processFlowResolver: ProcessFlowResolver,
+    private readonly unicaTiers: UnicaTiersService,
   ) {}
 
   async create(dto: CreateQuoteDto, actor: string) {
@@ -911,6 +913,14 @@ export class QuotesService {
         where: { IdeQuoteCoverage: coverage.IdeQuoteCoverage },
         data: { Prime: prime, UsrModification: actor, TstModification: new Date() },
       });
+    }
+
+    // Colectivo con prima ÚNICA (etapa 2c): la tarifa del tramo según el nº de asegurados
+    // reemplaza (por escala) la prima calculada por el motor de reglas.
+    if (draftCoverages.length > 0 && (await this.unicaTiers.isUnica(ideProduct))) {
+      const insureds = await this.prisma.tQuoteRisk.count({ where: { IdeQuote: ideQuote } });
+      const tier = await this.unicaTiers.resolveTier(ideProduct, insureds);
+      await this.unicaTiers.scaleQuote(ideQuote, tier.amtPerInsured);
     }
   }
 
