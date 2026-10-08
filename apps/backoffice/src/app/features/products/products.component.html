@@ -104,6 +104,9 @@
           <p-tab value="operations">{{ 'products.operationsTab' | transloco }}</p-tab>
           <p-tab value="payment-fractions">{{ 'products.paymentFractionsTab' | transloco }}</p-tab>
           <p-tab value="consents">{{ 'products.consentsTab' | transloco }}</p-tab>
+          @if (product['IndCollective'] && product['CodCollectivePremiumMode'] === 'UNICA') {
+            <p-tab value="collective-tiers">{{ 'products.tiersTab' | transloco }}</p-tab>
+          }
         </p-tablist>
         <p-tabpanels>
           <p-tabpanel value="risk-products">
@@ -139,6 +142,11 @@
           <p-tabpanel value="consents">
             <app-product-consents-tab [product]="product" />
           </p-tabpanel>
+          @if (product['IndCollective'] && product['CodCollectivePremiumMode'] === 'UNICA') {
+            <p-tabpanel value="collective-tiers">
+              <app-collective-tiers-tab [product]="product" />
+            </p-tabpanel>
+          }
         </p-tabpanels>
       </p-tabs>
     </div>

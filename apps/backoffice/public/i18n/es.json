@@ -650,8 +650,8 @@
     "collectiveLabel": "Producto colectivo (un tomador con varios asegurados)",
     "collectivePremiumModeLabel": "Modo de prima",
     "collectiveModePerCertificate": "Por certificado (cada asegurado paga su prima)",
-    "collectiveModeSingle": "Prima única (próximamente)",
-    "collectiveHelp": "Los productos colectivos se cotizan con una lista de asegurados y generan un certificado por cada uno. Con prima por certificado, el total de la póliza es la suma de las primas individuales.",
+    "collectiveModeSingle": "Prima única (tarifa por tramos de nº de asegurados)",
+    "collectiveHelp": "Los productos colectivos se cotizan con una lista de asegurados y generan un certificado por cada uno. Con prima por certificado, el total de la póliza es la suma de las primas individuales. Con prima única, cada asegurado paga la tarifa del tramo donde cae el nº total de asegurados (se configura en la pestaña «Tramos de tarifa»).",
     "validityTypesTab": "Vigencia",
     "productValidityTypes": {
       "subtitle": "Tipo de vigencia del producto. Es obligatorio para poder contratarlo: sin un tipo activo no se puede generar el contrato.",
@@ -721,6 +721,18 @@
         "checkbox": "Sí/No"
       },
       "noDictionaries": "No hay diccionarios con opciones activas."
+    },
+    "tiersTab": "Tramos de tarifa",
+    "tiers": {
+      "subtitle": "Tarifa anual por asegurado según cuántos asegurados tenga el colectivo: se busca el tramo donde cae el total y TODOS pagan ese importe (prima del colectivo = nº de asegurados × tarifa del tramo). Si un alta o baja cambia de tramo, los certificados vigentes se reprecian y la diferencia se cobra o devuelve prorrateada en el mismo suplemento.",
+      "fromColumn": "Desde (asegurados)",
+      "toColumn": "Hasta (asegurados)",
+      "amountColumn": "Prima anual por asegurado",
+      "noLimit": "Sin tope",
+      "addButton": "Agregar tramo",
+      "saveButton": "Guardar tramos",
+      "incomplete": "Completá \"desde\" y la prima de todos los tramos.",
+      "saved": "Tramos guardados."
     }
   },
   "quotes": {

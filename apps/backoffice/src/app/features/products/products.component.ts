@@ -28,6 +28,7 @@ import { ProductPaymentFractionsTabComponent } from './product-payment-fractions
 import { ProductValidityTypesTabComponent } from './product-validity-types-tab.component';
 import { ProductOperationsTabComponent } from './product-operations-tab.component';
 import { ProductConsentsTabComponent } from './product-consents-tab.component';
+import { CollectiveTiersTabComponent } from './collective-tiers-tab.component';
 
 const PRODUCTS_PATH = '/product-rating/products';
 const INSURANCE_AREAS_PATH = '/product-rating/insurance-areas';
@@ -73,6 +74,7 @@ const CURRENCIES_PATH = '/product-rating/currencies';
     ProductValidityTypesTabComponent,
     ProductOperationsTabComponent,
     ProductConsentsTabComponent,
+    CollectiveTiersTabComponent,
   ],
   providers: [MessageService, ConfirmationService],
   templateUrl: './products.component.html',
@@ -84,10 +86,10 @@ export class ProductsComponent {
   private readonly confirm = inject(ConfirmationService);
   private readonly transloco = inject(TranslocoService);
 
-  /** Modos de prima de un producto colectivo; "prima única" aparece pero aún no se puede elegir. */
+  /** Modos de prima de un producto colectivo. */
   readonly collectiveModeOptions = [
     { value: 'POR_CERTIFICADO', labelKey: 'products.collectiveModePerCertificate', disabled: false },
-    { value: 'UNICA', labelKey: 'products.collectiveModeSingle', disabled: true },
+    { value: 'UNICA', labelKey: 'products.collectiveModeSingle', disabled: false },
   ];
   readonly rows = signal<CatalogRow[]>([]);
   readonly loading = signal(false);
