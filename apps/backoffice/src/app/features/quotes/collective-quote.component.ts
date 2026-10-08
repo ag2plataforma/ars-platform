@@ -242,6 +242,10 @@ export class CollectiveQuoteComponent {
       next: ({ schema, flow }) => {
         const stepActive = !flow || flow.codProcessFlow === null || flow.activeSteps.includes(STEP_CODE_CUSTOM_ATTRIBUTES);
         this.fields.set(stepActive ? schema.fields : []);
+        // El formulario del diálogo se construyó (vacío) al crear el componente: hay que
+        // rehacerlo con los campos personalizados recién cargados, o la plantilla pide
+        // controles que no existen (`formControlName` sobre null) y la pantalla queda en blanco.
+        this.insuredForm = this.buildInsuredForm();
         this.insureds.set([]);
         this.loadingFields.set(false);
         this.step.set('insureds');
