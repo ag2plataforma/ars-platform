@@ -285,7 +285,7 @@ Si GitHub se viera comprometido, el daño máximo de esa llave es ejecutar `upda
 Postgres publica su puerto **solo en el loopback de la VPS** (`127.0.0.1:5432`), nunca en internet (ufw sigue sin abrir el 5432 y, además, Docker lo enlaza solo a 127.0.0.1). Desde el Mac se entra por **túnel SSH** que DBeaver abre solo:
 
 1. Nueva conexión → PostgreSQL. Pestaña *Main*: Host `localhost`, Puerto `5432`, Base de datos `ars`, Usuario `ars`, Contraseña = `POSTGRES_PASSWORD` de `deploy/.env` (se lee en la VPS con `grep '^POSTGRES_PASSWORD=' ~/ars-platform/deploy/.env` y se pega solo en DBeaver, nunca en chats).
-2. Pestaña *SSH* → marcar *Use SSH Tunnel*: Host `178.238.225.7`, Puerto `22`, Usuario `deploy`, Método *Public Key*, Private Key `~/.ssh/ars_vps` (la passphrase de esa llave en *Password*). Si falla con la llave ed25519, en *Advanced* cambia la implementación a `SSHJ`.
+2. Pestaña *SSH* → marcar *Use SSH Tunnel*: Host `178.238.225.7`, Puerto `22`, Usuario `deploy`, Método *Public Key*, Private Key = el archivo `ars_vps` (sin `.pub`) elegido con el botón de carpeta, o su **ruta absoluta** (`/Users/<tu_usuario>/.ssh/ars_vps`; DBeaver no expande `~`; `echo $HOME/.ssh/ars_vps` la muestra; en el selector, ⌘⇧. muestra las carpetas ocultas), y la passphrase de esa llave en *Password*. Si falla con la llave ed25519, en *Advanced* cambia la implementación a `SSHJ`.
 3. *Test Connection*. El esquema de la aplicación es `ars_platform` (DBeaver → Databases → ars → Schemas).
 4. Recomendado: en *General* → *Connection type* = *Production* (confirma antes de ejecutar, sin auto-commit), y hacer un backup (`bash deploy/scripts/backup.sh`) antes de modificar datos a mano. Para solo consultar, un usuario de solo lectura es más seguro que `ars`.
 
