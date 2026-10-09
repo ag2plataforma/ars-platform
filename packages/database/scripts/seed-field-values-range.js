@@ -6,7 +6,7 @@
  *
  * Cada valor se crea así:
  *   - `DesFieldValue`  = el número ("1", "2", ... "365") -- es lo que se muestra.
- *   - `CodFieldValue`  = `<codCampo>_<número>` (ej. `ASIS-Dias_1`). OJO: el código de un valor es
+ *   - `CodFieldValue`  = `<codCampo>-<número>` (ej. `ASIS-Dias-1`). OJO: el código de un valor es
  *     ÚNICO en toda la tabla (no solo dentro del campo), por eso lleva el prefijo del campo; es la
  *     misma convención que usa el motor de campos de riesgo.
  *   - Estado ACTIVO, auditoría con usuario `seed-field-values-range`.
@@ -78,7 +78,7 @@ async function main() {
             "UsrCreation", "TstCreation", "UsrModification", "TstModification")
          VALUES ($1, $2, $3, $4, $5, $6, $5, $6)
          ON CONFLICT ("CodFieldValue") DO NOTHING`,
-        [`${codField}_${n}`, String(n), ideField, ideState, USER, now],
+        [`${codField}-${n}`, String(n), ideField, ideState, USER, now],
       );
       created += res.rowCount;
     }
