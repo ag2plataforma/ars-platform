@@ -47,12 +47,12 @@ export class PrismaRateValueResolver implements RateValueResolver {
 
     if (rows.length === 0) {
       throw new NotFoundException(
-        'No se encontró valor de tarifa para los factores consultados.',
+        `No se encontró valor de tarifa para los factores consultados. ${describeLookup(codRateTable, [factor1, factor2, factor3, factor4, factor5])}`,
       );
     }
     if (rows.length > 1) {
       throw new ConflictException(
-        'Se encontró más de un valor de tarifa para los factores consultados.',
+        `Se encontró más de un valor de tarifa para los factores consultados. ${describeLookup(codRateTable, [factor1, factor2, factor3, factor4, factor5])}`,
       );
     }
 
@@ -65,4 +65,10 @@ export class PrismaRateValueResolver implements RateValueResolver {
     }
     return value;
   }
+}
+
+/** Texto de diagnóstico: tabla y factores buscados (los `undefined` = NULL no se filtran). */
+function describeLookup(codRateTable: string, factors: Array<string | undefined>): string {
+  const shown = factors.map((f, i) => (f === undefined ? null : `Factor${i + 1}=[${f}]`)).filter(Boolean);
+  return `(tabla "${codRateTable}", ${shown.join(', ')})`;
 }

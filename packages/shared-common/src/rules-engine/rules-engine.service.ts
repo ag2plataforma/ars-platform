@@ -129,7 +129,10 @@ export class RulesEngineService {
         // Un error de configuración de la fórmula no es un fallo interno del
         // servidor: se devuelve 422 con la regla y el motivo, para poder
         // corregirla desde la pantalla de Reglas de cálculo.
-        if (error instanceof HttpException) throw error;
+        if (error instanceof HttpException) {
+          const detail = typeof error.getResponse() === 'string' ? error.getResponse() : error.message;
+          throw new HttpException(`Regla de cálculo "${rule.codCalculationRule}": ${detail}`, error.getStatus());
+        }
         throw new UnprocessableEntityException(
           `Regla de cálculo "${rule.codCalculationRule}": ${error instanceof Error ? error.message : String(error)}`,
         );
