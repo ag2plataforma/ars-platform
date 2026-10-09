@@ -33,7 +33,9 @@ export class AttributesService {
       // tal cual dentro de una fórmula de `SCalculationRule`) sin pedirlo
       // aparte -- lo consume el panel de referencias de la pantalla de
       // Reglas de cálculo (backlog ítem 8, ver docs/02-roadmap.md).
-      { SFieldDictionary: true },
+      // `SState` incluido porque el frontend filtra por estado ACTIVO (los
+      // desplegables del constructor visual de reglas quedaban vacíos sin él).
+      { SFieldDictionary: true, SState: true },
     );
   }
 

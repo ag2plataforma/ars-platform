@@ -79,7 +79,9 @@
     </p-table>
   </div>
 
-  @if (selectedProduct(); as product) {
+  <!-- @for con track por IdeProduct: al pasar de un producto a otro se destruyen y
+       recrean las pestañas hijas (si no, conservaban los datos del producto anterior). -->
+  @for (product of selectedProductList(); track product['IdeProduct']) {
     <div class="rounded-lg border border-slate-200 p-4">
       <div class="mb-4 flex items-center justify-between">
         <div>

@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -102,6 +102,11 @@ export class ProductsComponent {
 
   readonly selectedProduct = signal<CatalogRow | null>(null);
   readonly activeChildTab = signal<string | number>('risk-products');
+  /** Lista de 0-1 elementos: permite `@for ... track IdeProduct` para recrear las pestañas al cambiar de producto. */
+  readonly selectedProductList = computed(() => {
+    const p = this.selectedProduct();
+    return p ? [p] : [];
+  });
 
   form = this.buildForm();
 
