@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { HttpException, Inject, Injectable, UnprocessableEntityException } from '@nestjs/common';
 import {
   ADJUSTMENT_VALUE_RESOLVER,
   AdjustmentValueResolver,
@@ -122,7 +122,18 @@ export class RulesEngineService {
 
     const results: EvaluationResult[] = [];
     for (const rule of ordered) {
-      const value = await this.evaluateRule(rule, context, fieldTokens, computedInThisChain);
+      let value: number;
+      try {
+        value = await this.evaluateRule(rule, context, fieldTokens, computedInThisChain);
+      } catch (error) {
+        // Un error de configuración de la fórmula no es un fallo interno del
+        // servidor: se devuelve 422 con la regla y el motivo, para poder
+        // corregirla desde la pantalla de Reglas de cálculo.
+        if (error instanceof HttpException) throw error;
+        throw new UnprocessableEntityException(
+          `Regla de cálculo "${rule.codCalculationRule}": ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
       computedInThisChain.set(rule.codCalculationRule, value);
       results.push({
         codCalculationRule: rule.codCalculationRule,
@@ -163,8 +174,7 @@ export class RulesEngineService {
     computedInThisChain: Map<string, number>,
   ): Promise<string> {
     let result = expr;
-    result = await this.substituteBuiltinTokens(result, context);
-    result = await this.substituteFieldTokens(result, fieldTokens, context);
+    result = await this.substituteTokens(result, fieldTokens, context);
     result = await this.substituteRateValueReferences(result);
     result = await this.substituteAdjustmentReferences(result, context);
     result = await this.substituteRuleReferences(result, context, computedInThisChain);
@@ -172,18 +182,70 @@ export class RulesEngineService {
   }
 
   /**
-   * Tokens integrados (no son campos personalizados: no necesitan
-   * `SFieldDictionary`/`SAttribute`). Hoy solo `COBERTURA` -> código de la
-   * cobertura que se está calculando, para tarifar por cobertura sin
-   * duplicar las coberturas en un diccionario:
-   * `FGetRateValue('TARIFA_COB', 'COBERTURA', NULL, NULL, NULL, NULL)`.
-   * Como cualquier factor de texto, debe ir entre comillas simples. Corre
-   * ANTES de `substituteFieldTokens` para que un campo personalizado
-   * homónimo no lo tape. Solo consulta la BD si el token aparece.
+   * Sustituye, en UNA sola pasada sobre el texto original, el token
+   * integrado `COBERTURA` y los tokens de campos personalizados.
+   *
+   * - `COBERTURA` (no es un campo del diccionario: no necesita
+   *   `SFieldDictionary`/`SAttribute`) vale el código de la cobertura que se
+   *   está calculando y se inserta SIEMPRE entre comillas simples, se haya
+   *   escrito `COBERTURA` o `'COBERTURA'`:
+   *   `FGetRateValue('TARIFA_COB', COBERTURA, NULL, NULL, NULL, NULL)`.
+   * - Un campo personalizado se sustituye por su valor tal cual (como
+   *   siempre; si se usa como factor de texto debe ir entre comillas).
+   * - Una sola pasada, con los tokens más largos primero, porque los códigos
+   *   llevan guiones (`ASIS-Dias`, `ASIS-Dias-Cat`) y el límite de palabra no
+   *   los separa: con un bucle token a token, `ASIS-Dias` sustituía dentro de
+   *   `ASIS-Dias-Cat` y dentro de los valores ya sustituidos (`ASIS-Dias-5`).
+   * - El primer argumento de `FGetRateValue` (código de la tabla) es un
+   *   literal, nunca se sustituye: tabla y campo pueden llamarse igual.
+   *
+   * Solo se consulta la BD por los tokens que realmente aparecen.
    */
-  private async substituteBuiltinTokens(expr: string, context: EvaluationContext): Promise<string> {
-    const pattern = wordBoundaryPattern(BUILTIN_COVERAGE_TOKEN);
-    if (!new RegExp(pattern).test(expr)) return expr;
+  private async substituteTokens(
+    expr: string,
+    fieldTokens: FieldToken[],
+    context: EvaluationContext,
+  ): Promise<string> {
+    const byCode = new Map(fieldTokens.map((token) => [token.codFieldDictionary, token]));
+    const codes = [...byCode.keys(), BUILTIN_COVERAGE_TOKEN].sort((a, b) => b.length - a.length);
+    const bare = codes.map(escapeRegExp).join('|');
+    const pattern = new RegExp(
+      `(?<protected>(?:[A-Za-z_][A-Za-z0-9_]*\\.)?"?FGetRateValue"?\\(\\s*'[^']*')` +
+        `|(?<quoted>'${escapeRegExp(BUILTIN_COVERAGE_TOKEN)}')` +
+        `|(?<![A-Za-z0-9_])(?<bare>${bare})(?![A-Za-z0-9_])`,
+      'g',
+    );
+
+    // Primero se localizan las apariciones; luego se resuelven (async) y se
+    // arma el resultado, sin volver a escanear el texto ya sustituido.
+    const matches = [...expr.matchAll(pattern)];
+    let coverageQuoted: string | null = null;
+    let result = '';
+    let last = 0;
+    for (const match of matches) {
+      const index = match.index ?? 0;
+      result += expr.slice(last, index);
+      last = index + match[0].length;
+      const groups = match.groups ?? {};
+      if (groups['protected'] !== undefined) {
+        result += match[0];
+      } else if (groups['quoted'] !== undefined || groups['bare'] === BUILTIN_COVERAGE_TOKEN) {
+        coverageQuoted ??= await this.resolveCoverageLiteral(context);
+        result += coverageQuoted;
+      } else {
+        const token = byCode.get(groups['bare'] as string)!;
+        result += await this.attributeResolver.resolveAttributeValue(
+          context.origin,
+          context.ideOriginRisk,
+          token.ideAttribute,
+          context.dbTransaction,
+        );
+      }
+    }
+    return result + expr.slice(last);
+  }
+
+  private async resolveCoverageLiteral(context: EvaluationContext): Promise<string> {
     const codCoverage = await this.ruleValueResolver.resolveCoverageCode(
       context.origin,
       context.ideCoverageOrMovement,
@@ -195,28 +257,7 @@ export class RulesEngineService {
     if (codCoverage.includes("'")) {
       throw new Error(`El código de cobertura "${codCoverage}" contiene comillas y no puede usarse como factor`);
     }
-    return expr.replace(new RegExp(pattern, 'g'), codCoverage);
-  }
-
-  private async substituteFieldTokens(
-    expr: string,
-    fieldTokens: FieldToken[],
-    context: EvaluationContext,
-  ): Promise<string> {
-    let result = expr;
-    for (const token of fieldTokens) {
-      const boundaryPattern = wordBoundaryPattern(token.codFieldDictionary);
-      if (new RegExp(boundaryPattern).test(result)) {
-        const value = await this.attributeResolver.resolveAttributeValue(
-          context.origin,
-          context.ideOriginRisk,
-          token.ideAttribute,
-          context.dbTransaction,
-        );
-        result = result.replace(new RegExp(boundaryPattern, 'g'), value);
-      }
-    }
-    return result;
+    return `'${codCoverage}'`;
   }
 
   /**
@@ -372,12 +413,4 @@ function parseSqlArg(raw: string): string | undefined {
 
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function wordBoundaryPattern(token: string): string {
-  // Sustitución "por límite de palabra" en vez del strpos/substring del
-  // original — evita que un token corto (p. ej. "EDAD") reemplace parte
-  // de otro más largo (p. ej. "EDAD_MAXIMA"). Mejora de seguridad sobre
-  // el original, documentada en docs/01-especificacion-motor-negocio-actual.md §6.
-  return `(?<![A-Za-z0-9_])${escapeRegExp(token)}(?![A-Za-z0-9_])`;
 }

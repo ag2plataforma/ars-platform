@@ -516,7 +516,7 @@
       "referencesHint": "Hacé clic para insertar en el campo (IF/THEN/ELSE) que tengas enfocado.",
       "fieldsGroupLabel": "Campos personalizados",
       "coverageTokenTitle": "Cobertura que se está calculando",
-      "coverageTokenHint": "Token integrado: vale el código de la cobertura en curso. Úsalo entre comillas como factor de una tarifa: FGetRateValue('TABLA', 'COBERTURA', NULL, NULL, NULL, NULL)",
+      "coverageTokenHint": "Token integrado: vale el código de la cobertura en curso. Úsalo como factor de una tarifa, con o sin comillas: FGetRateValue('TABLA', COBERTURA, NULL, NULL, NULL, NULL)",
       "noFieldsHint": "No hay campos personalizados activos.",
       "rulesGroupLabel": "Otras reglas",
       "noRulesHint": "No hay otras reglas activas.",
