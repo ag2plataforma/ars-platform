@@ -1,0 +1,119 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="mb-4">
+  <h1 class="text-lg font-semibold text-slate-900">{{ 'fieldDictionary.title' | transloco }}</h1>
+  <p class="max-w-3xl text-sm text-slate-500">{{ 'fieldDictionary.subtitle' | transloco }}</p>
+</div>
+
+<div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+  <!-- Campos -->
+  <section class="min-w-0">
+    <div class="mb-3 flex items-center justify-between">
+      <h2 class="text-base font-semibold text-slate-900">{{ 'fieldDictionary.fieldsHeading' | transloco }}</h2>
+      <button pButton type="button" icon="pi pi-plus" size="small" [label]="'fieldDictionary.newFieldButton' | transloco" (click)="openCreate('field')"></button>
+    </div>
+    <p-table [value]="fields()" [loading]="loading()" dataKey="IdeFieldDictionary" styleClass="p-datatable-sm"
+      selectionMode="single" [selection]="selectedField()" (onRowSelect)="selectField($any($event.data))"
+      [paginator]="fields().length > 10" [rows]="10">
+      <ng-template #header>
+        <tr>
+          <th>{{ 'fieldDictionary.codeColumn' | transloco }}</th>
+          <th>{{ 'fieldDictionary.descriptionColumn' | transloco }}</th>
+          <th>{{ 'fieldDictionary.valuesColumn' | transloco }}</th>
+          <th>{{ 'fieldDictionary.stateColumn' | transloco }}</th>
+          <th class="w-28">{{ 'fieldDictionary.actionsColumn' | transloco }}</th>
+        </tr>
+      </ng-template>
+      <ng-template #body let-row>
+        <tr [pSelectableRow]="row" class="cursor-pointer">
+          <td>{{ row.CodFieldDictionary }}</td>
+          <td>{{ row.DesFieldDictionary }}</td>
+          <td>{{ valueCounts().get(row.CodFieldDictionary) ?? 0 }}</td>
+          <td>
+            <p-tag [value]="(isActive(row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isActive(row) ? 'success' : 'danger'" />
+          </td>
+          <td>
+            <div class="flex gap-1">
+              <button pButton type="button" icon="pi pi-pencil" [text]="true" severity="secondary" (click)="$event.stopPropagation(); openEdit('field', row)"></button>
+              <button pButton type="button" [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'" [text]="true" [severity]="isActive(row) ? 'danger' : 'success'" (click)="$event.stopPropagation(); toggleState('field', row)"></button>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template #emptymessage>
+        <tr><td colspan="5" class="text-center text-slate-500">{{ 'fieldDictionary.noFields' | transloco }}</td></tr>
+      </ng-template>
+    </p-table>
+  </section>
+
+  <!-- Valores del campo elegido -->
+  <section class="min-w-0">
+    @if (selectedField(); as field) {
+      <div class="mb-1 flex items-center justify-between">
+        <h2 class="text-base font-semibold text-slate-900">
+          {{ 'fieldDictionary.valuesHeading' | transloco: { field: field['DesFieldDictionary'] } }}
+        </h2>
+        <button pButton type="button" icon="pi pi-plus" size="small" [label]="'fieldDictionary.newValueButton' | transloco" (click)="openCreate('value')"></button>
+      </div>
+      <p class="mb-3 text-xs text-slate-500">{{ 'fieldDictionary.valuesHint' | transloco }}</p>
+      <p-table [value]="selectedValues()" dataKey="IdeFieldValue" styleClass="p-datatable-sm"
+        [paginator]="selectedValues().length > 10" [rows]="10">
+        <ng-template #header>
+          <tr>
+            <th>{{ 'fieldDictionary.codeColumn' | transloco }}</th>
+            <th>{{ 'fieldDictionary.descriptionColumn' | transloco }}</th>
+            <th>{{ 'fieldDictionary.stateColumn' | transloco }}</th>
+            <th class="w-28">{{ 'fieldDictionary.actionsColumn' | transloco }}</th>
+          </tr>
+        </ng-template>
+        <ng-template #body let-row>
+          <tr>
+            <td>{{ row.CodFieldValue }}</td>
+            <td>{{ row.DesFieldValue }}</td>
+            <td>
+              <p-tag [value]="(isActive(row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isActive(row) ? 'success' : 'danger'" />
+            </td>
+            <td>
+              <div class="flex gap-1">
+                <button pButton type="button" icon="pi pi-pencil" [text]="true" severity="secondary" (click)="openEdit('value', row)"></button>
+                <button pButton type="button" [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'" [text]="true" [severity]="isActive(row) ? 'danger' : 'success'" (click)="toggleState('value', row)"></button>
+              </div>
+            </td>
+          </tr>
+        </ng-template>
+        <ng-template #emptymessage>
+          <tr><td colspan="4" class="text-center text-slate-500">{{ 'fieldDictionary.noValues' | transloco }}</td></tr>
+        </ng-template>
+      </p-table>
+    } @else {
+      <p class="pt-10 text-center text-sm text-slate-500">{{ 'fieldDictionary.selectFieldHint' | transloco }}</p>
+    }
+  </section>
+</div>
+
+<p-dialog
+  [header]="dialogTitle()"
+  [visible]="dialogVisible()"
+  (visibleChange)="!$event && closeDialog()"
+  [modal]="true"
+  [style]="{ width: '28rem' }"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-1">
+      <label class="text-sm font-medium text-slate-700">{{ 'fieldDictionary.codeLabel' | transloco }}</label>
+      <input pInputText type="text" formControlName="cod" class="w-full" />
+      @if (dialogMode() === 'create') {
+        <p class="text-xs text-slate-500">{{ 'fieldDictionary.codeHelp' | transloco }}</p>
+      }
+    </div>
+    <div class="flex flex-col gap-1">
+      <label class="text-sm font-medium text-slate-700">{{ 'fieldDictionary.descriptionLabel' | transloco }}</label>
+      <input pInputText type="text" formControlName="des" class="w-full" />
+    </div>
+    <div class="flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco" [loading]="saving()"></button>
+    </div>
+  </form>
+</p-dialog>

@@ -307,6 +307,14 @@ export const routes: Routes = [
               import('./features/products/products.component').then((m) => m.ProductsComponent),
           },
           {
+            // Diccionario de campos + valores de cada campo (maestro-detalle).
+            path: 'diccionario-de-campos',
+            loadComponent: () =>
+              import('./features/field-dictionary/field-dictionary.component').then(
+                (m) => m.FieldDictionaryComponent,
+              ),
+          },
+          {
             path: 'tarifas',
             loadComponent: () =>
               import('./features/rate-tables/rate-tables.component').then((m) => m.RateTablesComponent),

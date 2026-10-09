@@ -38,6 +38,7 @@ export class FieldDictionaryService {
       'DesFieldDictionary',
       'IdeFieldDictionary',
       'campo del diccionario',
+      { SState: true },
     );
   }
 

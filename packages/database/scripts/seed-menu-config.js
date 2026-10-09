@@ -157,6 +157,15 @@ const SITE_MAP_ITEMS = [
         path: '/configuracion-productos/requisitos',
         icon: 'pi-file-check',
       },
+      {
+        // Diccionario de campos y sus valores (edad, sexo...): lo usan los factores de las tablas de
+        // tarifa y los atributos de riesgo. Antes solo se cargaba por script.
+        cod: 'DICCIONARIO_CAMPOS',
+        des: 'Diccionario de campos',
+        order: 5,
+        path: '/configuracion-productos/diccionario-de-campos',
+        icon: 'pi-book',
+      },
     ],
   },
   { cod: 'COMISIONES', des: 'Comisiones', order: 9, path: '/comisiones', icon: 'pi-wallet' },

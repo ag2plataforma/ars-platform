@@ -228,14 +228,6 @@
     "validity-types": {
       "label": "Tipos de vigencia",
       "singular": "tipo de vigencia"
-    },
-    "field-dictionary": {
-      "label": "Diccionario de campos",
-      "singular": "campo"
-    },
-    "field-values": {
-      "label": "Valores de campos",
-      "singular": "valor de campo"
     }
   },
   "catalogFields": {
@@ -252,8 +244,7 @@
     "codClaimType": "Tipo de siniestro",
     "numFraction": "Cantidad de cuotas",
     "numOrder": "Orden (la menor es la de por defecto)",
-    "indAnnual": "¿Vigencia anual?",
-    "codFieldDictionary": "Campo"
+    "indAnnual": "¿Vigencia anual?"
   },
   "common": {
     "error": "Error",
@@ -1182,7 +1173,7 @@
     "valueCreatedDetail": "Se creó el valor de tarifa.",
     "valueUpdatedDetail": "Se actualizó el valor de tarifa.",
     "toggleValueConfirm": "¿Confirmás {{action}} este valor de tarifa?",
-    "fieldHelp": "¿No está el campo que necesitás? Crealo en Configuración de productos > Catálogos de producto > Diccionario de campos (y sus valores en «Valores de campos»)."
+    "fieldHelp": "¿No está el campo que necesitás? Crealo en Configuración de productos > Diccionario de campos (ahí también se definen los valores de cada campo)."
   },
   "commissions": {
     "title": "Comisiones",
@@ -1941,5 +1932,36 @@
     "fileErrorTitle": "No se pudo leer el archivo",
     "fileLoadedDetail": "Se cargaron {{count}} asegurado(s) desde el archivo.",
     "fileReadError": "El archivo no es un CSV válido."
+  },
+  "fieldDictionary": {
+    "title": "Diccionario de campos",
+    "subtitle": "Los campos (edad, sexo, zona...) que usan los factores de las tablas de tarifa y los atributos de riesgo, y los valores posibles de cada uno.",
+    "newFieldButton": "Nuevo campo",
+    "fieldsHeading": "Campos",
+    "codeColumn": "Código",
+    "descriptionColumn": "Descripción",
+    "valuesColumn": "Valores",
+    "stateColumn": "Estado",
+    "actionsColumn": "Acciones",
+    "noFields": "Todavía no hay campos.",
+    "valuesHeading": "Valores de «{{field}}»",
+    "valuesHint": "Valores posibles de este campo (por ejemplo, para «Estado civil»: Soltero, Casado...). Dejá la lista vacía si el campo es libre (como una edad o un monto).",
+    "selectFieldHint": "Elegí un campo de la lista para ver y definir sus valores.",
+    "newValueButton": "Nuevo valor",
+    "noValues": "Este campo todavía no tiene valores.",
+    "fieldDialogCreate": "Nuevo campo",
+    "fieldDialogEdit": "Editar campo",
+    "valueDialogCreate": "Nuevo valor de «{{field}}»",
+    "valueDialogEdit": "Editar valor de «{{field}}»",
+    "codeLabel": "Código",
+    "descriptionLabel": "Descripción",
+    "codeHelp": "Solo letras, números, puntos, guiones y guion bajo. No se puede cambiar después.",
+    "created": "Se creó «{{item}}».",
+    "updated": "Se actualizó «{{item}}».",
+    "toggleConfirm": "¿Confirmás {{action}} «{{item}}»?",
+    "activate": "activar",
+    "deactivate": "desactivar",
+    "toggled": "«{{item}}» quedó {{state}}.",
+    "loadError": "No se pudo cargar el diccionario de campos."
   }
 }

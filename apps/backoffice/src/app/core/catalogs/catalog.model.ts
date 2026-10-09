@@ -493,38 +493,6 @@ export const PRODUCT_CATALOG_REGISTRY: CatalogConfig[] = [
     desField: 'DesEndorsementReason',
     idField: 'IdeEndorsementReason',
   },
-  // --- Diccionario de campos (reference-data): los "campos" que usan los factores de las tablas de
-  // tarifa y los atributos de riesgo (edad, sexo, ciudad...) y los valores posibles de cada uno. ---
-  {
-    key: 'field-dictionary',
-    label: 'catalogsRegistry.field-dictionary.label',
-    singular: 'catalogsRegistry.field-dictionary.singular',
-    path: '/reference-data/field-dictionary',
-    codField: 'CodFieldDictionary',
-    desField: 'DesFieldDictionary',
-    idField: 'IdeFieldDictionary',
-  },
-  {
-    key: 'field-values',
-    label: 'catalogsRegistry.field-values.label',
-    singular: 'catalogsRegistry.field-values.singular',
-    path: '/reference-data/field-values',
-    codField: 'CodFieldValue',
-    desField: 'DesFieldValue',
-    idField: 'IdeFieldValue',
-    extraFields: [
-      {
-        key: 'codFieldDictionary',
-        label: 'catalogFields.codFieldDictionary',
-        type: 'select',
-        required: true,
-        optionsPath: '/reference-data/field-dictionary',
-        optionCodField: 'CodFieldDictionary',
-        optionDesField: 'DesFieldDictionary',
-        columnRelation: 'SFieldDictionary',
-      },
-    ],
-  },
 ];
 
 

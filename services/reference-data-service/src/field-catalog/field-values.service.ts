@@ -4,7 +4,7 @@ import { CatalogCrudService, StateMachineService } from '@ars-platform/shared-co
 import { CreateFieldValueDto } from './dto/create-field-value.dto';
 import { UpdateFieldValueDto } from './dto/update-field-value.dto';
 
-const INCLUDE = { SFieldDictionary: true } as const;
+const INCLUDE = { SFieldDictionary: true, SState: true } as const;
 
 /**
  * `SFieldValue` -- catálogo de valores posibles para un `SFieldDictionary`
