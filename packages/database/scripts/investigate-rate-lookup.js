@@ -78,7 +78,19 @@ async function main() {
          LEFT JOIN ars_platform."SAttribute" a ON a."IdeFieldDictionary" = d."IdeFieldDictionary"
         WHERE d."CodFieldDictionary" LIKE 'ASIS%' GROUP BY 1 ORDER BY 1`,
     );
-    for (const r of fields.rows) console.log(`  ${r.CodFieldDictionary}: ${r.valores} valores, ${r.atributos} atributo(s)`);
+    for (const r of fields.rows) {
+      const sample = await client.query(
+        `SELECT v."CodFieldValue" FROM ars_platform."SFieldValue" v
+           JOIN ars_platform."SFieldDictionary" d ON d."IdeFieldDictionary" = v."IdeFieldDictionary"
+          WHERE d."CodFieldDictionary" = $1 ORDER BY v."CodFieldValue" LIMIT 3`,
+        [r.CodFieldDictionary],
+      );
+      console.log(
+        `  ${r.CodFieldDictionary}: ${r.valores} valores (ej. ${sample.rows.map((x) => x.CodFieldValue).join(', ') || '-'}), ${r.atributos} atributo(s)`,
+      );
+    }
+    const allTables = await client.query(`SELECT "CodRateTable" FROM ars_platform."SRateTable" WHERE "CodRateTable" LIKE 'ASIS%' ORDER BY 1`);
+    console.log(`\nTablas de tarifa ASIS*: ${allTables.rows.map((r) => r.CodRateTable).join(', ') || 'ninguna'}`);
     console.log(`\nCódigos de cobertura existentes (${coverages.length}): ${coverages.slice(0, 40).join(', ')}`);
   } finally {
     await client.end();
