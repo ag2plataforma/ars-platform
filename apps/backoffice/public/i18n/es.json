@@ -228,6 +228,14 @@
     "validity-types": {
       "label": "Tipos de vigencia",
       "singular": "tipo de vigencia"
+    },
+    "field-dictionary": {
+      "label": "Diccionario de campos",
+      "singular": "campo"
+    },
+    "field-values": {
+      "label": "Valores de campos",
+      "singular": "valor de campo"
     }
   },
   "catalogFields": {
@@ -244,7 +252,8 @@
     "codClaimType": "Tipo de siniestro",
     "numFraction": "Cantidad de cuotas",
     "numOrder": "Orden (la menor es la de por defecto)",
-    "indAnnual": "¿Vigencia anual?"
+    "indAnnual": "¿Vigencia anual?",
+    "codFieldDictionary": "Campo"
   },
   "common": {
     "error": "Error",
@@ -1172,7 +1181,8 @@
     "factorUpdatedDetail": "Se actualizó el factor.",
     "valueCreatedDetail": "Se creó el valor de tarifa.",
     "valueUpdatedDetail": "Se actualizó el valor de tarifa.",
-    "toggleValueConfirm": "¿Confirmás {{action}} este valor de tarifa?"
+    "toggleValueConfirm": "¿Confirmás {{action}} este valor de tarifa?",
+    "fieldHelp": "¿No está el campo que necesitás? Crealo en Configuración de productos > Catálogos de producto > Diccionario de campos (y sus valores en «Valores de campos»)."
   },
   "commissions": {
     "title": "Comisiones",
