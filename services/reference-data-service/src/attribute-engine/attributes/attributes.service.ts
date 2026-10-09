@@ -43,6 +43,22 @@ export class AttributesService {
     return this.crud.findAll();
   }
 
+  /**
+   * Atributos con campo configurado para una referencia concreta -- hoy
+   * siempre un `SRiskProduct` (`SModelAttribute.IdeReference`), cadena
+   * `SModelAttribute` -> `SAttributeProperty` -> `SAttribute`. Es el universo
+   * de campos personalizados que una cotización/contrato de ese
+   * riesgo-producto puede traer, y por tanto los únicos útiles en una
+   * fórmula de sus coberturas (el resto resuelve a `0`).
+   */
+  findByReference(ideReference: string): Promise<SAttribute[]> {
+    return this.prisma.sAttribute.findMany({
+      where: { SAttributeProperty: { some: { SModelAttribute: { IdeReference: ideReference } } } },
+      orderBy: { DesAttribute: 'asc' },
+      include: { SFieldDictionary: true, SState: true },
+    });
+  }
+
   findOne(id: string): Promise<SAttribute> {
     return this.crud.findOne(id);
   }

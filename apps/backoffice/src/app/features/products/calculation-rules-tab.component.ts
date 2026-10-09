@@ -116,6 +116,15 @@ export class CalculationRulesTabComponent {
   readonly rateTables = signal<CatalogRow[]>([]);
   readonly adjustmentOptions = signal<CatalogRow[]>([]);
   readonly otherRules = signal<CatalogRow[]>([]);
+  /** Campos creados con «+ Nuevo campo» en esta sesión (ver `loadFormulaReferences`). */
+  private readonly createdFields = signal<CatalogRow[]>([]);
+  /** `IdeRiskProduct` del Plan x Riesgo elegido: de él cuelgan los campos personalizados. */
+  private selectedRiskProductId(): string {
+    const row = this.planProductRisks().find((r) => String(r['IdePlanProductRisk']) === this.selectedPlanProductRiskId());
+    if (!row) return '';
+    const rp = row['SRiskProduct'] as Record<string, unknown> | undefined;
+    return String(row['IdeRiskProduct'] ?? rp?.['IdeRiskProduct'] ?? '');
+  }
   readonly loadingReferences = signal(false);
 
   /** Opciones simplificadas ("código — descripción") para los
@@ -301,18 +310,27 @@ export class CalculationRulesTabComponent {
   private loadFormulaReferences(): void {
     this.loadingReferences.set(true);
     const editingCod = this.editingRow ? String(this.editingRow['CodCalculationRule'] ?? '') : null;
+    // Contexto de la regla: solo los campos configurados para el riesgo-producto
+    // del Plan x Riesgo elegido (el resto resolvería a 0 al cotizar) y solo las
+    // reglas de ESTA cobertura (`rule('COD')` se resuelve contra la misma
+    // cobertura; las de otras coberturas/productos no aplican). Las reglas ya
+    // están cargadas en `rows` (la tabla de esta pantalla es por cobertura).
+    const ideRiskProduct = this.selectedRiskProductId();
     forkJoin({
-      fields: this.catalogService.list(ATTRIBUTES_PATH),
+      fields: this.catalogService.list(ATTRIBUTES_PATH, ideRiskProduct ? { ideReference: ideRiskProduct } : {}),
       rateTables: this.catalogService.list(RATE_TABLES_PATH),
       adjustments: this.catalogService.list(ADJUSTMENTS_PATH),
-      rules: this.catalogService.list(PATH),
     }).subscribe({
-      next: ({ fields, rateTables, adjustments, rules }) => {
-        this.fieldTokens.set(fields.filter((row) => this.isActive(row)));
+      next: ({ fields, rateTables, adjustments }) => {
+        // Campos creados con "+ Nuevo campo" en esta sesión: todavía no están
+        // ligados a ningún riesgo-producto, pero se acaban de crear para usarlos.
+        const known = new Set(fields.map((row) => String(row['IdeAttribute'])));
+        const merged = [...fields, ...this.createdFields().filter((row) => !known.has(String(row['IdeAttribute'])))];
+        this.fieldTokens.set(merged.filter((row) => this.isActive(row)));
         this.rateTables.set(rateTables.filter((row) => this.isActive(row)));
         this.adjustmentOptions.set(adjustments.filter((row) => this.isActive(row)));
         this.otherRules.set(
-          rules.filter((row) => this.isActive(row) && String(row['CodCalculationRule'] ?? '') !== editingCod),
+          this.rows().filter((row) => this.isActive(row) && String(row['CodCalculationRule'] ?? '') !== editingCod),
         );
         this.loadingReferences.set(false);
       },
@@ -553,7 +571,8 @@ export class CalculationRulesTabComponent {
         this.catalogService
           .create(ATTRIBUTES_PATH, { codAttribute: cod, desAttribute: des, codFieldDictionary: cod })
           .subscribe({
-            next: () => {
+            next: (attribute) => {
+              this.createdFields.update((list) => [...list, attribute]);
               this.messages.add({
                 severity: 'success',
                 summary: this.transloco.translate<string>('common.done'),

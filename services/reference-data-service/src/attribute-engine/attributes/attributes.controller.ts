@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { CurrentUser, JwtPayload, Roles } from '@ars-platform/shared-common';
 import { AttributesService } from './attributes.service';
 import { CreateAttributeDto } from './dto/create-attribute.dto';
@@ -9,9 +9,11 @@ import { SetCatalogStateDto } from '../dto/set-catalog-state.dto';
 export class AttributesController {
   constructor(private readonly service: AttributesService) {}
 
+  /** `?ideReference=<IdeRiskProduct>` limita la lista a los campos configurados
+   *  (vía `SAttributeProperty`) para ese riesgo-producto. */
   @Get()
-  findAll() {
-    return this.service.findAll();
+  findAll(@Query('ideReference') ideReference?: string) {
+    return ideReference ? this.service.findByReference(ideReference) : this.service.findAll();
   }
 
   @Get(':id')
