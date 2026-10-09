@@ -348,6 +348,14 @@
                 <p class="text-slate-400">{{ 'products.calculationRules.noFieldsHint' | transloco }}</p>
               }
               <div class="flex flex-wrap gap-1">
+                <button
+                  type="button"
+                  class="rounded border border-indigo-300 bg-indigo-50 px-1.5 py-0.5 font-mono hover:bg-indigo-100"
+                  [title]="'products.calculationRules.coverageTokenHint' | transloco"
+                  (click)="insertFormulaReference(coverageToken)"
+                >
+                  {{ coverageToken }}
+                </button>
                 @for (row of fieldTokens(); track row['IdeAttribute']) {
                   <button
                     type="button"

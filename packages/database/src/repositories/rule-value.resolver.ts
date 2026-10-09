@@ -63,4 +63,29 @@ export class PrismaRuleValueResolver implements RuleValueResolver {
     });
     return concept ? Number(concept.ConceptValue) : 0;
   }
+
+  /** Código de la cobertura en curso (`SCoverage.CodCoverage`), vía
+   *  `SCoveragePlan` -- ver `RuleValueResolver.resolveCoverageCode`. */
+  async resolveCoverageCode(
+    origin: RuleOrigin,
+    ideCoverageOrMovement: string,
+    dbTransaction?: unknown,
+  ): Promise<string> {
+    const db = (dbTransaction as Prisma.TransactionClient | undefined) ?? this.prisma;
+    const select = { SCoveragePlan: { select: { SCoverage: { select: { CodCoverage: true } } } } } as const;
+
+    if (origin === 'Quote') {
+      const row = await db.tQuoteCoverage.findUnique({
+        where: { IdeQuoteCoverage: ideCoverageOrMovement },
+        select,
+      });
+      return row?.SCoveragePlan.SCoverage.CodCoverage ?? '';
+    }
+
+    const row = await db.tCoverageMovement.findUnique({
+      where: { IdeCoverageMovement: ideCoverageOrMovement },
+      select: { TRiskCoverage: { select } },
+    });
+    return row?.TRiskCoverage.SCoveragePlan.SCoverage.CodCoverage ?? '';
+  }
 }

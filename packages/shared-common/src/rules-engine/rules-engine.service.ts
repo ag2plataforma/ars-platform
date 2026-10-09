@@ -17,6 +17,9 @@ import {
 } from './calculation-rule.interface';
 import { evaluateBooleanExpression, evaluateNumericExpression } from './formula-expression';
 
+/** Token integrado: código de la cobertura en curso (ver `substituteBuiltinTokens`). */
+export const BUILTIN_COVERAGE_TOKEN = 'COBERTURA';
+
 /** Contexto de evaluación para una cobertura (cotización) o movimiento de
  *  cobertura (póliza) concretos — equivalente a los parámetros que
  *  `FQuoteCoverageConcept`/`FMovementConcept` reciben junto con el riesgo. */
@@ -160,11 +163,39 @@ export class RulesEngineService {
     computedInThisChain: Map<string, number>,
   ): Promise<string> {
     let result = expr;
+    result = await this.substituteBuiltinTokens(result, context);
     result = await this.substituteFieldTokens(result, fieldTokens, context);
     result = await this.substituteRateValueReferences(result);
     result = await this.substituteAdjustmentReferences(result, context);
     result = await this.substituteRuleReferences(result, context, computedInThisChain);
     return result;
+  }
+
+  /**
+   * Tokens integrados (no son campos personalizados: no necesitan
+   * `SFieldDictionary`/`SAttribute`). Hoy solo `COBERTURA` -> código de la
+   * cobertura que se está calculando, para tarifar por cobertura sin
+   * duplicar las coberturas en un diccionario:
+   * `FGetRateValue('TARIFA_COB', 'COBERTURA', NULL, NULL, NULL, NULL)`.
+   * Como cualquier factor de texto, debe ir entre comillas simples. Corre
+   * ANTES de `substituteFieldTokens` para que un campo personalizado
+   * homónimo no lo tape. Solo consulta la BD si el token aparece.
+   */
+  private async substituteBuiltinTokens(expr: string, context: EvaluationContext): Promise<string> {
+    const pattern = wordBoundaryPattern(BUILTIN_COVERAGE_TOKEN);
+    if (!new RegExp(pattern).test(expr)) return expr;
+    const codCoverage = await this.ruleValueResolver.resolveCoverageCode(
+      context.origin,
+      context.ideCoverageOrMovement,
+      context.dbTransaction,
+    );
+    if (!codCoverage) {
+      throw new Error(`No se pudo resolver la cobertura en curso para el token ${BUILTIN_COVERAGE_TOKEN}`);
+    }
+    if (codCoverage.includes("'")) {
+      throw new Error(`El código de cobertura "${codCoverage}" contiene comillas y no puede usarse como factor`);
+    }
+    return expr.replace(new RegExp(pattern, 'g'), codCoverage);
   }
 
   private async substituteFieldTokens(

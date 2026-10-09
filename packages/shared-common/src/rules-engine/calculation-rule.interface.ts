@@ -108,6 +108,20 @@ export interface RuleValueResolver {
     codCalculationRule: string,
     dbTransaction?: unknown,
   ): Promise<number>;
+
+  /**
+   * Código (`SCoverage.CodCoverage`) de la cobertura que se está
+   * calculando -- alimenta el token integrado `COBERTURA` de las fórmulas
+   * (ver `RulesEngineService.substituteBuiltinTokens`). `ideCoverageOrMovement`
+   * es `TQuoteCoverage.IdeQuoteCoverage` (Quote) o
+   * `TCoverageMovement.IdeCoverageMovement` (Contract). Cadena vacía si no
+   * se encuentra.
+   */
+  resolveCoverageCode(
+    origin: RuleOrigin,
+    ideCoverageOrMovement: string,
+    dbTransaction?: unknown,
+  ): Promise<string>;
 }
 
 /**

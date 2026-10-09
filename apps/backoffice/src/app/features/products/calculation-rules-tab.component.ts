@@ -39,6 +39,8 @@ const PATH = '/product-rating/calculation-rules';
 const PLAN_PRODUCT_RISKS_PATH = '/product-rating/plan-product-risks';
 const COVERAGE_PLANS_PATH = '/product-rating/coverage-plans';
 const CONCEPTS_PATH = '/reference-data/concepts';
+/** Token integrado del motor de reglas (ver `RulesEngineService.substituteBuiltinTokens`). */
+const COVERAGE_TOKEN = 'COBERTURA';
 const ATTRIBUTES_PATH = '/reference-data/attributes';
 const FIELD_DICTIONARY_PATH = '/reference-data/field-dictionary';
 const RATE_TABLES_PATH = '/product-rating/rate-tables';
@@ -121,9 +123,12 @@ export class CalculationRulesTabComponent {
    *  derivadas de los mismos 4 catálogos que ya carga `loadFormulaReferences`,
    *  reusando los mismos helpers de label que el panel de referencias de
    *  "modo avanzado" (`fieldTokenCode`/`fieldTokenTitle`, etc.). */
-  readonly fieldTokenChoices = computed<SimpleOption[]>(() =>
-    this.fieldTokens().map((row) => ({ code: this.fieldTokenCode(row), label: `${this.fieldTokenCode(row)} — ${this.fieldTokenTitle(row)}` })),
-  );
+  readonly fieldTokenChoices = computed<SimpleOption[]>(() => [
+    // Token integrado del motor (no es un campo del diccionario): código de la
+    // cobertura que se está calculando, para tarifar por cobertura.
+    { code: COVERAGE_TOKEN, label: `${COVERAGE_TOKEN} — ${this.transloco.translate<string>('products.calculationRules.coverageTokenTitle')}` },
+    ...this.fieldTokens().map((row) => ({ code: this.fieldTokenCode(row), label: `${this.fieldTokenCode(row)} — ${this.fieldTokenTitle(row)}` })),
+  ]);
   readonly ruleChoices = computed<SimpleOption[]>(() =>
     this.otherRules().map((row) => ({ code: this.ruleCode(row), label: `${this.ruleCode(row)} — ${this.ruleTitle(row)}` })),
   );
@@ -318,6 +323,8 @@ export class CalculationRulesTabComponent {
   /** Código real del campo personalizado -- el token tal cual se usa
    *  dentro de una fórmula (ej. `EDAD`), NO el código de `SAttribute`
    *  (que puede ser distinto, ver doc-comment de `AttributesService`). */
+  readonly coverageToken = COVERAGE_TOKEN;
+
   fieldTokenCode(row: CatalogRow): string {
     const dict = row['SFieldDictionary'] as Record<string, unknown> | undefined;
     return dict ? String(dict['CodFieldDictionary'] ?? '') : '';
