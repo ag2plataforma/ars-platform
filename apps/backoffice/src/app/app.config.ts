@@ -1,5 +1,5 @@
 import { ApplicationConfig } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { provideRouter, withNavigationErrorHandler } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { provideTransloco } from '@jsverse/transloco';
@@ -56,9 +56,33 @@ const ArsPreset = definePreset(Aura, {
  * vía clases de utilidad directo en los templates, sin módulo propio --
  * solo necesita el PostCSS plugin (ver .postcssrc.json).
  */
+/**
+ * Tras un despliegue los bundles "perezosos" (chunk-XXXX.js) cambian de hash y
+ * los viejos desaparecen del servidor: una pestana abierta con la version
+ * anterior pide un chunk que ya no existe, el servidor responde index.html y el
+ * navegador falla con "'text/html' is not a valid JavaScript MIME type" (o
+ * "Failed to fetch dynamically imported module"). Recargar la pagina trae la
+ * version nueva; se hace una sola vez por sesion para no entrar en bucle si el
+ * fallo fuera otro.
+ */
+function reloadOnStaleChunk(error: unknown): void {
+  const message = String((error as { message?: unknown } | null)?.message ?? error);
+  if (!/MIME type|dynamically imported module|Loading chunk|ChunkLoadError/i.test(message)) return;
+  try {
+    if (sessionStorage.getItem('ars.chunkReload') === '1') return;
+    sessionStorage.setItem('ars.chunkReload', '1');
+  } catch {
+    return;
+  }
+  window.location.reload();
+}
+
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideRouter(routes),
+    provideRouter(
+      routes,
+      withNavigationErrorHandler((nav) => reloadOnStaleChunk(nav.error)),
+    ),
     provideHttpClient(withInterceptors([authInterceptor])),
     provideAnimationsAsync(),
     /**
