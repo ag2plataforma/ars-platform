@@ -5,7 +5,7 @@ import { CreateRateFactorDto } from './dto/create-rate-factor.dto';
 import { UpdateRateFactorDto } from './dto/update-rate-factor.dto';
 import { ListRateFactorsDto } from './dto/list-rate-factors.dto';
 
-const INCLUDE = { SRateTable: true, SFieldDictionary: true } as const;
+const INCLUDE = { SRateTable: true, SFieldDictionary: true, SState: true } as const;
 
 /**
  * `SRateFactor` — define qué representa cada columna `Factor1`..`Factor5`
