@@ -125,6 +125,16 @@ function validateExpression(
     return '1';
   });
 
+  // El IF es una CONDICIÓN. Si se escribe ahí una cuenta (ej. `rule('X') * 1.5`)
+  // el motor la trata como «verdadero si no es 0» y el resultado sale del THEN/ELSE
+  // (a menudo 0): el error típico de poner la fórmula en el campo equivocado.
+  if (kind === 'boolean' && !/(<=|>=|!=|<>|=|<|>)|\b(AND|OR|NOT|TRUE|FALSE)\b/i.test(working)) {
+    errors.push(
+      `IF: "${expr.trim()}" no es una condición. El IF debe ser TRUE o una comparación (ej. EDAD > 5); ` +
+        'si es un cálculo, va en THEN o en ELSE.',
+    );
+  }
+
   try {
     if (kind === 'boolean') {
       evaluateBooleanExpression(working);
