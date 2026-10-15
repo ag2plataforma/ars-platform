@@ -12,7 +12,8 @@
  *
  * Uso (en la VPS, desde ~/ars-platform/deploy):
  *   bash scripts/db-run.sh investigate-product-rules.js "Viajes en España" "Viajes"
- *   (1er argumento: texto del plan; 2º, opcional: texto del riesgo; sin distinguir mayúsculas)
+ *   (1er argumento: texto del plan o del producto; 2º, opcional: texto del riesgo;
+ *    sin distinguir mayúsculas ni acentos). Si nada coincide, lista todos los Plan x Riesgo existentes.
  */
 const fs = require('fs');
 const path = require('path');
@@ -38,7 +39,7 @@ async function main() {
   });
   await client.connect();
   try {
-    const pprs = (
+    const all = (
       await client.query(
         `SELECT ppr."IdePlanProductRisk", pp."DesPlanProduct", r."DesRisk", rp."IdeRiskProduct", p."IdeProduct", p."CodProduct", p."DesProduct"
            FROM ${S}."SPlanProductRisk" ppr
@@ -46,13 +47,19 @@ async function main() {
            JOIN ${S}."SProduct" p ON p."IdeProduct" = pp."IdeProduct"
            JOIN ${S}."SRiskProduct" rp ON rp."IdeRiskProduct" = ppr."IdeRiskProduct"
            JOIN ${S}."SRisk" r ON r."IdeRisk" = rp."IdeRisk"
-          WHERE pp."DesPlanProduct" ILIKE $1 AND r."DesRisk" ILIKE $2
-          ORDER BY 1`,
-        [`%${planText}%`, `%${riskText ?? ''}%`],
+          ORDER BY p."DesProduct", pp."DesPlanProduct", r."DesRisk"`,
       )
     ).rows;
+    // Sin distinguir mayúsculas ni acentos ("España" == "espana").
+    const norm = (t) => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const wantPlan = norm(planText);
+    const wantRisk = norm(riskText);
+    const pprs = all.filter(
+      (r) => (norm(r.DesPlanProduct).includes(wantPlan) || norm(r.DesProduct).includes(wantPlan)) && norm(r.DesRisk).includes(wantRisk),
+    );
     if (pprs.length === 0) {
-      console.log('No hay ningun Plan x Riesgo que coincida.');
+      console.log(`Ningun Plan x Riesgo coincide con plan="${planText}" riesgo="${riskText ?? ''}". Los que existen (Producto :: Plan / Riesgo):`);
+      for (const r of all) console.log(`   ${r.DesProduct} :: ${r.DesPlanProduct} / ${r.DesRisk}`);
       return;
     }
 
