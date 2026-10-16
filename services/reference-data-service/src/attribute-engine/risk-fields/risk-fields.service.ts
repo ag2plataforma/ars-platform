@@ -6,6 +6,9 @@ import { CreateRiskFieldDto, FIELD_STAGES, RISK_FIELD_TYPES, UpdateRiskFieldDto 
 /** Prefijo de los diccionarios creados desde esta pantalla (el resto, p. ej. razas, son compartidos/solo lectura). */
 const OWN_DICTIONARY_PREFIX = 'RF_';
 
+/** Marca en `AttributeContent.role` del campo que indica la duracion (dias) del contrato temporal. */
+export const DURATION_ROLE = 'DURATION_DAYS';
+
 export interface RiskFieldOption {
   ideFieldValue: string;
   desFieldValue: string;
@@ -28,6 +31,8 @@ export interface RiskFieldView {
   options: RiskFieldOption[];
   /** `PRICING` (se pide al cotizar) o `CONTRACT` (solo al contratar). */
   codStage: string;
+  /** El campo indica la duracion (en dias) del contrato temporal. */
+  isDuration: boolean;
   codState: string;
 }
 
@@ -38,6 +43,8 @@ type Content = {
   validators?: Array<{ validationName: string; aditionalProps?: Record<string, unknown> }>;
   validationMessages?: Record<string, string>;
   options?: unknown;
+  /** `DURATION_DAYS` si el campo marca la duracion en dias del contrato temporal. */
+  role?: string;
   [key: string]: unknown;
 };
 
@@ -115,6 +122,7 @@ export class RiskFieldsService {
           active: v.SState.CodState === 'ACTIVO',
         })).sort((a, b) => a.desFieldValue.localeCompare(b.desFieldValue)),
         codStage: p.CodStage,
+        isDuration: content.role === DURATION_ROLE,
         codState: p.SState.CodState,
       };
     });
@@ -216,7 +224,8 @@ export class RiskFieldsService {
         max: dto.max,
         maxLength: dto.maxLength,
       });
-      await tx.sAttributeProperty.create({
+      if (dto.isDuration) content.role = DURATION_ROLE;
+      const createdProperty = await tx.sAttributeProperty.create({
         data: {
           CodAttributeProperty: await this.uniqueCode(tx, 'sAttributeProperty', 'CodAttributeProperty', codBase, 200),
           DesAttributeProperty: dto.label,
@@ -228,6 +237,9 @@ export class RiskFieldsService {
           ...audit(now),
         },
       });
+      if (dto.isDuration) {
+        await this.clearOtherDurationFields(tx, riskProduct.IdeReference, createdProperty.IdeAttributeProperty, actor);
+      }
     });
 
     return this.findByReference(riskProduct.IdeReference);
@@ -269,7 +281,9 @@ export class RiskFieldsService {
       ...Object.fromEntries(Object.entries(content.validationMessages ?? {}).filter(([k]) => !managed.has(k))),
       ...(rebuilt.validationMessages ?? {}),
     };
-    const merged = { ...content, ...rebuilt };
+    const merged: Content = { ...content, ...rebuilt };
+    if (dto.isDuration === true) merged.role = DURATION_ROLE;
+    else if (dto.isDuration === false) delete merged.role;
 
     const ideState = await this.stateMachine.getStateByCode('ACTIVO');
     const ideInactive = await this.stateMachine.getStateByCode('INACTIVO');
@@ -285,6 +299,9 @@ export class RiskFieldsService {
           TstModification: now,
         },
       });
+      if (dto.isDuration === true) {
+        await this.clearOtherDurationFields(tx, property.SModelAttribute.IdeReference, ideAttributeProperty, actor);
+      }
       if (dto.label !== undefined) {
         await tx.sAttribute.update({
           where: { IdeAttribute: property.IdeAttribute },
@@ -339,6 +356,28 @@ export class RiskFieldsService {
   }
 
   // ---------------------------------------------------------------- helpers
+
+  /** Solo un campo por producto/riesgo puede ser "la duracion": al marcar uno, se desmarcan los demas. */
+  private async clearOtherDurationFields(
+    tx: Prisma.TransactionClient,
+    ideReference: string,
+    exceptIdeAttributeProperty: string,
+    actor: string,
+  ): Promise<void> {
+    const others = await tx.sAttributeProperty.findMany({
+      where: { SModelAttribute: { IdeReference: ideReference }, NOT: { IdeAttributeProperty: exceptIdeAttributeProperty } },
+      select: { IdeAttributeProperty: true, AttributeContent: true },
+    });
+    for (const other of others) {
+      const content = this.parse(other.AttributeContent);
+      if (content.role !== DURATION_ROLE) continue;
+      delete content.role;
+      await tx.sAttributeProperty.update({
+        where: { IdeAttributeProperty: other.IdeAttributeProperty },
+        data: { AttributeContent: JSON.stringify(content), UsrModification: actor, TstModification: new Date() },
+      });
+    }
+  }
 
   /** Arma el JSON `AttributeContent` (mismo contrato que los campos reales: ver `getSchemaForReference`). */
   private buildContent(

@@ -24,6 +24,11 @@ export class CreateRiskFieldDto {
   @IsIn(FIELD_STAGES)
   codStage?: FieldStage;
 
+  /** El campo indica la DURACION en dias (numero o lista de numeros): el contrato temporal termina tantos dias despues de su inicio. */
+  @IsOptional()
+  @IsBoolean()
+  isDuration?: boolean;
+
   @IsString()
   @MinLength(1)
   @MaxLength(200)
@@ -70,6 +75,10 @@ export class UpdateRiskFieldDto {
   @IsOptional()
   @IsIn(FIELD_STAGES)
   codStage?: FieldStage;
+
+  @IsOptional()
+  @IsBoolean()
+  isDuration?: boolean;
 
   @IsOptional()
   @IsString()

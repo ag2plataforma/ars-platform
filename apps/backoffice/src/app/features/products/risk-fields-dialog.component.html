@@ -28,7 +28,12 @@
       </ng-template>
       <ng-template #body let-field>
         <tr>
-          <td>{{ field.label }}</td>
+          <td>
+            {{ field.label }}
+            @if (field.isDuration) {
+              <p-tag class="ml-2" [value]="'products.riskFields.durationTag' | transloco" severity="info" />
+            }
+          </td>
           <td>{{ typeLabel(field.type) }}</td>
           <td>{{ (field.required ? 'common.yes' : 'common.no') | transloco }}</td>
           <td>{{ stageLabel(field.codStage) }}</td>
@@ -103,6 +108,15 @@
       </p-select>
       <p class="text-xs text-slate-500">{{ 'products.riskFields.stageHint' | transloco }}</p>
     </div>
+    @if (scope() === 'product' && ((editing()?.type ?? form.controls.type.value) === 'number' || isList(editing()?.type ?? form.controls.type.value))) {
+      <div class="flex flex-col gap-1">
+        <div class="flex items-center gap-2">
+          <p-checkbox formControlName="isDuration" [binary]="true" inputId="rf-duration" />
+          <label for="rf-duration" class="text-sm text-slate-700">{{ 'products.riskFields.durationLabel' | transloco }}</label>
+        </div>
+        <p class="text-xs text-slate-500">{{ 'products.riskFields.durationHint' | transloco }}</p>
+      </div>
+    }
     <div class="flex items-center gap-2">
       <p-checkbox formControlName="required" [binary]="true" inputId="rf-required" />
       <label for="rf-required" class="text-sm text-slate-700">{{ 'products.riskFields.requiredLabel' | transloco }}</label>

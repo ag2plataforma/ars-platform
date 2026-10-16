@@ -202,7 +202,7 @@ export class ContractsService {
 
     const ideContract = await this.prisma.$transaction(
       async (tx) => {
-        const contract = await this.buildContract(quote, dto, actor, tx, collective);
+        const contract = await this.buildContract(quote, dto, actor, tx, collective, fileGenericValues);
         await this.setContractPersons(quote.IdeQuote, contract.IdeContract, actor, tx);
         await this.setContractDistributionChannel(quote.IdeDistributionChannel, quote.IdeProduct, contract, actor, tx);
         await this.setContractBilling(contract, actor, tx);
@@ -2262,10 +2262,11 @@ export class ContractsService {
     actor: string,
     tx: Prisma.TransactionClient = this.prisma,
     collective = false,
+    genericValues: Record<string, unknown> = {},
   ) {
     const productValidityType = await tx.sProductValidityType.findFirst({
       where: { IdeProduct: quote.IdeProduct, SState: { CodState: 'ACTIVO' } },
-      select: { IdeValidityType: true },
+      select: { IdeValidityType: true, SValidityType: { select: { IndAnnual: true } } },
     });
     if (!productValidityType) {
       const product = await tx.sProduct.findUnique({ where: { IdeProduct: quote.IdeProduct }, select: { CodProduct: true } });
@@ -2284,6 +2285,15 @@ export class ContractsService {
     const tstInitial = dto.initialDate ? new Date(dto.initialDate) : now;
     const tstEnd = new Date(tstInitial);
     tstEnd.setFullYear(tstEnd.getFullYear() + 1); // ver comentario de cabecera: placeholder confirmado igual al original para tipos de vigencia no anuales.
+    if (!productValidityType.SValidityType.IndAnnual) {
+      // Vigencia temporal (ej. viajes): termina tantos dias despues del inicio como indique el campo de
+      // duracion del producto (campo marcado como "duracion en dias"). Sin ese campo queda el placeholder.
+      const durationDays = await this.resolveDurationDays(quote.IdeProduct, quote.IdeQuote, genericValues, tx);
+      if (durationDays) {
+        tstEnd.setTime(tstInitial.getTime());
+        tstEnd.setDate(tstEnd.getDate() + durationDays);
+      }
+    }
 
     return tx.tContract.create({
       data: {
@@ -2306,6 +2316,59 @@ export class ContractsService {
         TstModification: now,
       },
     });
+  }
+
+  /**
+   * Duracion en dias del contrato temporal: el valor del campo personalizado marcado como duracion
+   * (`AttributeContent.role = 'DURATION_DAYS'`, a nivel producto o de riesgo). El valor se busca en los
+   * valores genericos (cotizacion + los pedidos al contratar) y, si no esta, en el primer riesgo de la
+   * cotizacion (cotizaciones hechas cuando el campo aun era del riesgo). Un campo de lista guarda el id del
+   * `SFieldValue` elegido; su descripcion es el numero de dias. `null` si no hay campo marcado o valor valido.
+   */
+  private async resolveDurationDays(
+    ideProduct: string,
+    ideQuote: string,
+    genericValues: Record<string, unknown>,
+    tx: Prisma.TransactionClient,
+  ): Promise<number | null> {
+    const riskProducts = await tx.sRiskProduct.findMany({ where: { IdeProduct: ideProduct }, select: { IdeRiskProduct: true } });
+    const properties = await tx.sAttributeProperty.findMany({
+      where: {
+        SState: { CodState: 'ACTIVO' },
+        SModelAttribute: { IdeReference: { in: [ideProduct, ...riskProducts.map((r) => r.IdeRiskProduct)] } },
+      },
+      select: { IdeAttributeProperty: true, AttributeContent: true },
+    });
+    const durationProperties = properties.filter((p) => {
+      try {
+        return (JSON.parse(p.AttributeContent) as { role?: string }).role === 'DURATION_DAYS';
+      } catch {
+        return false;
+      }
+    });
+    if (durationProperties.length === 0) return null;
+
+    const firstRisk = await tx.tQuoteRisk.findFirst({
+      where: { IdeQuote: ideQuote },
+      orderBy: { NumRisk: 'asc' },
+      select: { RiskAttributeValue: true },
+    });
+    const riskValues = (firstRisk?.RiskAttributeValue as Record<string, unknown> | null) ?? {};
+
+    for (const property of durationProperties) {
+      const raw = genericValues[property.IdeAttributeProperty] ?? riskValues[property.IdeAttributeProperty];
+      if (raw === undefined || raw === null || raw === '') continue;
+      let days = Number(raw);
+      if (!Number.isFinite(days)) {
+        const fieldValue = await tx.sFieldValue.findFirst({
+          where: { IdeFieldValue: String(raw) },
+          select: { DesFieldValue: true },
+        });
+        days = Number(fieldValue?.DesFieldValue);
+      }
+      if (Number.isFinite(days) && days >= 1) return Math.floor(days);
+    }
+    return null;
   }
 
   /**

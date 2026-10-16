@@ -39,6 +39,7 @@ interface RiskField {
   ownDictionary: boolean;
   options: RiskFieldOption[];
   codStage: string;
+  isDuration: boolean;
   codState: string;
 }
 
@@ -122,6 +123,7 @@ export class RiskFieldsDialogComponent {
       type: [{ value: field?.type ?? 'text', disabled: !!field }, Validators.required],
       required: [field?.required ?? false],
       codStage: [field?.codStage ?? 'PRICING'],
+      isDuration: [field?.isDuration ?? false],
       min: [field?.min as number | null],
       max: [field?.max as number | null],
       maxLength: [field?.maxLength as number | null],
@@ -211,6 +213,8 @@ export class RiskFieldsDialogComponent {
     const editing = this.editing();
     const type = editing?.type ?? raw.type;
     const body: Record<string, unknown> = { label: raw.label.trim(), required: raw.required, codStage: raw.codStage };
+    // Solo los campos de producto numericos o de lista pueden ser la duracion del contrato temporal.
+    if (this.scope() === 'product' && (type === 'number' || this.isList(type))) body['isDuration'] = raw.isDuration;
     if (type === 'number') {
       body['min'] = raw.min ?? (editing ? null : undefined);
       body['max'] = raw.max ?? (editing ? null : undefined);
