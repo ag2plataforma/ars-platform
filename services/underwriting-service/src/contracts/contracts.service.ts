@@ -21,6 +21,7 @@ import {
 } from './dto/certificate.dto';
 import { AddRiskDto } from './dto/add-risk.dto';
 import { RemoveRiskDto } from './dto/remove-risk.dto';
+import { assertInsuredPersonComplete, findOrCreateInsuredPerson, parseInsuredPerson, resolveInsuredPersonConfig } from './insured-persons';
 import { ChangePersonDataDto } from './dto/change-person-data.dto';
 import { ListContractsDto } from './dto/list-contracts.dto';
 import { ListRenewalCandidatesDto } from './dto/list-renewal-candidates.dto';
@@ -253,6 +254,7 @@ export class ContractsService {
           const contractFile = await this.createContractFile(contract, actor, tx, 1, fileGenericValues as Prisma.JsonObject);
           await this.createInitialContractOperation(contract.IdeContract, actor, tx);
 
+          const insuredPersons = await this.resolveInsuredPersons(quote.IdeQuote, quote.IdeProduct, quote.IdePerson, dto.riskPersons, actor, tx);
           const riskCoverages = await this.copyRisksAndCoverages(
             quote.IdeQuote,
             contract.IdeProduct,
@@ -261,6 +263,7 @@ export class ContractsService {
             tx,
             undefined,
             dto.riskAttributeValues,
+            insuredPersons,
           );
           await this.createInitialMovements(riskCoverages, actor, tx);
           await this.setNetPrime(contractFile.IdeContractFile, actor, tx);
@@ -2863,6 +2866,52 @@ export class ContractsService {
     });
   }
 
+  /**
+   * Riesgos de tipo persona (`SRiskType.IndPersonRisk`): busca (por documento) o crea la persona
+   * asegurada de cada uno con los datos que el producto pide (`SProduct.ObjInsuredPersonFields`).
+   * Devuelve `IdeQuoteRisk -> IdePerson`. Si falta la persona de un riesgo de tipo persona, 400.
+   */
+  private async resolveInsuredPersons(
+    ideQuote: string,
+    ideProduct: string,
+    ideHolder: string | null,
+    riskPersons: Record<string, unknown> | undefined,
+    actor: string,
+    tx: Prisma.TransactionClient,
+  ): Promise<Map<string, string>> {
+    const result = new Map<string, string>();
+    const quoteRisks = await tx.tQuoteRisk.findMany({
+      where: { IdeQuote: ideQuote },
+      orderBy: { NumRisk: 'asc' },
+      select: { IdeQuoteRisk: true, NumRisk: true, IdeRiskProduct: true, TQuoteRiskPlan: { where: { IndSelected: true }, select: { IdeQuoteRiskPlan: true } } },
+    });
+    const riskProducts = await tx.sRiskProduct.findMany({
+      where: { IdeRiskProduct: { in: quoteRisks.map((r) => r.IdeRiskProduct) } },
+      select: { IdeRiskProduct: true, SRiskType: { select: { IndPersonRisk: true } } },
+    });
+    const personRiskProducts = new Set(riskProducts.filter((r) => r.SRiskType.IndPersonRisk).map((r) => r.IdeRiskProduct));
+    const personRisks = quoteRisks.filter((r) => personRiskProducts.has(r.IdeRiskProduct) && r.TQuoteRiskPlan.length > 0);
+    if (personRisks.length === 0) return result;
+
+    const [product, holder, ideActive] = await Promise.all([
+      tx.sProduct.findUniqueOrThrow({ where: { IdeProduct: ideProduct }, select: { ObjInsuredPersonFields: true } }),
+      ideHolder ? tx.tPerson.findUnique({ where: { IdePerson: ideHolder }, select: { DesEmail: true } }) : Promise.resolve(null),
+      this.stateMachine.getStateByCode('ACTIVO'),
+    ]);
+    if (!holder) throw new BadRequestException('La cotización no tiene tomador: no se puede asignar el correo de los asegurados');
+    const config = resolveInsuredPersonConfig(product.ObjInsuredPersonFields);
+
+    for (const risk of personRisks) {
+      const label = `Riesgo nº ${risk.NumRisk}`;
+      const raw = riskPersons?.[risk.IdeQuoteRisk];
+      if (!raw) throw new BadRequestException(`${label}: faltan los datos de la persona asegurada`);
+      const person = parseInsuredPerson(raw, label);
+      assertInsuredPersonComplete(person, config, label);
+      result.set(risk.IdeQuoteRisk, await findOrCreateInsuredPerson(person, config, holder.DesEmail, ideActive, actor, tx));
+    }
+    return result;
+  }
+
   private async copyRisksAndCoverages(
     ideQuote: string,
     ideProduct: string,
@@ -2871,6 +2920,7 @@ export class ContractsService {
     tx: Prisma.TransactionClient = this.prisma,
     onlyIdeQuoteRisk?: string,
     contractRiskValues?: Record<string, Record<string, string>>,
+    insuredPersons?: Map<string, string>,
   ) {
     const quoteRisks = await tx.tQuoteRisk.findMany({
       where: { IdeQuote: ideQuote, ...(onlyIdeQuoteRisk ? { IdeQuoteRisk: onlyIdeQuoteRisk } : {}) },
@@ -2929,6 +2979,31 @@ export class ContractsService {
           TstModification: now,
         },
       });
+
+      const idePersonInsured = insuredPersons?.get(quoteRisk.IdeQuoteRisk);
+      if (idePersonInsured) {
+        const [rolInsured, ideActiveState] = await Promise.all([
+          tx.sPersonRol.findFirst({ where: { CodPersonRol: 'ASEGURADO' } }),
+          this.stateMachine.getStateByCode('ACTIVO'),
+        ]);
+        if (!rolInsured) throw new NotFoundException('No existe el rol de persona "ASEGURADO" (SPersonRol)');
+        await tx.tFileRiskPerson.create({
+          data: {
+            IdeFileRisk: fileRisk.IdeFileRisk,
+            IdePerson: idePersonInsured,
+            IdePersonRol: rolInsured.IdePersonRol,
+            IdeState: ideActiveState,
+            UsrCreation: actor,
+            TstCreation: now,
+            UsrModification: actor,
+            TstModification: now,
+          },
+        });
+        await tx.tPerson.update({
+          where: { IdePerson: idePersonInsured },
+          data: { IndClient: true, IndLead: false, TstRelationshipStart: now, UsrModification: actor, TstModification: now },
+        });
+      }
 
       const idePlanProduct = (
         await tx.sPlanProductRisk.findUnique({ where: { IdePlanProductRisk: selectedPlan.IdePlanProductRisk } })
@@ -4815,12 +4890,7 @@ export class ContractsService {
     actor: string,
     tx: Prisma.TransactionClient,
   ): Promise<void> {
-    if (dto.desEmail !== currentPerson.DesEmail) {
-      const emailTaken = await tx.tPerson.findFirst({ where: { DesEmail: dto.desEmail, NOT: { IdePerson: idePerson } } });
-      if (emailTaken) {
-        throw new ConflictException(`Ya existe una persona con el email "${dto.desEmail}"`);
-      }
-    }
+    // El correo puede repetirse entre personas; la identidad es el documento (se valida abajo).
     if (
       dto.numIdentification !== undefined &&
       dto.numIdentification !== currentPerson.NumIdentification &&

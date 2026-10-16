@@ -1378,6 +1378,7 @@ model SProduct {
   IndGenerateAllFraction  Boolean
   IndProportionalPrime    Boolean                   @default(true)
   IndMultiRisk            Boolean                   @default(false)
+  ObjInsuredPersonFields  Json?                     @db.Json
   TstInitial              DateTime                  @db.Date
   TstEnd                  DateTime?                 @db.Date
   IdeTextContent          String?                   @db.Uuid
@@ -1846,6 +1847,7 @@ model SRiskType {
   IdeRiskType     String         @id(map: "PK_SRiskType") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   CodRiskType     String         @unique(map: "UK_SRiskType_01") @db.VarChar(30)
   DesRiskType     String         @db.VarChar(200)
+  IndPersonRisk   Boolean        @default(false)
   IdeTextContent  String?        @db.Uuid
   IdeState        String         @db.Uuid
   UsrCreation     String         @db.VarChar(60)
@@ -2936,7 +2938,7 @@ model TPerson {
   DesMiddleName         String?                @db.VarChar(30)
   DesLastName1          String?                @db.VarChar(30)
   DesLastName2          String?                @db.VarChar(30)
-  DesEmail              String                 @unique(map: "UK_TPerson_02") @db.VarChar(60)
+  DesEmail              String                 @db.VarChar(60)
   IdeGender             String?                @db.Uuid
   TstBirthdate          DateTime?              @db.Date
   DesBirthPlace         String?                @db.VarChar(60)
@@ -2976,6 +2978,7 @@ model TPerson {
   TQuotePerson          TQuotePerson[]
 
   @@unique([IdeIdentificationType, NumIdentification], map: "UK_TPerson_01")
+  @@index([DesEmail], map: "IX_TPerson_DesEmail")
   @@index([IdeState], map: "IX_TPerson_SState")
 }
 

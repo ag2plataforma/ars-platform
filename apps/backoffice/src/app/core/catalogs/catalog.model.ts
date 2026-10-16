@@ -233,6 +233,7 @@ export const PRODUCT_CATALOG_REGISTRY: CatalogConfig[] = [
     codField: 'CodRiskType',
     desField: 'DesRiskType',
     idField: 'IdeRiskType',
+    extraFields: [{ key: 'indPersonRisk', label: 'catalogFields.indPersonRisk', type: 'boolean', required: true }],
   },
   {
     key: 'currencies',

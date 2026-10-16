@@ -3,6 +3,7 @@ import {
   IsDateString,
   IsInt,
   IsIn,
+  IsObject,
   IsOptional,
   IsString,
   Matches,
@@ -58,6 +59,14 @@ export class CreateProductDto {
   @IsOptional()
   @IsBoolean()
   indMultiRisk?: boolean;
+
+  /**
+   * Datos de la persona asegurada que se piden al contratar los riesgos de tipo persona:
+   * `{ firstName|middleName|lastName1|lastName2|document|birthdate|gender|maritalStatus|profession|birthPlace|email: 'NONE'|'OPTIONAL'|'REQUIRED' }`.
+   */
+  @IsOptional()
+  @IsObject()
+  insuredPersonFields?: Record<string, string>;
 
   @IsDateString()
   tstInitial!: string;

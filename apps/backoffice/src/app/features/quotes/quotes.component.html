@@ -975,6 +975,160 @@
           </div>
       </ng-template>
 
+      @for (item of insuredPersons(); track item.risk.ideQuoteRisk) {
+        <div class="flex flex-col gap-2 rounded-lg border border-slate-200 p-6">
+          <label class="text-sm font-medium text-slate-700">
+            {{ 'quotes.insuredPersonTitle' | transloco: { num: item.risk.numRisk, des: item.risk.desRisk } }}
+          </label>
+          <p class="text-xs text-slate-500">{{ 'quotes.insuredPersonHint' | transloco }}</p>
+          <div [formGroup]="item.form" class="grid grid-cols-2 gap-3 pt-1">
+            @if (insuredAsks('document')) {
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-slate-600">
+                  {{ 'quotes.insuredDocumentType' | transloco }}{{ insuredRequired('document') ? ' *' : '' }}
+                </label>
+                <p-select
+                  appendTo="body"
+                  formControlName="ideIdentificationType"
+                  [options]="identificationTypes()"
+                  optionLabel="DesIdentificationType"
+                  optionValue="IdeIdentificationType"
+                  [showClear]="!insuredRequired('document')"
+                  [placeholder]="'quotes.selectOptionPlaceholder' | transloco"
+                  styleClass="w-full"
+                />
+              </div>
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-slate-600">
+                  {{ 'quotes.insuredDocumentNumber' | transloco }}{{ insuredRequired('document') ? ' *' : '' }}
+                </label>
+                <div class="flex gap-2">
+                  <input pInputText type="text" formControlName="numIdentification" class="w-full" />
+                  <button
+                    pButton
+                    type="button"
+                    severity="secondary"
+                    [outlined]="true"
+                    icon="pi pi-search"
+                    [label]="'quotes.insuredSearchButton' | transloco"
+                    [loading]="insuredSearching() === item.risk.ideQuoteRisk"
+                    (click)="lookupInsured(item)"
+                  ></button>
+                </div>
+              </div>
+            }
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium text-slate-600">{{ 'quotes.insuredFirstName' | transloco }} *</label>
+              <input pInputText type="text" formControlName="desFirstName" />
+            </div>
+            @if (insuredAsks('middleName')) {
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-slate-600">
+                  {{ 'quotes.insuredMiddleName' | transloco }}{{ insuredRequired('middleName') ? ' *' : '' }}
+                </label>
+                <input pInputText type="text" formControlName="desMiddleName" />
+              </div>
+            }
+            @if (insuredAsks('lastName1')) {
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-slate-600">
+                  {{ 'quotes.insuredLastName1' | transloco }}{{ insuredRequired('lastName1') ? ' *' : '' }}
+                </label>
+                <input pInputText type="text" formControlName="desLastName1" />
+              </div>
+            }
+            @if (insuredAsks('lastName2')) {
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-slate-600">
+                  {{ 'quotes.insuredLastName2' | transloco }}{{ insuredRequired('lastName2') ? ' *' : '' }}
+                </label>
+                <input pInputText type="text" formControlName="desLastName2" />
+              </div>
+            }
+            @if (insuredAsks('birthdate')) {
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-slate-600">
+                  {{ 'quotes.insuredBirthdate' | transloco }}{{ insuredRequired('birthdate') ? ' *' : '' }}
+                </label>
+                <input pInputText type="date" formControlName="tstBirthdate" />
+              </div>
+            }
+            @if (insuredAsks('gender')) {
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-slate-600">
+                  {{ 'quotes.insuredGender' | transloco }}{{ insuredRequired('gender') ? ' *' : '' }}
+                </label>
+                <p-select
+                  appendTo="body"
+                  formControlName="ideGender"
+                  [options]="genders()"
+                  optionLabel="DesGender"
+                  optionValue="IdeGender"
+                  [showClear]="!insuredRequired('gender')"
+                  [placeholder]="'quotes.selectOptionPlaceholder' | transloco"
+                  styleClass="w-full"
+                />
+              </div>
+            }
+            @if (insuredAsks('maritalStatus')) {
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-slate-600">
+                  {{ 'quotes.insuredMaritalStatus' | transloco }}{{ insuredRequired('maritalStatus') ? ' *' : '' }}
+                </label>
+                <p-select
+                  appendTo="body"
+                  formControlName="ideMaritalStatus"
+                  [options]="maritalStatuses()"
+                  optionLabel="DesMaritalStatus"
+                  optionValue="IdeMaritalStatus"
+                  [showClear]="!insuredRequired('maritalStatus')"
+                  [placeholder]="'quotes.selectOptionPlaceholder' | transloco"
+                  styleClass="w-full"
+                />
+              </div>
+            }
+            @if (insuredAsks('profession')) {
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-slate-600">
+                  {{ 'quotes.insuredProfession' | transloco }}{{ insuredRequired('profession') ? ' *' : '' }}
+                </label>
+                <p-select
+                  appendTo="body"
+                  formControlName="ideProfession"
+                  [options]="professions()"
+                  optionLabel="DesProfession"
+                  optionValue="IdeProfession"
+                  [filter]="true"
+                  [showClear]="!insuredRequired('profession')"
+                  [placeholder]="'quotes.selectOptionPlaceholder' | transloco"
+                  styleClass="w-full"
+                />
+              </div>
+            }
+            @if (insuredAsks('birthPlace')) {
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-slate-600">
+                  {{ 'quotes.insuredBirthPlace' | transloco }}{{ insuredRequired('birthPlace') ? ' *' : '' }}
+                </label>
+                <input pInputText type="text" formControlName="desBirthPlace" />
+              </div>
+            }
+            @if (insuredAsks('email')) {
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-slate-600">
+                  {{ 'quotes.insuredEmail' | transloco }}{{ insuredRequired('email') ? ' *' : '' }}
+                </label>
+                <input pInputText type="email" formControlName="desEmail" />
+                <span class="text-xs text-slate-400">{{ 'quotes.insuredEmailHint' | transloco }}</span>
+              </div>
+            }
+          </div>
+          @if (item.form.touched && item.form.invalid) {
+            <span class="text-xs text-red-600">{{ 'quotes.insuredIncomplete' | transloco }}</span>
+          }
+        </div>
+      }
+
       @for (item of contractRiskFields(); track item.risk.ideQuoteRisk) {
         <div class="flex flex-col gap-2 rounded-lg border border-slate-200 p-6">
           <label class="text-sm font-medium text-slate-700">

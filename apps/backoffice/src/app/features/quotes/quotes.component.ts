@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { FormBuilder, FormsModule, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { Observable, concat, forkJoin, last, of, shareReplay } from 'rxjs';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
@@ -37,6 +37,11 @@ import { downloadBlob } from '../../core/files/file.util';
 import { DocumentTemplatesService } from '../documents/document-templates.service';
 import { PaymentFractionPickerComponent } from './payment-fraction-picker.component';
 import {
+  InsuredPersonConfig,
+  InsuredPersonField,
+  resolveInsuredPersonConfig,
+} from '../products/insured-person-fields';
+import {
   ProcessFlowResolution,
   RiskAttributeField,
   RiskAttributeSchema,
@@ -48,6 +53,10 @@ const PRODUCTS_PATH = '/product-rating/products';
 const DISTRIBUTION_CHANNELS_PATH = '/party/distribution-channels';
 const DISTRIBUTION_WAYS_PATH = '/party/distribution-ways';
 const RISK_PRODUCTS_PATH = '/product-rating/risk-products';
+const IDENTIFICATION_TYPES_PATH = '/reference-data/identification-types';
+const GENDERS_PATH = '/reference-data/genders';
+const MARITAL_STATUSES_PATH = '/reference-data/marital-statuses';
+const PROFESSIONS_PATH = '/reference-data/professions';
 
 type QuoteStep = 'form' | 'plans' | 'adjustments' | 'socialImpact' | 'persons' | 'requirements' | 'summary' | 'contract';
 
@@ -1366,10 +1375,108 @@ export class QuotesComponent {
   /** Campos de RIESGO de etapa CONTRACT, por riesgo de la cotizacion (solo los que tienen alguno). */
   readonly contractRiskFields = signal<Array<{ risk: QuoteRisk; state: RiskFieldsState }>>([]);
 
+  /** Asegurados de los riesgos de tipo persona (`SRiskType.IndPersonRisk`): datos minimos que pide el producto. */
+  readonly insuredPersons = signal<Array<{ risk: QuoteRisk; form: FormGroup }>>([]);
+  readonly insuredConfig = signal<InsuredPersonConfig>(resolveInsuredPersonConfig(null));
+  readonly identificationTypes = signal<CatalogRow[]>([]);
+  readonly genders = signal<CatalogRow[]>([]);
+  readonly maritalStatuses = signal<CatalogRow[]>([]);
+  readonly professions = signal<CatalogRow[]>([]);
+  private insuredCatalogsLoaded = false;
+  readonly insuredSearching = signal<string | null>(null);
+
+  /** `true` si el producto pide ese dato del asegurado (OPCIONAL u OBLIGATORIO). */
+  insuredAsks(field: InsuredPersonField): boolean {
+    return this.insuredConfig()[field] !== 'NONE';
+  }
+
+  insuredRequired(field: InsuredPersonField): boolean {
+    return this.insuredConfig()[field] === 'REQUIRED';
+  }
+
+  private isPersonRisk(ideRiskProduct: string): boolean {
+    const row = this.allRiskProducts.find((r) => r['IdeRiskProduct'] === ideRiskProduct);
+    const riskType = row?.['SRiskType'] as Record<string, unknown> | undefined;
+    return riskType?.['IndPersonRisk'] === true;
+  }
+
+  private buildInsuredForm(config: InsuredPersonConfig): FormGroup {
+    const req = (field: InsuredPersonField): ValidatorFn[] => (config[field] === 'REQUIRED' ? [Validators.required] : []);
+    const group = this.fb.group({});
+    const add = (name: string, validators: ValidatorFn[] = []) => group.addControl(name, this.fb.control('', validators));
+    add('desFirstName', [Validators.required, Validators.maxLength(30)]);
+    if (config.middleName !== 'NONE') add('desMiddleName', [...req('middleName'), Validators.maxLength(30)]);
+    if (config.lastName1 !== 'NONE') add('desLastName1', [...req('lastName1'), Validators.maxLength(30)]);
+    if (config.lastName2 !== 'NONE') add('desLastName2', [...req('lastName2'), Validators.maxLength(30)]);
+    if (config.document !== 'NONE') {
+      add('ideIdentificationType', req('document'));
+      add('numIdentification', [...req('document'), Validators.maxLength(60)]);
+    }
+    if (config.birthdate !== 'NONE') add('tstBirthdate', req('birthdate'));
+    if (config.gender !== 'NONE') add('ideGender', req('gender'));
+    if (config.maritalStatus !== 'NONE') add('ideMaritalStatus', req('maritalStatus'));
+    if (config.profession !== 'NONE') add('ideProfession', req('profession'));
+    if (config.birthPlace !== 'NONE') add('desBirthPlace', [...req('birthPlace'), Validators.maxLength(60)]);
+    if (config.email !== 'NONE') add('desEmail', [...req('email'), Validators.email, Validators.maxLength(60)]);
+    return group;
+  }
+
+  private loadInsuredPersons(): void {
+    this.insuredPersons.set([]);
+    const pricing = this.pricing();
+    if (!pricing || pricing.contract) return;
+    const personRisks = pricing.risks.filter((risk) => this.isPersonRisk(risk.ideRiskProduct));
+    if (personRisks.length === 0) return;
+    const product = this.products().find((p) => p['CodProduct'] === pricing.codProduct);
+    const config = resolveInsuredPersonConfig(product?.['ObjInsuredPersonFields']);
+    this.insuredConfig.set(config);
+    this.insuredPersons.set(
+      personRisks.map((risk) => ({ risk, form: this.buildInsuredForm(config) })).sort((a, b) => a.risk.numRisk - b.risk.numRisk),
+    );
+    if (!this.insuredCatalogsLoaded) {
+      this.insuredCatalogsLoaded = true;
+      this.catalogService.list(IDENTIFICATION_TYPES_PATH).subscribe({ next: (rows) => this.identificationTypes.set(rows) });
+      this.catalogService.list(GENDERS_PATH).subscribe({ next: (rows) => this.genders.set(rows) });
+      this.catalogService.list(MARITAL_STATUSES_PATH).subscribe({ next: (rows) => this.maritalStatuses.set(rows) });
+      this.catalogService.list(PROFESSIONS_PATH).subscribe({ next: (rows) => this.professions.set(rows) });
+    }
+  }
+
+  /** Precarga nombre/apellidos/correo de una persona ya registrada con ese documento (si existe; si no, se creara al contratar). */
+  lookupInsured(item: { risk: QuoteRisk; form: FormGroup }): void {
+    const num = String(item.form.get('numIdentification')?.value ?? '').trim();
+    if (!num) return;
+    this.insuredSearching.set(item.risk.ideQuoteRisk);
+    this.persons.lookup({ numIdentification: num }).subscribe({
+      next: (person) => {
+        this.insuredSearching.set(null);
+        const patch: Record<string, string> = { desFirstName: person.DesFirstName };
+        if (person.DesMiddleName) patch['desMiddleName'] = person.DesMiddleName;
+        if (person.DesLastName1) patch['desLastName1'] = person.DesLastName1;
+        if (person.DesLastName2) patch['desLastName2'] = person.DesLastName2;
+        for (const [key, value] of Object.entries(patch)) item.form.get(key)?.setValue(value);
+        this.messages.add({
+          severity: 'info',
+          summary: this.transloco.translate('quotes.insuredFoundSummary'),
+          detail: this.transloco.translate('quotes.insuredFoundDetail'),
+        });
+      },
+      error: () => {
+        this.insuredSearching.set(null);
+        this.messages.add({
+          severity: 'info',
+          summary: this.transloco.translate('quotes.insuredNotFoundSummary'),
+          detail: this.transloco.translate('quotes.insuredNotFoundDetail'),
+        });
+      },
+    });
+  }
+
   private loadContractFields(): void {
     for (const key of Object.keys(this.contractFields.form.controls)) this.contractFields.form.removeControl(key);
     this.contractFields.fields.set([]);
     this.contractRiskFields.set([]);
+    this.loadInsuredPersons();
     const ideProduct = this.pricing()?.ideProduct;
     if (!ideProduct || this.pricing()?.contract) {
       this.contractFields.loading.set(false);
@@ -1424,21 +1531,39 @@ export class QuotesComponent {
   generateContract(): void {
     if (!this.ideQuote) return;
     const riskStates = this.contractRiskFields();
+    const insured = this.insuredPersons();
     if (
       this.contractFields.loading() ||
       this.contractFields.form.invalid ||
-      riskStates.some(({ state }) => state.form.invalid)
+      riskStates.some(({ state }) => state.form.invalid) ||
+      insured.some(({ form }) => form.invalid)
     ) {
       this.contractFields.form.markAllAsTouched();
       for (const { state } of riskStates) state.form.markAllAsTouched();
+      for (const { form } of insured) form.markAllAsTouched();
       return;
+    }
+    const riskPersons: Record<string, Record<string, string>> = {};
+    for (const { risk, form } of insured) {
+      const values: Record<string, string> = {};
+      for (const [key, value] of Object.entries(form.getRawValue() as Record<string, unknown>)) {
+        const text = String(value ?? '').trim();
+        if (text) values[key] = text;
+      }
+      riskPersons[risk.ideQuoteRisk] = values;
     }
     const riskValues: Record<string, Record<string, unknown>> = {};
     for (const { risk, state } of riskStates) riskValues[risk.ideQuoteRisk] = state.form.getRawValue();
     const generic = this.contractFields.fields().length > 0 ? this.contractFields.form.getRawValue() : undefined;
     this.contracting.set(true);
     this.quoting
-      .createContract(this.ideQuote, this.paymentFraction() || undefined, generic, riskStates.length > 0 ? riskValues : undefined)
+      .createContract(
+        this.ideQuote,
+        this.paymentFraction() || undefined,
+        generic,
+        riskStates.length > 0 ? riskValues : undefined,
+        insured.length > 0 ? riskPersons : undefined,
+      )
       .subscribe({
       next: (result) => {
         this.contracting.set(false);

@@ -261,15 +261,28 @@ export class CollectiveQuotesService {
       throw new Error('si se indica el documento hay que indicar también su tipo');
     }
 
-    const byEmail = await tx.tPerson.findFirst({ where: { DesEmail: { equals: email, mode: 'insensitive' } } });
-    const byDoc =
-      numIdentification && ideIdentificationType
-        ? await tx.tPerson.findFirst({ where: { IdeIdentificationType: ideIdentificationType, NumIdentification: numIdentification } })
-        : null;
-    if (byEmail && byDoc && byEmail.IdePerson !== byDoc.IdePerson) {
-      throw new Error(`el correo ${email} pertenece a una persona distinta de la del documento ${numIdentification}`);
+    // Identidad = documento (tipo + numero). Si no hay documento, se reutiliza
+    // solo si coincide correo + nombre (+ fecha de nacimiento si se indica);
+    // un correo compartido por si solo NO identifica a nadie (familias).
+    if (numIdentification && ideIdentificationType) {
+      const byDoc = await tx.tPerson.findFirst({
+        where: { IdeIdentificationType: ideIdentificationType, NumIdentification: numIdentification },
+      });
+      if (byDoc) return byDoc.IdePerson;
+    } else {
+      const sameNameAndEmail = await tx.tPerson.findFirst({
+        where: {
+          DesEmail: { equals: email, mode: 'insensitive' },
+          DesFirstName: { equals: insured.desFirstName.trim(), mode: 'insensitive' },
+          ...(insured.desLastName1?.trim()
+            ? { DesLastName1: { equals: insured.desLastName1.trim(), mode: 'insensitive' as const } }
+            : {}),
+          ...(insured.tstBirthdate ? { TstBirthdate: new Date(insured.tstBirthdate) } : {}),
+          NumIdentification: null,
+        },
+      });
+      if (sameNameAndEmail) return sameNameAndEmail.IdePerson;
     }
-    if (byEmail || byDoc) return (byEmail ?? byDoc)!.IdePerson;
 
     let birthdate: Date | undefined;
     if (insured.tstBirthdate) {

@@ -244,7 +244,8 @@
     "codClaimType": "Tipo de siniestro",
     "numFraction": "Cantidad de cuotas",
     "numOrder": "Orden (la menor es la de por defecto)",
-    "indAnnual": "¿Vigencia anual?"
+    "indAnnual": "¿Vigencia anual?",
+    "indPersonRisk": "¿El riesgo es una persona?"
   },
   "common": {
     "error": "Error",
@@ -749,6 +750,26 @@
       "saveButton": "Guardar tramos",
       "incomplete": "Completá \"desde\" y la prima de todos los tramos.",
       "saved": "Tramos guardados."
+    },
+    "insuredFieldsTitle": "Datos de la persona asegurada",
+    "insuredFieldsHelp": "Solo para productos cuyos riesgos son personas (tipo de riesgo marcado como «Persona»). Indica qué datos se piden de cada asegurado al contratar. Por defecto: nombre, primer apellido, documento y fecha de nacimiento. Si no se pide correo, se usa el del tomador.",
+    "insuredMode": {
+      "NONE": "No pedir",
+      "OPTIONAL": "Opcional",
+      "REQUIRED": "Obligatorio"
+    },
+    "insuredField": {
+      "firstName": "Nombre",
+      "middleName": "Segundo nombre",
+      "lastName1": "Primer apellido",
+      "lastName2": "Segundo apellido",
+      "document": "Documento (tipo y número)",
+      "birthdate": "Fecha de nacimiento",
+      "gender": "Sexo",
+      "maritalStatus": "Estado civil",
+      "profession": "Profesión",
+      "birthPlace": "Lugar de nacimiento",
+      "email": "Correo"
     }
   },
   "quotes": {
@@ -866,7 +887,28 @@
     "unitMonth": "mes",
     "unitDay": "día",
     "unitPeriodTotal": "total del periodo",
-    "breakdownToggle": "Ver desglose del cálculo"
+    "breakdownToggle": "Ver desglose del cálculo",
+    "insuredPersonTitle": "Persona asegurada — riesgo {{num}}: {{des}}",
+    "insuredPersonHint": "Datos de la persona asegurada. Se identifica por su documento: si ya existe en el sistema se reutiliza; si no, se crea. Los campos marcados con * son obligatorios.",
+    "insuredDocumentType": "Tipo de documento",
+    "insuredDocumentNumber": "Número de documento",
+    "insuredSearchButton": "Buscar",
+    "insuredFirstName": "Nombre",
+    "insuredMiddleName": "Segundo nombre",
+    "insuredLastName1": "Primer apellido",
+    "insuredLastName2": "Segundo apellido",
+    "insuredBirthdate": "Fecha de nacimiento",
+    "insuredGender": "Sexo",
+    "insuredMaritalStatus": "Estado civil",
+    "insuredProfession": "Profesión",
+    "insuredBirthPlace": "Lugar de nacimiento",
+    "insuredEmail": "Correo",
+    "insuredEmailHint": "Si lo dejas vacío se usa el correo del tomador.",
+    "insuredIncomplete": "Completa los datos obligatorios de la persona asegurada.",
+    "insuredFoundSummary": "Persona encontrada",
+    "insuredFoundDetail": "Ya existe una persona con ese documento; se reutilizará al contratar.",
+    "insuredNotFoundSummary": "Persona nueva",
+    "insuredNotFoundDetail": "No hay ninguna persona con ese documento; se creará al contratar."
   },
   "quotesList": {
     "title": "Cotizaciones",

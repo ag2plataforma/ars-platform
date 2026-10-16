@@ -513,11 +513,13 @@ export class QuotingService {
     codPaymentFraction?: string,
     genericAttributeValue?: Record<string, unknown>,
     riskAttributeValues?: Record<string, Record<string, unknown>>,
+    riskPersons?: Record<string, Record<string, string>>,
   ): Observable<CreateContractResponse> {
     return this.http.post<CreateContractResponse>(`${this.base}/${ideQuote}/contract`, {
       ...(codPaymentFraction ? { codPaymentFraction } : {}),
       ...(genericAttributeValue ? { genericAttributeValue } : {}),
       ...(riskAttributeValues ? { riskAttributeValues } : {}),
+      ...(riskPersons ? { riskPersons } : {}),
     });
   }
 

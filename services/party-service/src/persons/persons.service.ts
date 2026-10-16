@@ -510,12 +510,9 @@ export class PersonsService {
     ideIdentificationType?: string,
     excludeId?: string,
   ): Promise<void> {
-    if (desEmail) {
-      const existing = await this.prisma.tPerson.findFirst({ where: { DesEmail: desEmail } });
-      if (existing && existing.IdePerson !== excludeId) {
-        throw new ConflictException(`Ya existe una persona con el email "${desEmail}"`);
-      }
-    }
+    // El correo ya NO identifica a la persona (puede repetirse: menores con el
+    // correo de un padre, familias, etc.). La identidad es el documento.
+    void desEmail;
     if (numIdentification && ideIdentificationType) {
       const existing = await this.prisma.tPerson.findFirst({
         where: { NumIdentification: numIdentification, IdeIdentificationType: ideIdentificationType },

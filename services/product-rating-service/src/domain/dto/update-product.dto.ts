@@ -1,4 +1,4 @@
-import { IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString } from 'class-validator';
+import { IsObject, IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString } from 'class-validator';
 
 export class UpdateProductDto {
   @IsOptional()
@@ -45,6 +45,14 @@ export class UpdateProductDto {
   @IsOptional()
   @IsBoolean()
   indMultiRisk?: boolean;
+
+  /**
+   * Datos de la persona asegurada que se piden al contratar los riesgos de tipo persona:
+   * `{ firstName|middleName|lastName1|lastName2|document|birthdate|gender|maritalStatus|profession|birthPlace|email: 'NONE'|'OPTIONAL'|'REQUIRED' }`.
+   */
+  @IsOptional()
+  @IsObject()
+  insuredPersonFields?: Record<string, string>;
 
   @IsOptional()
   @IsDateString()

@@ -1,4 +1,5 @@
 import { IsDateString, IsObject, IsOptional, IsString } from 'class-validator';
+import { InsuredPersonDto } from './insured-person.dto';
 
 /**
  * Parámetros opcionales de `FContract('CONTRACTNEW', ...)` -- la cotización
@@ -40,4 +41,13 @@ export class CreateContractDto {
   @IsOptional()
   @IsObject()
   riskAttributeValues?: Record<string, Record<string, string>>;
+
+  /**
+   * Personas aseguradas de los riesgos de tipo persona (`SRiskType.IndPersonRisk`), por riesgo de la
+   * cotizacion: `{ "<IdeQuoteRisk>": { ...datos de la persona } }`. Se buscan por documento o se crean,
+   * y se vinculan al riesgo del certificado (`TFileRiskPerson`, rol ASEGURADO).
+   */
+  @IsOptional()
+  @IsObject()
+  riskPersons?: Record<string, InsuredPersonDto>;
 }

@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, PrismaService, SProduct } from '@ars-platform/database';
 import { StateMachineService } from '@ars-platform/shared-common';
 import { CatalogCrudService } from '@ars-platform/shared-common';
@@ -115,6 +115,7 @@ export class ProductsService {
       extra.IndProportionalPrime = dto.indProportionalPrime;
     }
     if (dto.indMultiRisk !== undefined) extra.IndMultiRisk = dto.indMultiRisk;
+    if (dto.insuredPersonFields !== undefined) extra.ObjInsuredPersonFields = this.validateInsuredPersonFields(dto.insuredPersonFields);
     if (dto.tstInitial !== undefined) extra.TstInitial = new Date(dto.tstInitial);
     if (dto.tstEnd !== undefined) extra.TstEnd = new Date(dto.tstEnd);
 
@@ -137,5 +138,19 @@ export class ProductsService {
       extra.IdeCurrency = currency.IdeCurrency;
     }
     return extra;
+  }
+
+  private validateInsuredPersonFields(raw: Record<string, string>): Record<string, string> {
+    const allowedFields = ['firstName', 'middleName', 'lastName1', 'lastName2', 'document', 'birthdate', 'gender', 'maritalStatus', 'profession', 'birthPlace', 'email'];
+    const result: Record<string, string> = {};
+    for (const [field, mode] of Object.entries(raw)) {
+      if (!allowedFields.includes(field)) throw new BadRequestException(`Campo de persona desconocido "${field}"`);
+      if (mode !== 'NONE' && mode !== 'OPTIONAL' && mode !== 'REQUIRED') {
+        throw new BadRequestException(`Modo inválido "${mode}" para "${field}" (NONE, OPTIONAL o REQUIRED)`);
+      }
+      result[field] = mode;
+    }
+    result.firstName = 'REQUIRED';
+    return result;
   }
 }

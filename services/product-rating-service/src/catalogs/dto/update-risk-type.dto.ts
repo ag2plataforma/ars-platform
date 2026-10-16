@@ -1,7 +1,11 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsOptional, IsString } from 'class-validator';
 
 export class UpdateRiskTypeDto {
   @IsOptional()
   @IsString()
   desRiskType?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  indPersonRisk?: boolean;
 }
