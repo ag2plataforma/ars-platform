@@ -254,7 +254,7 @@ export class ContractsService {
           const contractFile = await this.createContractFile(contract, actor, tx, 1, fileGenericValues as Prisma.JsonObject);
           await this.createInitialContractOperation(contract.IdeContract, actor, tx);
 
-          const insuredPersons = await this.resolveInsuredPersons(quote.IdeQuote, quote.IdeProduct, quote.IdePerson, dto.riskPersons, actor, tx);
+          const insuredPersons = await this.resolveInsuredPersons(quote.IdeQuote, quote.IdePerson, dto.riskPersons, actor, tx);
           const riskCoverages = await this.copyRisksAndCoverages(
             quote.IdeQuote,
             contract.IdeProduct,
@@ -2868,12 +2868,11 @@ export class ContractsService {
 
   /**
    * Riesgos de tipo persona (`SRisk.IndPersonRisk`): busca (por documento) o crea la persona
-   * asegurada de cada uno con los datos que el producto pide (`SProduct.ObjInsuredPersonFields`).
+   * asegurada de cada uno con los datos que pide su riesgo de producto (`SRiskProduct.ObjInsuredPersonFields`).
    * Devuelve `IdeQuoteRisk -> IdePerson`. Si falta la persona de un riesgo de tipo persona, 400.
    */
   private async resolveInsuredPersons(
     ideQuote: string,
-    ideProduct: string,
     ideHolder: string | null,
     riskPersons: Record<string, unknown> | undefined,
     actor: string,
@@ -2887,25 +2886,27 @@ export class ContractsService {
     });
     const riskProducts = await tx.sRiskProduct.findMany({
       where: { IdeRiskProduct: { in: quoteRisks.map((r) => r.IdeRiskProduct) } },
-      select: { IdeRiskProduct: true, SRisk: { select: { IndPersonRisk: true } } },
+      select: { IdeRiskProduct: true, ObjInsuredPersonFields: true, SRisk: { select: { IndPersonRisk: true } } },
     });
-    const personRiskProducts = new Set(riskProducts.filter((r) => r.SRisk.IndPersonRisk).map((r) => r.IdeRiskProduct));
+    // Datos de persona que pide cada riesgo del producto (`SRiskProduct.ObjInsuredPersonFields`, null = minimo por defecto).
+    const personRiskProducts = new Map(
+      riskProducts.filter((r) => r.SRisk.IndPersonRisk).map((r) => [r.IdeRiskProduct, resolveInsuredPersonConfig(r.ObjInsuredPersonFields)]),
+    );
     const personRisks = quoteRisks.filter((r) => personRiskProducts.has(r.IdeRiskProduct) && r.TQuoteRiskPlan.length > 0);
     if (personRisks.length === 0) return result;
 
-    const [product, holder, ideActive] = await Promise.all([
-      tx.sProduct.findUniqueOrThrow({ where: { IdeProduct: ideProduct }, select: { ObjInsuredPersonFields: true } }),
+    const [holder, ideActive] = await Promise.all([
       ideHolder ? tx.tPerson.findUnique({ where: { IdePerson: ideHolder }, select: { DesEmail: true } }) : Promise.resolve(null),
       this.stateMachine.getStateByCode('ACTIVO'),
     ]);
     if (!holder) throw new BadRequestException('La cotización no tiene tomador: no se puede asignar el correo de los asegurados');
-    const config = resolveInsuredPersonConfig(product.ObjInsuredPersonFields);
 
     for (const risk of personRisks) {
       const label = `Riesgo nº ${risk.NumRisk}`;
       const raw = riskPersons?.[risk.IdeQuoteRisk];
       if (!raw) throw new BadRequestException(`${label}: faltan los datos de la persona asegurada`);
       const person = parseInsuredPerson(raw, label);
+      const config = personRiskProducts.get(risk.IdeRiskProduct)!;
       assertInsuredPersonComplete(person, config, label);
       result.set(risk.IdeQuoteRisk, await findOrCreateInsuredPerson(person, config, holder.DesEmail, ideActive, actor, tx));
     }

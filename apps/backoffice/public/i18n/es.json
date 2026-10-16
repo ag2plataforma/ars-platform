@@ -752,7 +752,7 @@
       "saved": "Tramos guardados."
     },
     "insuredFieldsTitle": "Datos de la persona asegurada",
-    "insuredFieldsHelp": "Solo para productos cuyos riesgos son personas (riesgo marcado como «¿El riesgo es una persona?» en Catálogos > Riesgos). Indica qué datos se piden de cada asegurado al contratar. Por defecto: nombre, primer apellido, documento y fecha de nacimiento. Si no se pide correo, se usa el del tomador.",
+    "insuredFieldsHelp": "Este riesgo es una persona. Indica qué datos de cada asegurado se piden al contratar. Por defecto: nombre, primer apellido, documento y fecha de nacimiento. Si no se pide correo, se usa el del tomador.",
     "insuredMode": {
       "NONE": "No pedir",
       "OPTIONAL": "Opcional",

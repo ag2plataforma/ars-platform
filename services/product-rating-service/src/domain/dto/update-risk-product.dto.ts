@@ -1,4 +1,4 @@
-import { IsDateString, IsOptional, IsString } from 'class-validator';
+import { IsDateString, IsObject, IsOptional, IsString } from 'class-validator';
 
 export class UpdateRiskProductDto {
   @IsOptional()
@@ -32,4 +32,12 @@ export class UpdateRiskProductDto {
   @IsOptional()
   @IsDateString()
   tstEnd?: string;
+
+  /**
+   * Datos de la persona asegurada que se piden al contratar este riesgo (solo si el riesgo es de tipo persona):
+   * `{ firstName|middleName|lastName1|lastName2|document|birthdate|gender|maritalStatus|profession|birthPlace|email: 'NONE'|'OPTIONAL'|'REQUIRED' }`.
+   */
+  @IsOptional()
+  @IsObject()
+  insuredPersonFields?: Record<string, string>;
 }

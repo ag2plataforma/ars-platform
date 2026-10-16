@@ -1378,7 +1378,6 @@ model SProduct {
   IndGenerateAllFraction  Boolean
   IndProportionalPrime    Boolean                   @default(true)
   IndMultiRisk            Boolean                   @default(false)
-  ObjInsuredPersonFields  Json?                     @db.Json
   TstInitial              DateTime                  @db.Date
   TstEnd                  DateTime?                 @db.Date
   IdeTextContent          String?                   @db.Uuid
@@ -1800,6 +1799,7 @@ model SRiskProduct {
   IdeProduct          String                @db.Uuid
   IdeRisk             String                @db.Uuid
   IdeRiskType         String                @db.Uuid
+  ObjInsuredPersonFields Json?              @db.Json
   TstInitial          DateTime              @db.Timestamp(6)
   TstEnd              DateTime?             @db.Timestamp(6)
   IdeTextContent      String?               @db.Uuid

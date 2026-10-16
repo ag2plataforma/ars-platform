@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, PrismaService, SRiskProduct } from '@ars-platform/database';
 import { StateMachineService } from '@ars-platform/shared-common';
 import { CreateRiskProductDto } from './dto/create-risk-product.dto';
@@ -57,6 +57,9 @@ export class RiskProductsService {
         IdeProduct: ideProduct,
         IdeRisk: ideRisk,
         IdeRiskType: ideRiskType,
+        ...(dto.insuredPersonFields !== undefined
+          ? { ObjInsuredPersonFields: this.validateInsuredPersonFields(dto.insuredPersonFields) }
+          : {}),
         TstInitial: new Date(dto.tstInitial),
         TstEnd: dto.tstEnd ? new Date(dto.tstEnd) : undefined,
         IdeState: activeStateId,
@@ -84,6 +87,9 @@ export class RiskProductsService {
     if (dto.codProduct !== undefined) data.IdeProduct = await this.resolveProduct(dto.codProduct);
     if (dto.codRisk !== undefined) data.IdeRisk = await this.resolveRisk(dto.codRisk);
     if (dto.codRiskType !== undefined) data.IdeRiskType = await this.resolveRiskType(dto.codRiskType);
+    if (dto.insuredPersonFields !== undefined) {
+      data.ObjInsuredPersonFields = this.validateInsuredPersonFields(dto.insuredPersonFields);
+    }
 
     return this.prisma.sRiskProduct.update({
       where: { IdeRiskProduct: id },
@@ -124,5 +130,19 @@ export class RiskProductsService {
       throw new NotFoundException(`No existe tipo de riesgo con código "${codRiskType}"`);
     }
     return riskType.IdeRiskType;
+  }
+
+  private validateInsuredPersonFields(raw: Record<string, string>): Prisma.InputJsonObject {
+    const allowedFields = ['firstName', 'middleName', 'lastName1', 'lastName2', 'document', 'birthdate', 'gender', 'maritalStatus', 'profession', 'birthPlace', 'email'];
+    const result: Record<string, string> = {};
+    for (const [field, mode] of Object.entries(raw)) {
+      if (!allowedFields.includes(field)) throw new BadRequestException(`Campo de persona desconocido "${field}"`);
+      if (mode !== 'NONE' && mode !== 'OPTIONAL' && mode !== 'REQUIRED') {
+        throw new BadRequestException(`Modo inválido "${mode}" para "${field}" (NONE, OPTIONAL o REQUIRED)`);
+      }
+      result[field] = mode;
+    }
+    result.firstName = 'REQUIRED';
+    return result;
   }
 }

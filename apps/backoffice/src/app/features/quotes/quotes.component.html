@@ -982,10 +982,10 @@
           </label>
           <p class="text-xs text-slate-500">{{ 'quotes.insuredPersonHint' | transloco }}</p>
           <div [formGroup]="item.form" class="grid grid-cols-2 gap-3 pt-1">
-            @if (insuredAsks('document')) {
+            @if (insuredAsks(item, 'document')) {
               <div class="flex flex-col gap-1">
                 <label class="text-xs font-medium text-slate-600">
-                  {{ 'quotes.insuredDocumentType' | transloco }}{{ insuredRequired('document') ? ' *' : '' }}
+                  {{ 'quotes.insuredDocumentType' | transloco }}{{ insuredRequired(item, 'document') ? ' *' : '' }}
                 </label>
                 <p-select
                   appendTo="body"
@@ -993,14 +993,14 @@
                   [options]="identificationTypes()"
                   optionLabel="DesIdentificationType"
                   optionValue="IdeIdentificationType"
-                  [showClear]="!insuredRequired('document')"
+                  [showClear]="!insuredRequired(item, 'document')"
                   [placeholder]="'quotes.selectOptionPlaceholder' | transloco"
                   styleClass="w-full"
                 />
               </div>
               <div class="flex flex-col gap-1">
                 <label class="text-xs font-medium text-slate-600">
-                  {{ 'quotes.insuredDocumentNumber' | transloco }}{{ insuredRequired('document') ? ' *' : '' }}
+                  {{ 'quotes.insuredDocumentNumber' | transloco }}{{ insuredRequired(item, 'document') ? ' *' : '' }}
                 </label>
                 <div class="flex gap-2">
                   <input pInputText type="text" formControlName="numIdentification" class="w-full" />
@@ -1021,42 +1021,42 @@
               <label class="text-xs font-medium text-slate-600">{{ 'quotes.insuredFirstName' | transloco }} *</label>
               <input pInputText type="text" formControlName="desFirstName" />
             </div>
-            @if (insuredAsks('middleName')) {
+            @if (insuredAsks(item, 'middleName')) {
               <div class="flex flex-col gap-1">
                 <label class="text-xs font-medium text-slate-600">
-                  {{ 'quotes.insuredMiddleName' | transloco }}{{ insuredRequired('middleName') ? ' *' : '' }}
+                  {{ 'quotes.insuredMiddleName' | transloco }}{{ insuredRequired(item, 'middleName') ? ' *' : '' }}
                 </label>
                 <input pInputText type="text" formControlName="desMiddleName" />
               </div>
             }
-            @if (insuredAsks('lastName1')) {
+            @if (insuredAsks(item, 'lastName1')) {
               <div class="flex flex-col gap-1">
                 <label class="text-xs font-medium text-slate-600">
-                  {{ 'quotes.insuredLastName1' | transloco }}{{ insuredRequired('lastName1') ? ' *' : '' }}
+                  {{ 'quotes.insuredLastName1' | transloco }}{{ insuredRequired(item, 'lastName1') ? ' *' : '' }}
                 </label>
                 <input pInputText type="text" formControlName="desLastName1" />
               </div>
             }
-            @if (insuredAsks('lastName2')) {
+            @if (insuredAsks(item, 'lastName2')) {
               <div class="flex flex-col gap-1">
                 <label class="text-xs font-medium text-slate-600">
-                  {{ 'quotes.insuredLastName2' | transloco }}{{ insuredRequired('lastName2') ? ' *' : '' }}
+                  {{ 'quotes.insuredLastName2' | transloco }}{{ insuredRequired(item, 'lastName2') ? ' *' : '' }}
                 </label>
                 <input pInputText type="text" formControlName="desLastName2" />
               </div>
             }
-            @if (insuredAsks('birthdate')) {
+            @if (insuredAsks(item, 'birthdate')) {
               <div class="flex flex-col gap-1">
                 <label class="text-xs font-medium text-slate-600">
-                  {{ 'quotes.insuredBirthdate' | transloco }}{{ insuredRequired('birthdate') ? ' *' : '' }}
+                  {{ 'quotes.insuredBirthdate' | transloco }}{{ insuredRequired(item, 'birthdate') ? ' *' : '' }}
                 </label>
                 <input pInputText type="date" formControlName="tstBirthdate" />
               </div>
             }
-            @if (insuredAsks('gender')) {
+            @if (insuredAsks(item, 'gender')) {
               <div class="flex flex-col gap-1">
                 <label class="text-xs font-medium text-slate-600">
-                  {{ 'quotes.insuredGender' | transloco }}{{ insuredRequired('gender') ? ' *' : '' }}
+                  {{ 'quotes.insuredGender' | transloco }}{{ insuredRequired(item, 'gender') ? ' *' : '' }}
                 </label>
                 <p-select
                   appendTo="body"
@@ -1064,16 +1064,16 @@
                   [options]="genders()"
                   optionLabel="DesGender"
                   optionValue="IdeGender"
-                  [showClear]="!insuredRequired('gender')"
+                  [showClear]="!insuredRequired(item, 'gender')"
                   [placeholder]="'quotes.selectOptionPlaceholder' | transloco"
                   styleClass="w-full"
                 />
               </div>
             }
-            @if (insuredAsks('maritalStatus')) {
+            @if (insuredAsks(item, 'maritalStatus')) {
               <div class="flex flex-col gap-1">
                 <label class="text-xs font-medium text-slate-600">
-                  {{ 'quotes.insuredMaritalStatus' | transloco }}{{ insuredRequired('maritalStatus') ? ' *' : '' }}
+                  {{ 'quotes.insuredMaritalStatus' | transloco }}{{ insuredRequired(item, 'maritalStatus') ? ' *' : '' }}
                 </label>
                 <p-select
                   appendTo="body"
@@ -1081,16 +1081,16 @@
                   [options]="maritalStatuses()"
                   optionLabel="DesMaritalStatus"
                   optionValue="IdeMaritalStatus"
-                  [showClear]="!insuredRequired('maritalStatus')"
+                  [showClear]="!insuredRequired(item, 'maritalStatus')"
                   [placeholder]="'quotes.selectOptionPlaceholder' | transloco"
                   styleClass="w-full"
                 />
               </div>
             }
-            @if (insuredAsks('profession')) {
+            @if (insuredAsks(item, 'profession')) {
               <div class="flex flex-col gap-1">
                 <label class="text-xs font-medium text-slate-600">
-                  {{ 'quotes.insuredProfession' | transloco }}{{ insuredRequired('profession') ? ' *' : '' }}
+                  {{ 'quotes.insuredProfession' | transloco }}{{ insuredRequired(item, 'profession') ? ' *' : '' }}
                 </label>
                 <p-select
                   appendTo="body"
@@ -1099,24 +1099,24 @@
                   optionLabel="DesProfession"
                   optionValue="IdeProfession"
                   [filter]="true"
-                  [showClear]="!insuredRequired('profession')"
+                  [showClear]="!insuredRequired(item, 'profession')"
                   [placeholder]="'quotes.selectOptionPlaceholder' | transloco"
                   styleClass="w-full"
                 />
               </div>
             }
-            @if (insuredAsks('birthPlace')) {
+            @if (insuredAsks(item, 'birthPlace')) {
               <div class="flex flex-col gap-1">
                 <label class="text-xs font-medium text-slate-600">
-                  {{ 'quotes.insuredBirthPlace' | transloco }}{{ insuredRequired('birthPlace') ? ' *' : '' }}
+                  {{ 'quotes.insuredBirthPlace' | transloco }}{{ insuredRequired(item, 'birthPlace') ? ' *' : '' }}
                 </label>
                 <input pInputText type="text" formControlName="desBirthPlace" />
               </div>
             }
-            @if (insuredAsks('email')) {
+            @if (insuredAsks(item, 'email')) {
               <div class="flex flex-col gap-1">
                 <label class="text-xs font-medium text-slate-600">
-                  {{ 'quotes.insuredEmail' | transloco }}{{ insuredRequired('email') ? ' *' : '' }}
+                  {{ 'quotes.insuredEmail' | transloco }}{{ insuredRequired(item, 'email') ? ' *' : '' }}
                 </label>
                 <input pInputText type="email" formControlName="desEmail" />
                 <span class="text-xs text-slate-400">{{ 'quotes.insuredEmailHint' | transloco }}</span>

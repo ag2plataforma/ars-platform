@@ -230,27 +230,6 @@
       </div>
       <p class="text-xs text-slate-500">{{ 'products.multiRiskHelp' | transloco }}</p>
     </div>
-    <div class="flex flex-col gap-2 rounded-lg border border-slate-200 p-3" formGroupName="insuredFields">
-      <label class="text-sm font-medium text-slate-700">{{ 'products.insuredFieldsTitle' | transloco }}</label>
-      <p class="text-xs text-slate-500">{{ 'products.insuredFieldsHelp' | transloco }}</p>
-      <div class="grid grid-cols-2 gap-x-3 gap-y-2">
-        @for (field of insuredPersonFields; track field) {
-          <div class="flex flex-col gap-1">
-            <label class="text-xs font-medium text-slate-600">{{ 'products.insuredField.' + field | transloco }}</label>
-            <p-select
-              appendTo="body"
-              [formControlName]="field"
-              [options]="insuredModeOptions"
-              optionValue="value"
-              styleClass="w-full"
-            >
-              <ng-template #selectedItem let-item>{{ item.label | transloco }}</ng-template>
-              <ng-template #item let-item>{{ item.label | transloco }}</ng-template>
-            </p-select>
-          </div>
-        }
-      </div>
-    </div>
     <div class="flex items-center gap-2">
       <p-checkbox formControlName="indCollective" [binary]="true" inputId="indCollective" />
       <label for="indCollective" class="text-sm text-slate-700">{{ 'products.collectiveLabel' | transloco }}</label>

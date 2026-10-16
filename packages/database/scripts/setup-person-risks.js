@@ -6,9 +6,10 @@
  *    una persona (ej. "Viaje", "Persona"). Al contratar, la app pide los datos
  *    minimos de cada asegurado y crea/busca la persona. (SRiskType NO se usa:
  *    indica si el riesgo es principal u opcional.)
- *  - SProduct."ObjInsuredPersonFields" json: configuracion por producto de
- *    los datos de persona a pedir ({ campo: "OPTIONAL" | "REQUIRED" }).
- *    Null = minimo por defecto (nombre, primer apellido, documento, nacimiento).
+ *  - SRiskProduct."ObjInsuredPersonFields" json: configuracion, por riesgo de
+ *    cada producto, de los datos de persona a pedir del asegurado
+ *    ({ campo: "NONE" | "OPTIONAL" | "REQUIRED" }). Null = minimo por defecto
+ *    (nombre, primer apellido, documento, nacimiento).
  *  - TPerson."DesEmail": se QUITA la restriccion UNIQUE (UK_TPerson_02) para
  *    permitir que varias personas compartan correo (menores con el correo de
  *    un padre). La identidad de la persona pasa a ser el documento
@@ -41,7 +42,7 @@ async function main() {
 
   const statements = [
     `ALTER TABLE ars_platform."SRisk" ADD COLUMN IF NOT EXISTS "IndPersonRisk" boolean NOT NULL DEFAULT false`,
-    `ALTER TABLE ars_platform."SProduct" ADD COLUMN IF NOT EXISTS "ObjInsuredPersonFields" json`,
+    `ALTER TABLE ars_platform."SRiskProduct" ADD COLUMN IF NOT EXISTS "ObjInsuredPersonFields" json`,
     `ALTER TABLE ars_platform."TPerson" DROP CONSTRAINT IF EXISTS "UK_TPerson_02"`,
     `DROP INDEX IF EXISTS ars_platform."UK_TPerson_02"`,
     `CREATE INDEX IF NOT EXISTS "IX_TPerson_DesEmail" ON ars_platform."TPerson" ("DesEmail")`,
@@ -73,6 +74,24 @@ async function main() {
       WHERE upper("CodRisk") IN ('PERSONA','PERSON') OR upper("DesRisk") IN ('PERSONA','PERSON')
       RETURNING "CodRisk", "DesRisk"`,
   );
+  // Version anterior: la configuracion se guardaba en SProduct (a nivel de producto). Si existe, se copia a
+  // los riesgos de producto marcados como persona que aun no tengan configuracion y se elimina la columna.
+  const legacyProduct = await client.query(
+    `SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'ars_platform' AND table_name = 'SProduct' AND column_name = 'ObjInsuredPersonFields'`,
+  );
+  if (legacyProduct.rowCount > 0) {
+    const copied = await client.query(
+      `UPDATE ars_platform."SRiskProduct" rp SET "ObjInsuredPersonFields" = p."ObjInsuredPersonFields"
+         FROM ars_platform."SProduct" p, ars_platform."SRisk" r
+        WHERE p."IdeProduct" = rp."IdeProduct" AND r."IdeRisk" = rp."IdeRisk" AND r."IndPersonRisk" = true
+          AND rp."ObjInsuredPersonFields" IS NULL AND p."ObjInsuredPersonFields" IS NOT NULL
+        RETURNING rp."CodRiskProduct"`,
+    );
+    console.log('Configuracion de persona traspasada de SProduct a SRiskProduct:', JSON.stringify(copied.rows.map((r) => r.CodRiskProduct)));
+    await client.query(`ALTER TABLE ars_platform."SProduct" DROP COLUMN "ObjInsuredPersonFields"`);
+  }
+
   const all = await client.query(
     `SELECT "CodRisk", "DesRisk", "IndPersonRisk" FROM ars_platform."SRisk" ORDER BY 1`,
   );

@@ -18,12 +18,6 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { CatalogService } from '../../core/catalogs/catalog.service';
 import { CatalogRow } from '../../core/catalogs/catalog.model';
 import { RiskProductsTabComponent } from './risk-products-tab.component';
-import {
-  INSURED_PERSON_FIELDS,
-  InsuredFieldMode,
-  InsuredPersonField,
-  resolveInsuredPersonConfig,
-} from './insured-person-fields';
 import { RiskFieldsDialogComponent } from './risk-fields-dialog.component';
 import { PlanProductsTabComponent } from './plan-products-tab.component';
 import { PlanProductRisksTabComponent } from './plan-product-risks-tab.component';
@@ -88,12 +82,6 @@ const CURRENCIES_PATH = '/product-rating/currencies';
   templateUrl: './products.component.html',
 })
 export class ProductsComponent {
-  readonly insuredPersonFields = INSURED_PERSON_FIELDS;
-  readonly insuredModeOptions = [
-    { value: 'NONE', label: 'products.insuredMode.NONE' },
-    { value: 'OPTIONAL', label: 'products.insuredMode.OPTIONAL' },
-    { value: 'REQUIRED', label: 'products.insuredMode.REQUIRED' },
-  ];
   private readonly fb = inject(FormBuilder);
   private readonly catalogService = inject(CatalogService);
   private readonly messages = inject(MessageService);
@@ -148,14 +136,6 @@ export class ProductsComponent {
       indGenerateAllFraction: [row ? Boolean(row['IndGenerateAllFraction']) : false],
       indProportionalPrime: [row ? Boolean(row['IndProportionalPrime'] ?? true) : true],
       indMultiRisk: [row ? Boolean(row['IndMultiRisk']) : false],
-      insuredFields: this.fb.nonNullable.group(
-        Object.fromEntries(
-          INSURED_PERSON_FIELDS.map((f) => [
-            f,
-            [{ value: resolveInsuredPersonConfig(row?.['ObjInsuredPersonFields'])[f], disabled: f === 'firstName' }],
-          ]),
-        ) as Record<InsuredPersonField, [{ value: InsuredFieldMode; disabled: boolean }]>,
-      ),
       indCollective: [row ? Boolean(row['IndCollective']) : false],
       codCollectivePremiumMode: [row ? String(row['CodCollectivePremiumMode'] ?? 'POR_CERTIFICADO') : 'POR_CERTIFICADO'],
       tstInitial: [row ? this.toDateInput(row['TstInitial']) : '', Validators.required],
@@ -263,7 +243,6 @@ export class ProductsComponent {
       indGenerateAllFraction: raw.indGenerateAllFraction,
       indProportionalPrime: raw.indProportionalPrime,
       indMultiRisk: raw.indMultiRisk,
-      insuredPersonFields: raw.insuredFields,
       indCollective: raw.indCollective,
       codCollectivePremiumMode: raw.codCollectivePremiumMode,
       tstInitial: raw.tstInitial,

@@ -58,6 +58,13 @@ const GENDERS_PATH = '/reference-data/genders';
 const MARITAL_STATUSES_PATH = '/reference-data/marital-statuses';
 const PROFESSIONS_PATH = '/reference-data/professions';
 
+/** Asegurado de un riesgo de tipo persona: formulario y datos que pide su riesgo de producto. */
+interface InsuredPersonItem {
+  risk: QuoteRisk;
+  config: InsuredPersonConfig;
+  form: FormGroup;
+}
+
 type QuoteStep = 'form' | 'plans' | 'adjustments' | 'socialImpact' | 'persons' | 'requirements' | 'summary' | 'contract';
 
 /** Un "slot" de persona a asociar a la cotización (Tomador/Titular --
@@ -1376,8 +1383,7 @@ export class QuotesComponent {
   readonly contractRiskFields = signal<Array<{ risk: QuoteRisk; state: RiskFieldsState }>>([]);
 
   /** Asegurados de los riesgos de tipo persona (`SRisk.IndPersonRisk`): datos minimos que pide el producto. */
-  readonly insuredPersons = signal<Array<{ risk: QuoteRisk; form: FormGroup }>>([]);
-  readonly insuredConfig = signal<InsuredPersonConfig>(resolveInsuredPersonConfig(null));
+  readonly insuredPersons = signal<Array<InsuredPersonItem>>([]);
   readonly identificationTypes = signal<CatalogRow[]>([]);
   readonly genders = signal<CatalogRow[]>([]);
   readonly maritalStatuses = signal<CatalogRow[]>([]);
@@ -1386,18 +1392,19 @@ export class QuotesComponent {
   readonly insuredSearching = signal<string | null>(null);
 
   /** `true` si el producto pide ese dato del asegurado (OPCIONAL u OBLIGATORIO). */
-  insuredAsks(field: InsuredPersonField): boolean {
-    return this.insuredConfig()[field] !== 'NONE';
+  insuredAsks(item: InsuredPersonItem, field: InsuredPersonField): boolean {
+    return item.config[field] !== 'NONE';
   }
 
-  insuredRequired(field: InsuredPersonField): boolean {
-    return this.insuredConfig()[field] === 'REQUIRED';
+  insuredRequired(item: InsuredPersonItem, field: InsuredPersonField): boolean {
+    return item.config[field] === 'REQUIRED';
   }
 
-  private isPersonRisk(ideRiskProduct: string): boolean {
+  /** Riesgo de producto, si su riesgo (`SRisk`) es una persona. */
+  private personRiskProduct(ideRiskProduct: string): CatalogRow | null {
     const row = this.allRiskProducts.find((r) => r['IdeRiskProduct'] === ideRiskProduct);
     const risk = row?.['SRisk'] as Record<string, unknown> | undefined;
-    return risk?.['IndPersonRisk'] === true;
+    return risk?.['IndPersonRisk'] === true ? (row ?? null) : null;
   }
 
   private buildInsuredForm(config: InsuredPersonConfig): FormGroup {
@@ -1425,14 +1432,16 @@ export class QuotesComponent {
     this.insuredPersons.set([]);
     const pricing = this.pricing();
     if (!pricing || pricing.contract) return;
-    const personRisks = pricing.risks.filter((risk) => this.isPersonRisk(risk.ideRiskProduct));
-    if (personRisks.length === 0) return;
-    const product = this.products().find((p) => p['CodProduct'] === pricing.codProduct);
-    const config = resolveInsuredPersonConfig(product?.['ObjInsuredPersonFields']);
-    this.insuredConfig.set(config);
-    this.insuredPersons.set(
-      personRisks.map((risk) => ({ risk, form: this.buildInsuredForm(config) })).sort((a, b) => a.risk.numRisk - b.risk.numRisk),
-    );
+    const items: InsuredPersonItem[] = [];
+    for (const risk of pricing.risks) {
+      const riskProduct = this.personRiskProduct(risk.ideRiskProduct);
+      if (!riskProduct) continue;
+      // Datos que pide este riesgo del producto (`SRiskProduct.ObjInsuredPersonFields`; null = minimo por defecto).
+      const config = resolveInsuredPersonConfig(riskProduct['ObjInsuredPersonFields']);
+      items.push({ risk, config, form: this.buildInsuredForm(config) });
+    }
+    if (items.length === 0) return;
+    this.insuredPersons.set(items.sort((a, b) => a.risk.numRisk - b.risk.numRisk));
     if (!this.insuredCatalogsLoaded) {
       this.insuredCatalogsLoaded = true;
       this.catalogService.list(IDENTIFICATION_TYPES_PATH).subscribe({ next: (rows) => this.identificationTypes.set(rows) });
@@ -1443,7 +1452,7 @@ export class QuotesComponent {
   }
 
   /** Precarga nombre/apellidos/correo de una persona ya registrada con ese documento (si existe; si no, se creara al contratar). */
-  lookupInsured(item: { risk: QuoteRisk; form: FormGroup }): void {
+  lookupInsured(item: InsuredPersonItem): void {
     const num = String(item.form.get('numIdentification')?.value ?? '').trim();
     if (!num) return;
     this.insuredSearching.set(item.risk.ideQuoteRisk);

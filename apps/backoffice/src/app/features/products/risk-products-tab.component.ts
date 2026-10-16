@@ -1,4 +1,4 @@
-import { Component, inject, input, signal } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -16,6 +16,12 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { CatalogService } from '../../core/catalogs/catalog.service';
 import { CatalogRow } from '../../core/catalogs/catalog.model';
 import { RiskFieldsDialogComponent } from './risk-fields-dialog.component';
+import {
+  INSURED_PERSON_FIELDS,
+  InsuredFieldMode,
+  InsuredPersonField,
+  resolveInsuredPersonConfig,
+} from './insured-person-fields';
 
 const PATH = '/product-rating/risk-products';
 const RISKS_PATH = '/product-rating/risks';
@@ -72,6 +78,17 @@ export class RiskProductsTabComponent {
   readonly loading = signal(false);
   readonly risks = signal<CatalogRow[]>([]);
   readonly riskTypes = signal<CatalogRow[]>([]);
+  readonly insuredPersonFields = INSURED_PERSON_FIELDS;
+  readonly insuredModeOptions = [
+    { value: 'NONE', label: 'products.insuredMode.NONE' },
+    { value: 'OPTIONAL', label: 'products.insuredMode.OPTIONAL' },
+    { value: 'REQUIRED', label: 'products.insuredMode.REQUIRED' },
+  ];
+  /** Riesgo elegido en el formulario (`CodRisk`): la configuracion de persona solo aplica si el riesgo es de tipo persona. */
+  private readonly selectedCodRisk = signal('');
+  readonly selectedRiskIsPerson = computed(
+    () => this.risks().find((r) => r['CodRisk'] === this.selectedCodRisk())?.['IndPersonRisk'] === true,
+  );
   readonly dialogVisible = signal(false);
   readonly dialogMode = signal<'create' | 'edit'>('create');
   private editingRow: CatalogRow | null = null;
@@ -94,7 +111,22 @@ export class RiskProductsTabComponent {
       desLarge: [row ? String(row['DesLarge'] ?? '') : ''],
       tstInitial: [row ? this.toDateInput(row['TstInitial']) : '', Validators.required],
       tstEnd: [row ? this.toDateInput(row['TstEnd']) : ''],
+      insuredFields: this.fb.nonNullable.group(
+        Object.fromEntries(
+          INSURED_PERSON_FIELDS.map((f) => [
+            f,
+            [{ value: resolveInsuredPersonConfig(row?.['ObjInsuredPersonFields'])[f], disabled: f === 'firstName' }],
+          ]),
+        ) as Record<InsuredPersonField, [{ value: InsuredFieldMode; disabled: boolean }]>,
+      ),
     });
+  }
+
+  /** Crea el formulario y engancha el riesgo elegido para mostrar/ocultar la configuracion de persona. */
+  private resetForm(row?: CatalogRow): void {
+    this.form = this.buildForm(row);
+    this.selectedCodRisk.set(this.form.controls.codRisk.value);
+    this.form.controls.codRisk.valueChanges.subscribe((cod) => this.selectedCodRisk.set(cod));
   }
 
   private relCode(row: CatalogRow | undefined, relation: string, codField: string): string {
@@ -149,7 +181,7 @@ export class RiskProductsTabComponent {
     this.dialogMode.set('create');
     this.editingRow = null;
     this.loadOptions();
-    this.form = this.buildForm();
+    this.resetForm();
     this.dialogVisible.set(true);
   }
 
@@ -157,7 +189,7 @@ export class RiskProductsTabComponent {
     this.dialogMode.set('edit');
     this.editingRow = row;
     this.loadOptions();
-    this.form = this.buildForm(row);
+    this.resetForm(row);
     this.dialogVisible.set(true);
   }
 
@@ -178,6 +210,7 @@ export class RiskProductsTabComponent {
       desLarge: raw.desLarge,
       tstInitial: raw.tstInitial,
     };
+    if (this.selectedRiskIsPerson()) body['insuredPersonFields'] = raw.insuredFields;
     if (raw.tstEnd) body['tstEnd'] = raw.tstEnd;
 
     if (this.dialogMode() === 'create') {
