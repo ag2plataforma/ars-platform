@@ -43,7 +43,7 @@ export class CreateContractDto {
   riskAttributeValues?: Record<string, Record<string, string>>;
 
   /**
-   * Personas aseguradas de los riesgos de tipo persona (`SRisk.IndPersonRisk`), por riesgo de la
+   * Personas aseguradas de los riesgos de tipo persona (`SRisk.CodInsuredObject = 'PERSON'`), por riesgo de la
    * cotizacion: `{ "<IdeQuoteRisk>": { ...datos de la persona } }`. Se buscan por documento o se crean,
    * y se vinculan al riesgo del certificado (`TFileRiskPerson`, rol ASEGURADO).
    */

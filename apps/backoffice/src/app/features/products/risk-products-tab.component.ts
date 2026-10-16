@@ -87,7 +87,7 @@ export class RiskProductsTabComponent {
   /** Riesgo elegido en el formulario (`CodRisk`): la configuracion de persona solo aplica si el riesgo es de tipo persona. */
   private readonly selectedCodRisk = signal('');
   readonly selectedRiskIsPerson = computed(
-    () => this.risks().find((r) => r['CodRisk'] === this.selectedCodRisk())?.['IndPersonRisk'] === true,
+    () => this.risks().find((r) => r['CodRisk'] === this.selectedCodRisk())?.['CodInsuredObject'] === 'PERSON',
   );
   readonly dialogVisible = signal(false);
   readonly dialogMode = signal<'create' | 'edit'>('create');

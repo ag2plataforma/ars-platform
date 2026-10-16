@@ -2867,7 +2867,7 @@ export class ContractsService {
   }
 
   /**
-   * Riesgos de tipo persona (`SRisk.IndPersonRisk`): busca (por documento) o crea la persona
+   * Riesgos de tipo persona (`SRisk.CodInsuredObject = 'PERSON'`): busca (por documento) o crea la persona
    * asegurada de cada uno con los datos que pide su riesgo de producto (`SRiskProduct.ObjInsuredPersonFields`).
    * Devuelve `IdeQuoteRisk -> IdePerson`. Si falta la persona de un riesgo de tipo persona, 400.
    */
@@ -2886,11 +2886,11 @@ export class ContractsService {
     });
     const riskProducts = await tx.sRiskProduct.findMany({
       where: { IdeRiskProduct: { in: quoteRisks.map((r) => r.IdeRiskProduct) } },
-      select: { IdeRiskProduct: true, ObjInsuredPersonFields: true, SRisk: { select: { IndPersonRisk: true } } },
+      select: { IdeRiskProduct: true, ObjInsuredPersonFields: true, SRisk: { select: { CodInsuredObject: true } } },
     });
     // Datos de persona que pide cada riesgo del producto (`SRiskProduct.ObjInsuredPersonFields`, null = minimo por defecto).
     const personRiskProducts = new Map(
-      riskProducts.filter((r) => r.SRisk.IndPersonRisk).map((r) => [r.IdeRiskProduct, resolveInsuredPersonConfig(r.ObjInsuredPersonFields)]),
+      riskProducts.filter((r) => r.SRisk.CodInsuredObject === 'PERSON').map((r) => [r.IdeRiskProduct, resolveInsuredPersonConfig(r.ObjInsuredPersonFields)]),
     );
     const personRisks = quoteRisks.filter((r) => personRiskProducts.has(r.IdeRiskProduct) && r.TQuoteRiskPlan.length > 0);
     if (personRisks.length === 0) return result;

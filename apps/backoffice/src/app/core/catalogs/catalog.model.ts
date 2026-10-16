@@ -25,6 +25,8 @@ export interface CatalogExtraField {
   optionsPath?: string;
   optionCodField?: string;
   optionDesField?: string;
+  /** Solo para `type: 'select'` con opciones fijas (sin catálogo): `label` es una clave de traducción. */
+  staticOptions?: { value: string; label: string }[];
   /** Solo para `type: 'select'`: relación incluida en la fila para mostrar en la tabla sin resolver aparte (ej. `SLanguage`). */
   columnRelation?: string;
 }
@@ -223,7 +225,16 @@ export const PRODUCT_CATALOG_REGISTRY: CatalogConfig[] = [
         optionDesField: 'DesRiskLevel',
         columnRelation: 'SRiskLevel',
       },
-      { key: 'indPersonRisk', label: 'catalogFields.indPersonRisk', type: 'boolean', required: true },
+      {
+        key: 'codInsuredObject',
+        label: 'catalogFields.codInsuredObject',
+        type: 'select',
+        required: true,
+        staticOptions: [
+          { value: 'NONE', label: 'catalogFields.insuredObject.NONE' },
+          { value: 'PERSON', label: 'catalogFields.insuredObject.PERSON' },
+        ],
+      },
     ],
   },
   {

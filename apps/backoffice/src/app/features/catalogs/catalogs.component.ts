@@ -181,12 +181,22 @@ export class CatalogsComponent {
       const related = row[field.columnRelation] as Record<string, unknown> | undefined;
       return related ? String(related[field.optionDesField] ?? '') : '';
     }
+    if (field.staticOptions) {
+      const value = String(row[extraRowField(field)] ?? field.staticOptions[0].value);
+      const option = field.staticOptions.find((o) => o.value === value);
+      return option ? this.transloco.translate(option.label) : value;
+    }
     if (field.type === 'boolean') {
       const value = row[extraRowField(field)];
       if (value === null || value === undefined) return '';
       return this.transloco.translate(value ? 'common.yes' : 'common.no');
     }
     return String(row[extraRowField(field)] ?? '');
+  }
+
+  /** Opciones fijas de un campo `select` sin catalogo (`staticOptions`), con la etiqueta ya traducida. */
+  staticOptionList(field: CatalogExtraField): { value: string; label: string }[] {
+    return (field.staticOptions ?? []).map((o) => ({ value: o.value, label: this.transloco.translate(o.label) }));
   }
 
   /** Opciones Sí/No de los campos `boolean` (el formulario maneja strings `'true'`/`'false'`). */
@@ -237,8 +247,8 @@ export class CatalogsComponent {
                 field.optionCodField ?? ''
               ] ?? '',
             )
-          : String(row[extraRowField(field)] ?? '')
-        : '';
+          : String(row[extraRowField(field)] ?? field.staticOptions?.[0].value ?? '')
+        : (field.staticOptions?.[0].value ?? '');
       extraGroup.addControl(
         field.key,
         this.fb.control(currentValue, field.required ? Validators.required : []),

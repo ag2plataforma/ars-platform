@@ -150,6 +150,15 @@
             [placeholder]="'catalogs.selectPlaceholder' | transloco"
             styleClass="w-full"
           />
+        } @else if (field.staticOptions) {
+          <p-select
+            appendTo="body"
+            [formControl]="getExtraControl(field.key)"
+            [options]="staticOptionList(field)"
+            optionLabel="label"
+            optionValue="value"
+            styleClass="w-full"
+          />
         } @else if (field.type === 'textarea') {
           <textarea pTextarea rows="3" [formControl]="getExtraControl(field.key)" class="w-full"></textarea>
         } @else {

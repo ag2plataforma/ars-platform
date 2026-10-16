@@ -245,7 +245,11 @@
     "numFraction": "Cantidad de cuotas",
     "numOrder": "Orden (la menor es la de por defecto)",
     "indAnnual": "¿Vigencia anual?",
-    "indPersonRisk": "¿El riesgo es una persona?"
+    "codInsuredObject": "Tipo de objeto asegurado",
+    "insuredObject": {
+      "NONE": "Ninguno (sin ficha propia)",
+      "PERSON": "Persona"
+    }
   },
   "common": {
     "error": "Error",

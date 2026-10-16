@@ -39,7 +39,7 @@ export class RisksService {
     return this.crud.create(
       dto.codRisk,
       dto.desRisk,
-      { IdeRiskLevel: ideRiskLevel, IndPersonRisk: dto.indPersonRisk ?? false },
+      { IdeRiskLevel: ideRiskLevel, CodInsuredObject: this.toInsuredObject(dto.codInsuredObject) },
       activeStateId,
       actor,
     );
@@ -50,13 +50,18 @@ export class RisksService {
     if (dto.codRiskLevel !== undefined) {
       extra.IdeRiskLevel = await this.resolveRiskLevel(dto.codRiskLevel);
     }
-    if (dto.indPersonRisk !== undefined) extra.IndPersonRisk = dto.indPersonRisk;
+    if (dto.codInsuredObject !== undefined) extra.CodInsuredObject = this.toInsuredObject(dto.codInsuredObject);
     return this.crud.update(id, dto.desRisk, extra, actor);
   }
 
   async setState(id: string, codState: string, actor: string): Promise<SRisk> {
     const stateId = await this.stateMachine.getStateByCode(codState);
     return this.crud.setState(id, stateId, actor);
+  }
+
+  /** `NONE` (o vacio) se guarda como NULL: el riesgo no tiene ficha de objeto asegurado. */
+  private toInsuredObject(code?: string): string | null {
+    return !code || code === 'NONE' ? null : code;
   }
 
   private async resolveRiskLevel(codRiskLevel: string): Promise<string> {
