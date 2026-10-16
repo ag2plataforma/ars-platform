@@ -1305,6 +1305,29 @@
       "nameSearchEmptyDetail": "No se encontró ninguna persona con ese nombre."
     }
   },
+  "modelAttributes": {
+    "title": "Modelos de atributos",
+    "subtitle": "Define a qué se aplica cada set de campos personalizados: a un producto (datos generales de la cotización) o a un tipo de riesgo (datos de cada riesgo).",
+    "newButton": "Nuevo modelo",
+    "codeColumn": "Código",
+    "descriptionColumn": "Descripción",
+    "appliesToColumn": "Se aplica a (entidad)",
+    "appliesToHint": "Producto = campos generales de la cotización; Riesgo de producto = campos de cada riesgo.",
+    "referenceEntityColumn": "Entidad de referencia",
+    "referenceColumn": "Referencia",
+    "entityPlaceholder": "Elige una entidad",
+    "referencePlaceholder": "Elige el producto o riesgo",
+    "referenceIdPlaceholder": "Id (uuid) de la referencia",
+    "referenceIdHint": "Para esta entidad no hay lista: pega el id de la referencia.",
+    "fieldsTooltip": "Campos",
+    "emptyState": "No hay modelos de atributos configurados.",
+    "createDialogTitle": "Nuevo modelo de atributos",
+    "editDialogTitle": "Editar modelo de atributos",
+    "loadErrorDetail": "No se pudieron cargar los modelos de atributos.",
+    "createdDetail": "Modelo de atributos creado.",
+    "updatedDetail": "Modelo de atributos actualizado.",
+    "toggledDetail": "Estado del modelo actualizado."
+  },
   "processFlows": {
     "flowSteps": {
       "title": "Pasos de flujo",

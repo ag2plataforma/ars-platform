@@ -1,0 +1,176 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex flex-col gap-4">
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold text-slate-900">{{ 'modelAttributes.title' | transloco }}</h2>
+      <p class="text-sm text-slate-500">{{ 'modelAttributes.subtitle' | transloco }}</p>
+    </div>
+    <button pButton type="button" icon="pi pi-plus" [label]="'modelAttributes.newButton' | transloco" (click)="openCreate()"></button>
+  </div>
+
+  <p-table
+    [value]="rows()"
+    [loading]="loading()"
+    dataKey="IdeModelAttribute"
+    [paginator]="true"
+    [rows]="10"
+    [rowsPerPageOptions]="[10, 25, 50]"
+    [showCurrentPageReport]="true"
+    currentPageReportTemplate="{{ 'common.paginatorTemplate' | transloco }}"
+    styleClass="p-datatable-sm"
+  >
+    <ng-template #header>
+      <tr>
+        <th pSortableColumn="CodModelAttribute">
+          <span class="ars-th-flex">{{ 'modelAttributes.codeColumn' | transloco }}<p-sortIcon field="CodModelAttribute" /></span>
+        </th>
+        <th pSortableColumn="DesModelAttribute">
+          <span class="ars-th-flex">
+            {{ 'modelAttributes.descriptionColumn' | transloco }}
+            <p-sortIcon field="DesModelAttribute" />
+            <p-columnFilter type="text" field="DesModelAttribute" display="menu" />
+          </span>
+        </th>
+        <th>{{ 'modelAttributes.appliesToColumn' | transloco }}</th>
+        <th>{{ 'modelAttributes.referenceColumn' | transloco }}</th>
+        <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+        <th class="w-40">{{ 'catalogs.actionsColumn' | transloco }}</th>
+      </tr>
+    </ng-template>
+    <ng-template #body let-row>
+      <tr>
+        <td>{{ row.CodModelAttribute }}</td>
+        <td>{{ row.DesModelAttribute }}</td>
+        <td>{{ entityLabel(row, 'IdeEntityApply') }}</td>
+        <td>{{ referenceLabel(row) }}</td>
+        <td>
+          <p-tag [value]="(isActive(row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isActive(row) ? 'success' : 'danger'" />
+        </td>
+        <td>
+          <div class="flex gap-1">
+            @if (canEditFields(row)) {
+              <button
+                pButton
+                type="button"
+                icon="pi pi-list"
+                [text]="true"
+                severity="info"
+                [pTooltip]="'modelAttributes.fieldsTooltip' | transloco"
+                tooltipPosition="top"
+                (click)="openFields(row)"
+              ></button>
+            }
+            <button
+              pButton
+              type="button"
+              icon="pi pi-pencil"
+              [text]="true"
+              severity="secondary"
+              [pTooltip]="'locations.editTooltip' | transloco"
+              tooltipPosition="top"
+              (click)="openEdit(row)"
+            ></button>
+            <button
+              pButton
+              type="button"
+              [icon]="isActive(row) ? 'pi pi-ban' : 'pi pi-check'"
+              [text]="true"
+              [severity]="isActive(row) ? 'danger' : 'success'"
+              [pTooltip]="(isActive(row) ? 'catalogs.deactivateHeader' : 'catalogs.activateHeader') | transloco"
+              tooltipPosition="top"
+              (click)="toggleState(row)"
+            ></button>
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="6" class="text-center text-slate-500">{{ 'modelAttributes.emptyState' | transloco }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-dialog
+  [header]="(dialogMode() === 'create' ? 'modelAttributes.createDialogTitle' : 'modelAttributes.editDialogTitle') | transloco"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  appendTo="body"
+  [style]="{ width: '34rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'modelAttributes.codeColumn' | transloco }}</label>
+      <input pInputText formControlName="cod" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'modelAttributes.descriptionColumn' | transloco }}</label>
+      <input pInputText formControlName="des" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'modelAttributes.appliesToColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codEntityApply"
+        [options]="entities()"
+        optionLabel="DesEntity"
+        optionValue="CodEntity"
+        [filter]="true"
+        filterBy="DesEntity,CodEntity"
+        [placeholder]="'modelAttributes.entityPlaceholder' | transloco"
+        styleClass="w-full"
+        (onChange)="onApplyEntityChange()"
+      />
+      <p class="text-xs text-slate-500">{{ 'modelAttributes.appliesToHint' | transloco }}</p>
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'modelAttributes.referenceEntityColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codEntityReference"
+        [options]="entities()"
+        optionLabel="DesEntity"
+        optionValue="CodEntity"
+        [filter]="true"
+        filterBy="DesEntity,CodEntity"
+        [placeholder]="'modelAttributes.entityPlaceholder' | transloco"
+        styleClass="w-full"
+        (onChange)="onReferenceEntityChange()"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'modelAttributes.referenceColumn' | transloco }}</label>
+      @if (referenceOptions(); as options) {
+        <p-select
+          appendTo="body"
+          formControlName="ideReference"
+          [options]="options"
+          optionLabel="label"
+          optionValue="value"
+          [filter]="true"
+          [placeholder]="'modelAttributes.referencePlaceholder' | transloco"
+          styleClass="w-full"
+        />
+      } @else {
+        <input pInputText formControlName="ideReference" class="w-full" [placeholder]="'modelAttributes.referenceIdPlaceholder' | transloco" />
+        <p class="text-xs text-slate-500">{{ 'modelAttributes.referenceIdHint' | transloco }}</p>
+      }
+    </div>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco" [loading]="saving()"></button>
+    </div>
+  </form>
+</p-dialog>
+
+<app-risk-fields-dialog
+  [ideProduct]="fieldsProductId()"
+  [ideRiskProduct]="fieldsRiskProductId()"
+  [riskLabel]="fieldsLabel()"
+  [(visible)]="fieldsVisible"
+/>

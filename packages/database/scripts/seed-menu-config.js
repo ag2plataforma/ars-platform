@@ -261,6 +261,15 @@ const SITE_MAP_ITEMS = [
         icon: 'pi-sitemap',
       },
       {
+        // Modelos de atributos (`SModelAttribute`): a que producto/riesgo se aplica cada set de campos
+        // personalizados (docs/02-roadmap.md, "Hallazgos de las pruebas", punto 12).
+        cod: 'FLUJOS_PROCESO_MODELOS_ATRIBUTOS',
+        des: 'Modelos de atributos',
+        order: 4,
+        path: '/flujos-de-proceso/modelos-de-atributos',
+        icon: 'pi-list',
+      },
+      {
         cod: 'FLUJOS_PROCESO_ASIGNACION',
         des: 'Asignación por producto',
         order: 3,

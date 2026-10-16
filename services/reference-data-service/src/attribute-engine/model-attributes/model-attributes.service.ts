@@ -8,6 +8,7 @@ const INCLUDE = {
   SEntity_SModelAttribute_IdeEntityApplyToSEntity: true,
   SEntity_SModelAttribute_IdeEntityReferenceToSEntity: true,
   SFlowStep: true,
+  SState: true,
 } as const;
 
 /**

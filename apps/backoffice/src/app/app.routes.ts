@@ -273,6 +273,11 @@ export const routes: Routes = [
               import('./features/process-flows/flow-steps.component').then((m) => m.FlowStepsComponent),
           },
           {
+            path: 'modelos-de-atributos',
+            loadComponent: () =>
+              import('./features/attributes/model-attributes.component').then((m) => m.ModelAttributesComponent),
+          },
+          {
             path: 'asignacion-por-producto',
             loadComponent: () =>
               import('./features/process-flows/product-process-flows.component').then(
