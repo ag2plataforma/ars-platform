@@ -29,6 +29,8 @@ export interface RiskAttributeField {
   name: string;
   label: string;
   type: string;
+  /** `PRICING` (se pide al cotizar) o `CONTRACT` (solo al contratar). */
+  codStage?: string;
   validators: RiskAttributeValidator[];
   validationMessages: Record<string, string>;
   options?: RiskAttributeFieldOption[];
@@ -69,8 +71,11 @@ export class RiskAttributesService {
 
   constructor(private readonly http: HttpClient) {}
 
-  getSchema(ideRiskProduct: string): Observable<RiskAttributeSchema> {
-    return this.http.get<RiskAttributeSchema>(`${this.base}/by-reference/${ideRiskProduct}/schema`);
+  /** Campos de un set de atributos por su referencia (`IdeRiskProduct` o `IdeProduct`); `stage` filtra por etapa. */
+  getSchema(ideReference: string, stage?: 'PRICING' | 'CONTRACT'): Observable<RiskAttributeSchema> {
+    let params = new HttpParams();
+    if (stage) params = params.set('stage', stage);
+    return this.http.get<RiskAttributeSchema>(`${this.base}/by-reference/${ideReference}/schema`, { params });
   }
 
   /**

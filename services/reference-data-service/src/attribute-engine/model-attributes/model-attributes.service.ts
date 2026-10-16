@@ -68,13 +68,15 @@ export class ModelAttributesService {
    * de acá -- así el motor de reglas (`PrismaAttributeValueResolver`) lo
    * resuelve correctamente al tarificar.
    */
-  async getSchemaForReference(ideReference: string): Promise<{
+  async getSchemaForReference(ideReference: string, stage?: string): Promise<{
     fields: Array<{
       ideAttributeProperty: string;
       codAttributeProperty: string;
       name: string;
       label: string;
       type: string;
+      /** `PRICING` (se pide al cotizar) o `CONTRACT` (solo al contratar). */
+      codStage: string;
       validators: Array<{ validationName: string; aditionalProps?: Record<string, unknown> }>;
       validationMessages: Record<string, string>;
       options?: Array<{ key: string; value: unknown }>;
@@ -90,7 +92,11 @@ export class ModelAttributesService {
     }
 
     const properties = await this.prisma.sAttributeProperty.findMany({
-      where: { IdeModelAttribute: { in: models.map((m) => m.IdeModelAttribute) }, IdeState: activeStateId },
+      where: {
+        IdeModelAttribute: { in: models.map((m) => m.IdeModelAttribute) },
+        IdeState: activeStateId,
+        ...(stage ? { CodStage: stage } : {}),
+      },
       include: {
         SAttribute: {
           include: {
@@ -128,6 +134,7 @@ export class ModelAttributesService {
           name: typeof content.name === 'string' ? content.name : property.CodAttributeProperty,
           label: typeof content.label === 'string' ? content.label : property.DesAttributeProperty,
           type: typeof content.type === 'string' ? content.type : 'text',
+          codStage: property.CodStage,
           validators: Array.isArray(content.validators) ? (content.validators as never[]) : [],
           validationMessages:
             content.validationMessages && typeof content.validationMessages === 'object'

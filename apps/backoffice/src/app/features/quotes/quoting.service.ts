@@ -153,6 +153,8 @@ export interface CreateQuotePayload {
   codProduct: string;
   codDistributionChannel: string;
   codDistributionWay: string;
+  /** Valores de los campos de nivel producto (comunes a todos los riesgos). */
+  genericAttributeValue?: Record<string, unknown>;
   risks: CreateQuoteRiskPayload[];
 }
 

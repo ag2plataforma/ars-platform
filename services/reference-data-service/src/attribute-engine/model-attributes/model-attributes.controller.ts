@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { CurrentUser, JwtPayload, Roles } from '@ars-platform/shared-common';
 import { ModelAttributesService } from './model-attributes.service';
 import { CreateModelAttributeDto } from './dto/create-model-attribute.dto';
@@ -26,8 +26,8 @@ export class ModelAttributesController {
    * `ModelAttributesService.getSchemaForReference`).
    */
   @Get('by-reference/:ideReference/schema')
-  getSchema(@Param('ideReference') ideReference: string) {
-    return this.service.getSchemaForReference(ideReference);
+  getSchema(@Param('ideReference') ideReference: string, @Query('stage') stage?: string) {
+    return this.service.getSchemaForReference(ideReference, stage === 'PRICING' || stage === 'CONTRACT' ? stage : undefined);
   }
 
   @Roles('ADMIN')

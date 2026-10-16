@@ -1,8 +1,8 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormsModule, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
-import { forkJoin, of } from 'rxjs';
+import { Observable, concat, forkJoin, last, of, shareReplay } from 'rxjs';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { CheckboxModule } from 'primeng/checkbox';
@@ -36,7 +36,13 @@ import { MOBILE_PHONE_CONTACT_CLASS, Person, PersonsService } from '../../core/p
 import { downloadBlob } from '../../core/files/file.util';
 import { DocumentTemplatesService } from '../documents/document-templates.service';
 import { PaymentFractionPickerComponent } from './payment-fraction-picker.component';
-import { RiskAttributeField, RiskAttributesService, STEP_CODE_CUSTOM_ATTRIBUTES } from './risk-attributes.service';
+import {
+  ProcessFlowResolution,
+  RiskAttributeField,
+  RiskAttributeSchema,
+  RiskAttributesService,
+  STEP_CODE_CUSTOM_ATTRIBUTES,
+} from './risk-attributes.service';
 
 const PRODUCTS_PATH = '/product-rating/products';
 const DISTRIBUTION_CHANNELS_PATH = '/party/distribution-channels';
@@ -126,6 +132,37 @@ function buildRiskFieldsState(fb: FormBuilder, codRiskProduct: string) {
 
 type RiskFieldsState = ReturnType<typeof buildRiskFieldsState>;
 
+/** Un riesgo agregado a la cotizacion. En productos multirriesgo puede haber varios del mismo tipo
+ * (ej. 4 viajeros), por eso se identifica con `key` y no con `CodRiskProduct`. */
+interface RiskEntry {
+  key: string;
+  row: CatalogRow;
+}
+
+/** Tope de riesgos por cotizacion (evita un tipeo accidental de "500"). */
+const MAX_RISKS = 20;
+
+/** Un plan visto "en comun" para todos los riesgos de una cotizacion multirriesgo: mismo plan para todos,
+ * cada riesgo se tarifa por separado y el total es la suma. */
+export interface CommonPlanCoverage {
+  desShortCoverage: string | null;
+  prime: number;
+  indSelected: boolean;
+  parts: Array<{ plan: QuotePlan; coverage: QuoteCoverage }>;
+}
+
+export interface CommonPlan {
+  codPlanProduct: string;
+  desShortPlan: string | null;
+  desLargePlan: string | null;
+  unitDesUnit: string;
+  total: number;
+  indSelected: boolean;
+  perRisk: Array<{ numRisk: number; desRisk: string; basePrice: number; plan: QuotePlan; risk: QuoteRisk }>;
+  mandatory: CommonPlanCoverage[];
+  optional: CommonPlanCoverage[];
+}
+
 /**
  * "Cotización" -- construida por etapas (decisión explícita del usuario,
  * `AskUserQuestion`: por etapas en vez de todo el wizard de una vez, y
@@ -205,7 +242,17 @@ export class QuotesComponent {
   readonly distributionChannels = signal<CatalogRow[]>([]);
   readonly distributionWays = signal<CatalogRow[]>([]);
   readonly riskProductOptions = signal<CatalogRow[]>([]);
-  readonly selectedRisks = signal<CatalogRow[]>([]);
+  readonly selectedRisks = signal<RiskEntry[]>([]);
+  private nextRiskKey = 0;
+
+  /** `CodProduct` elegido (como signal para que `isMultiRisk` reaccione). */
+  readonly selectedProductCode = signal('');
+  /** El producto elegido admite N riesgos por cotizacion (`SProduct.IndMultiRisk`). */
+  readonly isMultiRisk = computed(() => {
+    const cod = this.selectedProductCode();
+    return !!this.products().find((p) => p['CodProduct'] === cod)?.['IndMultiRisk'];
+  });
+  readonly maxRisks = MAX_RISKS;
 
   readonly creating = signal(false);
   readonly pricing = signal<QuotePricingResult | null>(null);
@@ -273,6 +320,12 @@ export class QuotesComponent {
    * `CodRiskProduct` -- ver `buildRiskFieldsState`. */
   private readonly riskFieldsMap = new Map<string, RiskFieldsState>();
 
+  /** Campos de NIVEL PRODUCTO que se piden al cotizar (etapa PRICING): comunes a todos los riesgos. */
+  readonly productFields = buildRiskFieldsState(this.fb, '__producto__');
+  private productFieldsLoadToken = 0;
+  /** Config (schema + flujo) por tipo de riesgo, cacheada para no repetir la consulta por cada riesgo igual. */
+  private readonly riskConfigCache = new Map<string, Observable<{ schema: RiskAttributeSchema; flow: ProcessFlowResolution | null }>>();
+
   form = this.fb.nonNullable.group({
     codProduct: ['', Validators.required],
     codDistributionChannel: ['', Validators.required],
@@ -280,6 +333,7 @@ export class QuotesComponent {
   });
 
   riskToAddControl = this.fb.control<string | null>(null);
+  riskQuantityControl = this.fb.nonNullable.control(1, [Validators.min(1), Validators.max(MAX_RISKS)]);
 
   constructor() {
     this.catalogService.list(PRODUCTS_PATH).subscribe({ next: (rows) => this.products.set(rows) });
@@ -299,6 +353,10 @@ export class QuotesComponent {
     // Angular llegara a reusar esta instancia entre dos ids distintos
     // (misma config de ruta, ':id'), aunque en el flujo real siempre se
     // navega acá desde el listado (`QuotesListComponent`).
+    // Los campos del producto dependen del flujo (canal/via): se recargan si cambian.
+    this.form.controls.codDistributionChannel.valueChanges.subscribe(() => this.reloadProductFieldsIfProduct());
+    this.form.controls.codDistributionWay.valueChanges.subscribe(() => this.reloadProductFieldsIfProduct());
+
     this.route.paramMap.subscribe((params) => {
       const ideQuoteParam = params.get('id');
       if (ideQuoteParam) {
@@ -312,10 +370,74 @@ export class QuotesComponent {
   onProductChange(): void {
     // Los riesgos agregados pertenecen al producto anterior -- al
     // cambiar de producto ya no aplican.
+    this.clearRisks();
+    this.riskToAddControl.setValue(null);
+    this.riskQuantityControl.setValue(1);
+    this.selectedProductCode.set(this.form.controls.codProduct.value);
+    this.refreshRiskProductOptions();
+    this.loadProductFields();
+  }
+
+  private clearRisks(): void {
     this.selectedRisks.set([]);
     this.riskFieldsMap.clear();
-    this.riskToAddControl.setValue(null);
-    this.refreshRiskProductOptions();
+  }
+
+  private reloadProductFieldsIfProduct(): void {
+    if (this.form.controls.codProduct.value) this.loadProductFields();
+  }
+
+  /** Vacia los campos de producto (sin producto elegido o al empezar una cotizacion nueva). */
+  private clearProductFields(): void {
+    this.productFieldsLoadToken++;
+    for (const key of Object.keys(this.productFields.form.controls)) this.productFields.form.removeControl(key);
+    this.productFields.fields.set([]);
+    this.productFields.loading.set(false);
+  }
+
+  /**
+   * Trae los campos de NIVEL PRODUCTO (etapa PRICING) del producto elegido y arma su formulario. Si ya
+   * habia valores cargados y el campo sigue existiendo, se conservan (el usuario puede estar cambiando
+   * canal/via con el formulario a medio llenar).
+   */
+  private loadProductFields(): void {
+    const previous = this.productFields.form.getRawValue() as Record<string, unknown>;
+    this.clearProductFields();
+    const codProduct = this.form.controls.codProduct.value;
+    const product = this.products().find((p) => p['CodProduct'] === codProduct);
+    if (!product) return;
+    const token = this.productFieldsLoadToken;
+    this.productFields.loading.set(true);
+    const codDistributionChannel = this.form.controls.codDistributionChannel.value;
+    const codDistributionWay = this.form.controls.codDistributionWay.value;
+    const flow$ = codDistributionChannel
+      ? this.riskAttributes.resolveActiveSteps({
+          codProduct,
+          codDistributionChannel,
+          codDistributionWay: codDistributionWay || undefined,
+        })
+      : of(null);
+    forkJoin({ schema: this.riskAttributes.getSchema(String(product['IdeProduct']), 'PRICING'), flow: flow$ }).subscribe({
+      next: ({ schema, flow }) => {
+        if (token !== this.productFieldsLoadToken) return; // llego tarde: el producto ya cambio
+        const stepActive = !flow || flow.codProcessFlow === null || flow.activeSteps.includes(STEP_CODE_CUSTOM_ATTRIBUTES);
+        const fields = stepActive ? schema.fields : [];
+        for (const field of fields) {
+          const initialValue = previous[field.ideAttributeProperty] ?? (field.type === 'checkbox' ? false : null);
+          this.productFields.form.addControl(
+            field.ideAttributeProperty,
+            this.fb.control(initialValue, buildValidators(field.validators)),
+          );
+        }
+        this.productFields.fields.set(fields);
+        this.productFields.loading.set(false);
+      },
+      error: (err: HttpErrorResponse) => {
+        if (token !== this.productFieldsLoadToken) return;
+        this.productFields.loading.set(false);
+        this.showError(err);
+      },
+    });
   }
 
   private refreshRiskProductOptions(): void {
@@ -342,20 +464,40 @@ export class QuotesComponent {
   addRisk(): void {
     const codRiskProduct = this.riskToAddControl.value;
     if (!codRiskProduct) return;
-    if (this.selectedRisks().some((row) => row['CodRiskProduct'] === codRiskProduct)) {
-      this.riskToAddControl.setValue(null);
-      return;
-    }
     const row = this.riskProductOptions().find((r) => r['CodRiskProduct'] === codRiskProduct);
     if (!row) return;
-    this.selectedRisks.update((current) => [...current, row]);
+    if (!this.isMultiRisk()) {
+      // Producto de un solo riesgo: elegir otro tipo reemplaza al anterior.
+      this.clearRisks();
+      this.pushRisk(row);
+    } else {
+      const quantity = Math.max(1, Math.min(MAX_RISKS, Math.trunc(Number(this.riskQuantityControl.value)) || 1));
+      const room = MAX_RISKS - this.selectedRisks().length;
+      for (let i = 0; i < Math.min(quantity, room); i++) this.pushRisk(row);
+    }
     this.riskToAddControl.setValue(null);
-    this.loadRiskFields(row);
+    this.riskQuantityControl.setValue(1);
   }
 
-  removeRisk(codRiskProduct: unknown): void {
-    this.selectedRisks.update((current) => current.filter((row) => row['CodRiskProduct'] !== codRiskProduct));
-    this.riskFieldsMap.delete(String(codRiskProduct));
+  private pushRisk(row: CatalogRow): void {
+    const entry: RiskEntry = { key: `risk-${++this.nextRiskKey}`, row };
+    this.selectedRisks.update((current) => [...current, entry]);
+    this.loadRiskFields(entry);
+  }
+
+  removeRisk(key: string): void {
+    this.selectedRisks.update((current) => current.filter((entry) => entry.key !== key));
+    this.riskFieldsMap.delete(key);
+  }
+
+  /** Numero del riesgo entre los de su mismo tipo ("Viaje 2"); solo se muestra en multirriesgo. */
+  riskNumber(entry: RiskEntry): number {
+    let n = 0;
+    for (const current of this.selectedRisks()) {
+      if (current.row['CodRiskProduct'] === entry.row['CodRiskProduct']) n++;
+      if (current === entry) return n;
+    }
+    return n;
   }
 
   /** Trae el schema de campos personalizados del riesgo recién agregado
@@ -363,14 +505,15 @@ export class QuotesComponent {
    * dinámico -- un control por `IdeAttributeProperty`, con los
    * validadores que declare cada campo. Un riesgo sin motor de
    * atributos configurado (`fields: []`) simplemente no pinta nada y no
-   * bloquea "Cotizar". */
-  private loadRiskFields(row: CatalogRow): void {
-    const codRiskProduct = String(row['CodRiskProduct']);
-    const ideRiskProduct = String(row['IdeRiskProduct']);
+   * bloquea "Cotizar". Solo los campos de etapa PRICING (los de
+   * CONTRACT se piden recien al contratar). */
+  private loadRiskFields(entry: RiskEntry): void {
+    const codRiskProduct = String(entry.row['CodRiskProduct']);
+    const ideRiskProduct = String(entry.row['IdeRiskProduct']);
     const state = buildRiskFieldsState(this.fb, codRiskProduct);
-    this.riskFieldsMap.set(codRiskProduct, state);
+    this.riskFieldsMap.set(entry.key, state);
 
-    // Además del schema (¿tiene este riesgo campos personalizados
+    // Ademas del schema (¿tiene este riesgo campos personalizados
     // configurados?), consulta si el flujo asignado al producto/canal
     // (`SProductProcessFlow`, pedido explícito del usuario, 2026-09-23)
     // deja ACTIVO el paso "Atributos personalizados" -- comportamiento
@@ -381,17 +524,25 @@ export class QuotesComponent {
     const codProduct = this.form.controls.codProduct.value;
     const codDistributionChannel = this.form.controls.codDistributionChannel.value;
     const codDistributionWay = this.form.controls.codDistributionWay.value;
-    const activeSteps$ =
-      codProduct && codDistributionChannel
-        ? this.riskAttributes.resolveActiveSteps({
-            codProduct,
-            codDistributionChannel,
-            codRiskProduct,
-            codDistributionWay: codDistributionWay || undefined,
-          })
-        : of(null);
+    const cacheKey = `${ideRiskProduct}|${codDistributionChannel}|${codDistributionWay}`;
+    let config$ = this.riskConfigCache.get(cacheKey);
+    if (!config$) {
+      const activeSteps$ =
+        codProduct && codDistributionChannel
+          ? this.riskAttributes.resolveActiveSteps({
+              codProduct,
+              codDistributionChannel,
+              codRiskProduct,
+              codDistributionWay: codDistributionWay || undefined,
+            })
+          : of(null);
+      config$ = forkJoin({ schema: this.riskAttributes.getSchema(ideRiskProduct, 'PRICING'), flow: activeSteps$ }).pipe(
+        shareReplay(1),
+      );
+      this.riskConfigCache.set(cacheKey, config$);
+    }
 
-    forkJoin({ schema: this.riskAttributes.getSchema(ideRiskProduct), flow: activeSteps$ }).subscribe({
+    config$.subscribe({
       next: ({ schema, flow }) => {
         const stepActive = !flow || flow.codProcessFlow === null || flow.activeSteps.includes(STEP_CODE_CUSTOM_ATTRIBUTES);
         const fields = stepActive ? schema.fields : [];
@@ -403,6 +554,7 @@ export class QuotesComponent {
         state.loading.set(false);
       },
       error: (err: HttpErrorResponse) => {
+        this.riskConfigCache.delete(cacheKey);
         state.loading.set(false);
         this.showError(err);
       },
@@ -411,8 +563,8 @@ export class QuotesComponent {
 
   /** Estado de campos personalizados de un riesgo ya agregado, para el
    * template (`@for` sobre `selectedRisks()`). */
-  customFieldsFor(codRiskProduct: unknown): RiskFieldsState | undefined {
-    return this.riskFieldsMap.get(String(codRiskProduct));
+  customFieldsFor(key: string): RiskFieldsState | undefined {
+    return this.riskFieldsMap.get(key);
   }
 
   fieldInvalid(riskFields: RiskFieldsState, field: RiskAttributeField): boolean {
@@ -434,8 +586,9 @@ export class QuotesComponent {
    * docs/02-roadmap.md). */
   canSubmit(): boolean {
     if (!this.form.valid || this.selectedRisks().length === 0 || this.creating()) return false;
+    if (this.productFields.loading() || this.productFields.form.invalid) return false;
     for (const risk of this.selectedRisks()) {
-      const state = this.riskFieldsMap.get(String(risk['CodRiskProduct']));
+      const state = this.riskFieldsMap.get(risk.key);
       if (!state) continue;
       if (state.loading() || state.form.invalid) return false;
     }
@@ -445,6 +598,7 @@ export class QuotesComponent {
   submit(): void {
     if (!this.canSubmit()) {
       this.form.markAllAsTouched();
+      this.productFields.form.markAllAsTouched();
       for (const state of this.riskFieldsMap.values()) {
         state.form.markAllAsTouched();
       }
@@ -457,9 +611,11 @@ export class QuotesComponent {
         codProduct: raw.codProduct,
         codDistributionChannel: raw.codDistributionChannel,
         codDistributionWay: raw.codDistributionWay,
-        risks: this.selectedRisks().map((row) => {
-          const codRiskProduct = String(row['CodRiskProduct']);
-          const state = this.riskFieldsMap.get(codRiskProduct);
+        genericAttributeValue:
+          this.productFields.fields().length > 0 ? this.productFields.form.getRawValue() : undefined,
+        risks: this.selectedRisks().map((entry) => {
+          const codRiskProduct = String(entry.row['CodRiskProduct']);
+          const state = this.riskFieldsMap.get(entry.key);
           return {
             codRiskProduct,
             riskAttributeValue: state ? state.form.getRawValue() : undefined,
@@ -524,6 +680,80 @@ export class QuotesComponent {
   /** Solo las coberturas seleccionadas con algún concepto calculado. */
   breakdownCoverages(plan: QuotePlan): QuoteCoverage[] {
     return [...plan.mandatoryCoverages, ...plan.optionalCoverages].filter((c) => c.indSelected && c.concepts.length > 0);
+  }
+
+  /** Cotizacion con mas de un riesgo: un solo plan para todos (cada riesgo se tarifa aparte y se suma). */
+  readonly commonPlanMode = computed(() => (this.pricing()?.risks.length ?? 0) > 1);
+
+  readonly commonPlans = computed<CommonPlan[]>(() => {
+    const risks = this.pricing()?.risks ?? [];
+    if (risks.length < 2) return [];
+    const result: CommonPlan[] = [];
+    for (const first of risks[0].plans) {
+      const perRisk: CommonPlan['perRisk'] = [];
+      for (const risk of risks) {
+        const plan = risk.plans.find((p) => p.codPlanProduct === first.codPlanProduct);
+        if (plan) perRisk.push({ numRisk: risk.numRisk, desRisk: risk.desRisk, basePrice: plan.basePrice, plan, risk });
+      }
+      if (perRisk.length !== risks.length) continue; // el plan no existe para todos los riesgos
+      const aggregate = (pick: (plan: QuotePlan) => QuoteCoverage[]): CommonPlanCoverage[] => {
+        const byName = new Map<string, CommonPlanCoverage>();
+        for (const { plan } of perRisk) {
+          for (const coverage of pick(plan)) {
+            const name: string = coverage.desShortCoverage ?? String(this.transloco.translate('quotes.coverageFallback'));
+            const entry = byName.get(name) ?? { desShortCoverage: name, prime: 0, indSelected: true, parts: [] };
+            entry.prime += Number(coverage.prime);
+            entry.indSelected = entry.indSelected && coverage.indSelected;
+            entry.parts.push({ plan, coverage });
+            byName.set(name, entry);
+          }
+        }
+        return [...byName.values()];
+      };
+      result.push({
+        codPlanProduct: first.codPlanProduct,
+        desShortPlan: first.desShortPlan,
+        desLargePlan: first.desLargePlan,
+        unitDesUnit: first.unit.desUnit,
+        total: perRisk.reduce((sum, p) => sum + Number(p.basePrice), 0),
+        indSelected: perRisk.every((p) => p.plan.indSelected),
+        perRisk,
+        mandatory: aggregate((plan) => plan.mandatoryCoverages),
+        optional: aggregate((plan) => plan.optionalCoverages),
+      });
+    }
+    return result;
+  });
+
+  /** Elige el mismo plan para todos los riesgos (una llamada por riesgo, en orden). */
+  selectCommonPlan(commonPlan: CommonPlan): void {
+    const ideQuote = this.ideQuote;
+    if (!ideQuote || commonPlan.indSelected) return;
+    const calls = commonPlan.perRisk
+      .filter((p) => !p.plan.indSelected)
+      .map((p) => this.quoting.selectPlan(ideQuote, p.risk.ideQuoteRisk, p.plan.ideQuoteRiskPlan));
+    concat(...calls)
+      .pipe(last())
+      .subscribe({
+        next: (result) => this.pricing.set(result),
+        error: (err: HttpErrorResponse) => this.showError(err),
+      });
+  }
+
+  /** Marca/desmarca una cobertura opcional en todos los riesgos del plan comun. */
+  toggleCommonCoverage(coverage: CommonPlanCoverage, selected: boolean): void {
+    const ideQuote = this.ideQuote;
+    if (!ideQuote) return;
+    const calls = coverage.parts
+      .filter((part) => part.coverage.indSelected !== selected)
+      .map((part) => this.quoting.toggleCoverage(ideQuote, part.plan.ideQuoteRiskPlan, part.coverage.ideQuoteCoverage, selected));
+    if (calls.length === 0) return;
+    concat(...calls)
+      .pipe(last())
+      .subscribe({
+        next: (result) => this.pricing.set(result),
+        error: (err: HttpErrorResponse) => this.showError(err),
+      });
   }
 
   unitLabel(desUnit: string): string {
@@ -1267,9 +1497,11 @@ export class QuotesComponent {
       slot.contactForm.reset();
       slot.savingContact.set(false);
     }
-    this.selectedRisks.set([]);
-    this.riskFieldsMap.clear();
+    this.clearRisks();
+    this.clearProductFields();
+    this.selectedProductCode.set('');
     this.riskToAddControl.setValue(null);
+    this.riskQuantityControl.setValue(1);
     this.form.reset();
     this.step.set('form');
   }
