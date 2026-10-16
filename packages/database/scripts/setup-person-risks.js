@@ -41,14 +41,32 @@ async function main() {
 
   const statements = [
     `ALTER TABLE ars_platform."SRisk" ADD COLUMN IF NOT EXISTS "IndPersonRisk" boolean NOT NULL DEFAULT false`,
-    // Por si una version anterior de este script llego a crear la columna en el tipo de riesgo.
-    `ALTER TABLE ars_platform."SRiskType" DROP COLUMN IF EXISTS "IndPersonRisk"`,
     `ALTER TABLE ars_platform."SProduct" ADD COLUMN IF NOT EXISTS "ObjInsuredPersonFields" json`,
     `ALTER TABLE ars_platform."TPerson" DROP CONSTRAINT IF EXISTS "UK_TPerson_02"`,
     `DROP INDEX IF EXISTS ars_platform."UK_TPerson_02"`,
     `CREATE INDEX IF NOT EXISTS "IX_TPerson_DesEmail" ON ars_platform."TPerson" ("DesEmail")`,
   ];
   for (const sql of statements) await client.query(sql);
+
+  // Una version anterior de este script creo la marca en SRiskType (error de diseno: ese catalogo
+  // indica principal/opcional). Si existe, se traspasa lo marcado a los SRisk que usan esos tipos
+  // (via SRiskProduct) y se elimina la columna.
+  const legacy = await client.query(
+    `SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'ars_platform' AND table_name = 'SRiskType' AND column_name = 'IndPersonRisk'`,
+  );
+  if (legacy.rowCount > 0) {
+    const moved = await client.query(
+      `UPDATE ars_platform."SRisk" r SET "IndPersonRisk" = true
+        WHERE EXISTS (
+          SELECT 1 FROM ars_platform."SRiskProduct" rp
+            JOIN ars_platform."SRiskType" rt ON rt."IdeRiskType" = rp."IdeRiskType"
+           WHERE rp."IdeRisk" = r."IdeRisk" AND rt."IndPersonRisk" = true)
+        RETURNING r."CodRisk"`,
+    );
+    console.log('Marca traspasada de SRiskType a SRisk:', JSON.stringify(moved.rows.map((r) => r.CodRisk)));
+    await client.query(`ALTER TABLE ars_platform."SRiskType" DROP COLUMN "IndPersonRisk"`);
+  }
 
   const marked = await client.query(
     `UPDATE ars_platform."SRisk" SET "IndPersonRisk" = true
