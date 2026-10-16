@@ -1333,6 +1333,7 @@ export class QuotesComponent {
 
   goToContractStep(): void {
     this.step.set('contract');
+    this.loadContractFields();
   }
 
   backToSummary(): void {
@@ -1359,6 +1360,36 @@ export class QuotesComponent {
     });
   }
 
+  /** Campos de nivel producto de etapa CONTRACT: se piden recien al contratar. */
+  readonly contractFields = buildRiskFieldsState(this.fb, '__contrato__');
+
+  private loadContractFields(): void {
+    for (const key of Object.keys(this.contractFields.form.controls)) this.contractFields.form.removeControl(key);
+    this.contractFields.fields.set([]);
+    const ideProduct = this.pricing()?.ideProduct;
+    if (!ideProduct || this.pricing()?.contract) {
+      this.contractFields.loading.set(false);
+      return;
+    }
+    this.contractFields.loading.set(true);
+    this.riskAttributes.getSchema(ideProduct, 'CONTRACT').subscribe({
+      next: (schema) => {
+        for (const field of schema.fields) {
+          this.contractFields.form.addControl(
+            field.ideAttributeProperty,
+            this.fb.control(field.type === 'checkbox' ? false : null, buildValidators(field.validators)),
+          );
+        }
+        this.contractFields.fields.set(schema.fields);
+        this.contractFields.loading.set(false);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.contractFields.loading.set(false);
+        this.showError(err);
+      },
+    });
+  }
+
   /** Navega a la pantalla de detalle de contrato (`/contratos/:id`) --
    *  el `p-tag` "Contrato <N>" pasa a ser un link real, pedido explícito
    *  del usuario el 22/09/2026 (ver docs/02-roadmap.md). */
@@ -1368,8 +1399,13 @@ export class QuotesComponent {
 
   generateContract(): void {
     if (!this.ideQuote) return;
+    if (this.contractFields.loading() || this.contractFields.form.invalid) {
+      this.contractFields.form.markAllAsTouched();
+      return;
+    }
+    const generic = this.contractFields.fields().length > 0 ? this.contractFields.form.getRawValue() : undefined;
     this.contracting.set(true);
-    this.quoting.createContract(this.ideQuote, this.paymentFraction() || undefined).subscribe({
+    this.quoting.createContract(this.ideQuote, this.paymentFraction() || undefined, generic).subscribe({
       next: (result) => {
         this.contracting.set(false);
         this.contractResult.set(result);
@@ -1426,11 +1462,13 @@ export class QuotesComponent {
             NumContract: result.contract.numContract,
           });
           this.step.set('contract');
+          this.loadContractFields();
           return;
         }
         if (result.codState === 'ACEPTADO') {
           this.quoteAccepted.set(true);
           this.step.set('contract');
+          this.loadContractFields();
           return;
         }
         if (result.socialImpact.active && !result.socialImpact.answered) {

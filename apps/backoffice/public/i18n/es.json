@@ -767,6 +767,8 @@
     "singleRiskHint": "Este producto cotiza un solo riesgo.",
     "commonPlanHint": "Esta cotización tiene {{n}} riesgos: se elige un único plan para todos. Cada riesgo se tarifa por separado y el total suma todos.",
     "perRiskBreakdown": "Por riesgo",
+    "contractDataLabel": "Datos para el contrato",
+    "contractDataHint": "Datos que se piden solo al emitir el contrato.",
     "chooseProductFirst": "Elegí primero un producto para ver sus riesgos disponibles.",
     "riskPlaceholder": "Elegí un riesgo",
     "addButton": "Agregar",

@@ -94,6 +94,8 @@ export interface GenericAdjustmentOption {
 export interface QuotePricingResult {
   ideQuote: string;
   numQuote: string;
+  ideProduct: string;
+  codProduct: string;
   symbolCurrency: string;
   /** `SState.CodState`/`DesState` de la cotización -- agregado para
    *  poder "retomar" una existente desde el listado sin reconstruir la
@@ -505,11 +507,15 @@ export class QuotingService {
    * previo. `codPaymentFraction` (opcional) es la fracción de pago elegida
    * (ver `listPaymentFractionOptions`); sin ella el backend usa la de menor
    * orden del producto. `initialDate` queda afuera (se usa la fecha actual). */
-  createContract(ideQuote: string, codPaymentFraction?: string): Observable<CreateContractResponse> {
-    return this.http.post<CreateContractResponse>(
-      `${this.base}/${ideQuote}/contract`,
-      codPaymentFraction ? { codPaymentFraction } : {},
-    );
+  createContract(
+    ideQuote: string,
+    codPaymentFraction?: string,
+    genericAttributeValue?: Record<string, unknown>,
+  ): Observable<CreateContractResponse> {
+    return this.http.post<CreateContractResponse>(`${this.base}/${ideQuote}/contract`, {
+      ...(codPaymentFraction ? { codPaymentFraction } : {}),
+      ...(genericAttributeValue ? { genericAttributeValue } : {}),
+    });
   }
 
   /** `GET :id/payment-fractions` -- fracciones que ofrece el producto hoy,

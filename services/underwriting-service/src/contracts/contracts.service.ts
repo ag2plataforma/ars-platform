@@ -182,6 +182,12 @@ export class ContractsService {
 
     await this.assertPersonsReadyForIssuance(quote.IdeQuote);
 
+    // Valores de nivel producto del certificado: los de la cotizacion (PRICING) + los pedidos al contratar (CONTRACT).
+    const fileGenericValues = {
+      ...((quote.GenericAttributeValue as Record<string, unknown> | null) ?? {}),
+      ...(dto.genericAttributeValue ?? {}),
+    };
+
     // Colectivos (etapa 1): una cotización con asegurados (`TQuoteRiskPerson`) genera un
     // certificado (`TContractFile`) por asegurado en vez de uno solo para todos los riesgos.
     // Etapa 2: sus requisitos obligatorios por asegurado no bloquean la contratación.
@@ -211,7 +217,7 @@ export class ContractsService {
           const allRiskCoverages: Awaited<ReturnType<ContractsService['copyRisksAndCoverages']>> = [];
           const fileIds: string[] = [];
           for (const [index, quoteRisk] of quoteRisks.entries()) {
-            const contractFile = await this.createContractFile(contract, actor, tx, index + 1, quote.GenericAttributeValue);
+            const contractFile = await this.createContractFile(contract, actor, tx, index + 1, fileGenericValues as Prisma.JsonObject);
             fileIds.push(contractFile.IdeContractFile);
             try {
               allRiskCoverages.push(
@@ -243,7 +249,7 @@ export class ContractsService {
             await this.setNetPrime(ideContractFile, actor, tx);
           }
         } else {
-          const contractFile = await this.createContractFile(contract, actor, tx, 1, quote.GenericAttributeValue);
+          const contractFile = await this.createContractFile(contract, actor, tx, 1, fileGenericValues as Prisma.JsonObject);
           await this.createInitialContractOperation(contract.IdeContract, actor, tx);
 
           const riskCoverages = await this.copyRisksAndCoverages(

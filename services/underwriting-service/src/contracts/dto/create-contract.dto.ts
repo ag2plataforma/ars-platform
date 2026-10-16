@@ -1,4 +1,4 @@
-import { IsDateString, IsOptional, IsString } from 'class-validator';
+import { IsDateString, IsObject, IsOptional, IsString } from 'class-validator';
 
 /**
  * Parámetros opcionales de `FContract('CONTRACTNEW', ...)` -- la cotización
@@ -22,4 +22,13 @@ export class CreateContractDto {
   @IsOptional()
   @IsDateString()
   initialDate?: string;
+
+  /**
+   * Valores de los campos de nivel producto de etapa CONTRACT (solo se piden al contratar), como
+   * `{ "<IdeAttributeProperty>": valor }`. Se mezclan con los de la cotizacion (PRICING) en
+   * `TContractFile.GenericAttributeValue`.
+   */
+  @IsOptional()
+  @IsObject()
+  genericAttributeValue?: Record<string, string>;
 }

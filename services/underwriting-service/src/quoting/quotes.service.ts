@@ -1031,6 +1031,8 @@ export class QuotesService {
     return {
       ideQuote: quote.IdeQuote,
       numQuote: quote.NumQuote,
+      ideProduct: quote.IdeProduct,
+      codProduct: quote.SProduct.CodProduct,
       symbolCurrency: quote.SProduct.SCurrency.SymbolCurrency,
       // Agregado para poder "retomar" una cotización existente desde el
       // listado (`GET /quotes/:id`, mismo endpoint, ver
