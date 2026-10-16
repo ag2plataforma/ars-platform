@@ -927,6 +927,64 @@
         </div>
       }
 
+      <ng-template #fieldsGrid let-riskFields>
+          <div [formGroup]="riskFields.form" class="grid grid-cols-2 gap-3 pt-1">
+            @for (field of riskFields.fields(); track field.ideAttributeProperty) {
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-slate-600">{{ field.label }}</label>
+                @switch (field.type) {
+                  @case ('select') {
+                    <p-select
+                      appendTo="body"
+                      [formControlName]="field.ideAttributeProperty"
+                      [options]="field.options ?? []"
+                      optionLabel="key"
+                      optionValue="value"
+                      [placeholder]="'quotes.selectOptionPlaceholder' | transloco"
+                      styleClass="w-full"
+                    />
+                  }
+                  @case ('radio') {
+                    <div class="flex flex-wrap gap-3 pt-1">
+                      @for (opt of field.options ?? []; track opt.key) {
+                        <label class="flex items-center gap-1 text-xs text-slate-600">
+                          <p-radiobutton [formControlName]="field.ideAttributeProperty" [value]="opt.value" />
+                          {{ opt.key }}
+                        </label>
+                      }
+                    </div>
+                  }
+                  @case ('checkbox') {
+                    <p-checkbox [binary]="true" [formControlName]="field.ideAttributeProperty" />
+                  }
+                  @case ('number') {
+                    <input pInputText type="number" [formControlName]="field.ideAttributeProperty" />
+                  }
+                  @case ('date') {
+                    <input pInputText type="date" [formControlName]="field.ideAttributeProperty" />
+                  }
+                  @default {
+                    <input pInputText type="text" [formControlName]="field.ideAttributeProperty" />
+                  }
+                }
+                @if (fieldInvalid(riskFields, field)) {
+                  <span class="text-xs text-red-600">{{ firstErrorMessage(riskFields, field) }}</span>
+                }
+              </div>
+            }
+          </div>
+      </ng-template>
+
+      @for (item of contractRiskFields(); track item.risk.ideQuoteRisk) {
+        <div class="flex flex-col gap-2 rounded-lg border border-slate-200 p-6">
+          <label class="text-sm font-medium text-slate-700">
+            {{ 'quotes.contractRiskDataLabel' | transloco: { num: item.risk.numRisk, des: item.risk.desRisk } }}
+          </label>
+          <p class="text-xs text-slate-500">{{ 'quotes.contractDataHint' | transloco }}</p>
+          <ng-container *ngTemplateOutlet="fieldsGrid; context: { $implicit: item.state }" />
+        </div>
+      }
+
       <div class="flex flex-col gap-4 rounded-lg border border-slate-200 p-6">
         <div class="flex items-center justify-between gap-4">
           <div>

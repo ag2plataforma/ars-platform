@@ -1050,6 +1050,7 @@ export class QuotesService {
       genericAdjustments,
       risks: quote.TQuoteRisk.map((risk) => ({
         ideQuoteRisk: risk.IdeQuoteRisk,
+        ideRiskProduct: risk.IdeRiskProduct,
         numRisk: risk.NumRisk,
         desRisk: risk.SRiskProduct.SRisk.DesRisk,
         plans: risk.TQuoteRiskPlan.map((plan) => {

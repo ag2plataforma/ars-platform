@@ -48,6 +48,7 @@ export interface QuotePlan {
 
 export interface QuoteRisk {
   ideQuoteRisk: string;
+  ideRiskProduct: string;
   numRisk: number;
   desRisk: string;
   plans: QuotePlan[];
@@ -511,10 +512,12 @@ export class QuotingService {
     ideQuote: string,
     codPaymentFraction?: string,
     genericAttributeValue?: Record<string, unknown>,
+    riskAttributeValues?: Record<string, Record<string, unknown>>,
   ): Observable<CreateContractResponse> {
     return this.http.post<CreateContractResponse>(`${this.base}/${ideQuote}/contract`, {
       ...(codPaymentFraction ? { codPaymentFraction } : {}),
       ...(genericAttributeValue ? { genericAttributeValue } : {}),
+      ...(riskAttributeValues ? { riskAttributeValues } : {}),
     });
   }
 

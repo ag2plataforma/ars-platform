@@ -228,6 +228,7 @@ export class ContractsService {
                   actor,
                   tx,
                   quoteRisk.IdeQuoteRisk,
+                  dto.riskAttributeValues,
                 )),
               );
             } catch (err) {
@@ -258,6 +259,8 @@ export class ContractsService {
             contractFile.IdeContractFile,
             actor,
             tx,
+            undefined,
+            dto.riskAttributeValues,
           );
           await this.createInitialMovements(riskCoverages, actor, tx);
           await this.setNetPrime(contractFile.IdeContractFile, actor, tx);
@@ -2867,6 +2870,7 @@ export class ContractsService {
     actor: string,
     tx: Prisma.TransactionClient = this.prisma,
     onlyIdeQuoteRisk?: string,
+    contractRiskValues?: Record<string, Record<string, string>>,
   ) {
     const quoteRisks = await tx.tQuoteRisk.findMany({
       where: { IdeQuote: ideQuote, ...(onlyIdeQuoteRisk ? { IdeQuoteRisk: onlyIdeQuoteRisk } : {}) },
@@ -2910,7 +2914,11 @@ export class ContractsService {
           NumFileRisk: numFileRisk,
           IdeRiskProduct: quoteRisk.IdeRiskProduct,
           IdePlanProductRisk: selectedPlan.IdePlanProductRisk,
-          RiskAttributeValue: quoteRisk.RiskAttributeValue ?? undefined,
+          // Valores del riesgo al cotizar (PRICING) + los pedidos al contratar (CONTRACT).
+          RiskAttributeValue:
+            contractRiskValues?.[quoteRisk.IdeQuoteRisk] && Object.keys(contractRiskValues[quoteRisk.IdeQuoteRisk]).length > 0
+              ? ({ ...((quoteRisk.RiskAttributeValue as Record<string, unknown> | null) ?? {}), ...contractRiskValues[quoteRisk.IdeQuoteRisk] } as Prisma.InputJsonObject)
+              : (quoteRisk.RiskAttributeValue ?? undefined),
           TstInclusion: now,
           TstInitial: contractFile.TstInitial,
           TstEnd: contractFile.TstEnd,

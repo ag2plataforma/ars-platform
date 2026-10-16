@@ -31,4 +31,13 @@ export class CreateContractDto {
   @IsOptional()
   @IsObject()
   genericAttributeValue?: Record<string, string>;
+
+  /**
+   * Valores de los campos de RIESGO de etapa CONTRACT, por riesgo de la cotizacion:
+   * `{ "<IdeQuoteRisk>": { "<IdeAttributeProperty>": valor } }`. Se mezclan con los del riesgo en
+   * `TFileRisk.RiskAttributeValue`.
+   */
+  @IsOptional()
+  @IsObject()
+  riskAttributeValues?: Record<string, Record<string, string>>;
 }

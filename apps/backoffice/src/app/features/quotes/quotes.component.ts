@@ -1363,13 +1363,37 @@ export class QuotesComponent {
   /** Campos de nivel producto de etapa CONTRACT: se piden recien al contratar. */
   readonly contractFields = buildRiskFieldsState(this.fb, '__contrato__');
 
+  /** Campos de RIESGO de etapa CONTRACT, por riesgo de la cotizacion (solo los que tienen alguno). */
+  readonly contractRiskFields = signal<Array<{ risk: QuoteRisk; state: RiskFieldsState }>>([]);
+
   private loadContractFields(): void {
     for (const key of Object.keys(this.contractFields.form.controls)) this.contractFields.form.removeControl(key);
     this.contractFields.fields.set([]);
+    this.contractRiskFields.set([]);
     const ideProduct = this.pricing()?.ideProduct;
     if (!ideProduct || this.pricing()?.contract) {
       this.contractFields.loading.set(false);
       return;
+    }
+    for (const risk of this.pricing()?.risks ?? []) {
+      this.riskAttributes.getSchema(risk.ideRiskProduct, 'CONTRACT').subscribe({
+        next: (schema) => {
+          if (schema.fields.length === 0) return;
+          const state = buildRiskFieldsState(this.fb, risk.ideRiskProduct);
+          for (const field of schema.fields) {
+            state.form.addControl(
+              field.ideAttributeProperty,
+              this.fb.control(field.type === 'checkbox' ? false : null, buildValidators(field.validators)),
+            );
+          }
+          state.fields.set(schema.fields);
+          state.loading.set(false);
+          this.contractRiskFields.update((current) =>
+            [...current, { risk, state }].sort((a, b) => a.risk.numRisk - b.risk.numRisk),
+          );
+        },
+        error: (err: HttpErrorResponse) => this.showError(err),
+      });
     }
     this.contractFields.loading.set(true);
     this.riskAttributes.getSchema(ideProduct, 'CONTRACT').subscribe({
@@ -1399,13 +1423,23 @@ export class QuotesComponent {
 
   generateContract(): void {
     if (!this.ideQuote) return;
-    if (this.contractFields.loading() || this.contractFields.form.invalid) {
+    const riskStates = this.contractRiskFields();
+    if (
+      this.contractFields.loading() ||
+      this.contractFields.form.invalid ||
+      riskStates.some(({ state }) => state.form.invalid)
+    ) {
       this.contractFields.form.markAllAsTouched();
+      for (const { state } of riskStates) state.form.markAllAsTouched();
       return;
     }
+    const riskValues: Record<string, Record<string, unknown>> = {};
+    for (const { risk, state } of riskStates) riskValues[risk.ideQuoteRisk] = state.form.getRawValue();
     const generic = this.contractFields.fields().length > 0 ? this.contractFields.form.getRawValue() : undefined;
     this.contracting.set(true);
-    this.quoting.createContract(this.ideQuote, this.paymentFraction() || undefined, generic).subscribe({
+    this.quoting
+      .createContract(this.ideQuote, this.paymentFraction() || undefined, generic, riskStates.length > 0 ? riskValues : undefined)
+      .subscribe({
       next: (result) => {
         this.contracting.set(false);
         this.contractResult.set(result);
