@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsOptional, IsString } from 'class-validator';
 
 export class UpdateRiskDto {
   @IsOptional()
@@ -8,4 +8,8 @@ export class UpdateRiskDto {
   @IsOptional()
   @IsString()
   codRiskLevel?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  indPersonRisk?: boolean;
 }

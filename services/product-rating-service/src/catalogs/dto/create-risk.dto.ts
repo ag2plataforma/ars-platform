@@ -1,4 +1,4 @@
-import { IsString, Matches } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, Matches } from 'class-validator';
 
 export class CreateRiskDto {
   @IsString()
@@ -13,4 +13,9 @@ export class CreateRiskDto {
   /** CodRiskLevel del nivel de riesgo al que pertenece (debe existir). */
   @IsString()
   codRiskLevel!: string;
+
+  /** `true` = el riesgo ES una persona (ej. viajero): al contratar se piden los datos del asegurado. */
+  @IsOptional()
+  @IsBoolean()
+  indPersonRisk?: boolean;
 }

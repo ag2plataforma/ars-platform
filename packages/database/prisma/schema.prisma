@@ -1747,6 +1747,7 @@ model SRisk {
   IdeRisk         String         @id(map: "PK_SRisk") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   CodRisk         String         @unique(map: "UK_SRisk_01") @db.VarChar(30)
   DesRisk         String         @db.VarChar(200)
+  IndPersonRisk   Boolean        @default(false)
   IdeRiskLevel    String         @db.Uuid
   IdeTextContent  String?        @db.Uuid
   IdeState        String         @db.Uuid
@@ -1847,7 +1848,6 @@ model SRiskType {
   IdeRiskType     String         @id(map: "PK_SRiskType") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   CodRiskType     String         @unique(map: "UK_SRiskType_01") @db.VarChar(30)
   DesRiskType     String         @db.VarChar(200)
-  IndPersonRisk   Boolean        @default(false)
   IdeTextContent  String?        @db.Uuid
   IdeState        String         @db.Uuid
   UsrCreation     String         @db.VarChar(60)

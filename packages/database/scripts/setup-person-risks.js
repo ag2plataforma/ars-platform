@@ -2,9 +2,10 @@
 /**
  * Prepara la BD para los riesgos de tipo persona (ver docs/02-roadmap.md):
  *
- *  - SRiskType."IndPersonRisk" boolean default false: marca los tipos de
- *    riesgo cuyo riesgo ES una persona (ej. "Persona"). Al contratar, la app
- *    pide los datos minimos de cada asegurado y crea/busca la persona.
+ *  - SRisk."IndPersonRisk" boolean default false: marca los riesgos que SON
+ *    una persona (ej. "Viaje", "Persona"). Al contratar, la app pide los datos
+ *    minimos de cada asegurado y crea/busca la persona. (SRiskType NO se usa:
+ *    indica si el riesgo es principal u opcional.)
  *  - SProduct."ObjInsuredPersonFields" json: configuracion por producto de
  *    los datos de persona a pedir ({ campo: "OPTIONAL" | "REQUIRED" }).
  *    Null = minimo por defecto (nombre, primer apellido, documento, nacimiento).
@@ -12,8 +13,8 @@
  *    permitir que varias personas compartan correo (menores con el correo de
  *    un padre). La identidad de la persona pasa a ser el documento
  *    (UK_TPerson_01: tipo + numero, que se mantiene). Se crea un indice normal.
- *  - Marca como persona los tipos de riesgo cuyo codigo/descripcion sea
- *    "PERSONA"/"PERSON" (si existen); el resto se marca desde el catalogo.
+ *  - Marca como persona los riesgos cuyo codigo/descripcion sea
+ *    "PERSONA"/"PERSON" (si existen); el resto se marca desde Catalogos > Riesgos.
  *
  * Idempotente. Uso (desde la raiz del repo):
  *   bash scripts/db-run.sh setup-person-risks.js
@@ -39,7 +40,9 @@ async function main() {
   await client.connect();
 
   const statements = [
-    `ALTER TABLE ars_platform."SRiskType" ADD COLUMN IF NOT EXISTS "IndPersonRisk" boolean NOT NULL DEFAULT false`,
+    `ALTER TABLE ars_platform."SRisk" ADD COLUMN IF NOT EXISTS "IndPersonRisk" boolean NOT NULL DEFAULT false`,
+    // Por si una version anterior de este script llego a crear la columna en el tipo de riesgo.
+    `ALTER TABLE ars_platform."SRiskType" DROP COLUMN IF EXISTS "IndPersonRisk"`,
     `ALTER TABLE ars_platform."SProduct" ADD COLUMN IF NOT EXISTS "ObjInsuredPersonFields" json`,
     `ALTER TABLE ars_platform."TPerson" DROP CONSTRAINT IF EXISTS "UK_TPerson_02"`,
     `DROP INDEX IF EXISTS ars_platform."UK_TPerson_02"`,
@@ -48,16 +51,16 @@ async function main() {
   for (const sql of statements) await client.query(sql);
 
   const marked = await client.query(
-    `UPDATE ars_platform."SRiskType" SET "IndPersonRisk" = true
-      WHERE upper("CodRiskType") IN ('PERSONA','PERSON') OR upper("DesRiskType") IN ('PERSONA','PERSON')
-      RETURNING "CodRiskType", "DesRiskType"`,
+    `UPDATE ars_platform."SRisk" SET "IndPersonRisk" = true
+      WHERE upper("CodRisk") IN ('PERSONA','PERSON') OR upper("DesRisk") IN ('PERSONA','PERSON')
+      RETURNING "CodRisk", "DesRisk"`,
   );
   const all = await client.query(
-    `SELECT "CodRiskType", "DesRiskType", "IndPersonRisk" FROM ars_platform."SRiskType" ORDER BY 1`,
+    `SELECT "CodRisk", "DesRisk", "IndPersonRisk" FROM ars_platform."SRisk" ORDER BY 1`,
   );
   console.log('OK. Columnas listas; correo de TPerson ya no es unico.');
   console.log('Marcados como persona ahora:', JSON.stringify(marked.rows));
-  console.log('Tipos de riesgo:', JSON.stringify(all.rows));
+  console.log('Riesgos:', JSON.stringify(all.rows));
   await client.end();
 }
 

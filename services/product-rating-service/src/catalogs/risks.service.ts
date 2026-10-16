@@ -39,7 +39,7 @@ export class RisksService {
     return this.crud.create(
       dto.codRisk,
       dto.desRisk,
-      { IdeRiskLevel: ideRiskLevel },
+      { IdeRiskLevel: ideRiskLevel, IndPersonRisk: dto.indPersonRisk ?? false },
       activeStateId,
       actor,
     );
@@ -50,6 +50,7 @@ export class RisksService {
     if (dto.codRiskLevel !== undefined) {
       extra.IdeRiskLevel = await this.resolveRiskLevel(dto.codRiskLevel);
     }
+    if (dto.indPersonRisk !== undefined) extra.IndPersonRisk = dto.indPersonRisk;
     return this.crud.update(id, dto.desRisk, extra, actor);
   }
 

@@ -33,13 +33,11 @@ export class RiskTypesService {
 
   async create(dto: CreateRiskTypeDto, actor: string): Promise<SRiskType> {
     const activeStateId = await this.stateMachine.getStateByCode('ACTIVO');
-    return this.crud.create(dto.codRiskType, dto.desRiskType, { IndPersonRisk: dto.indPersonRisk ?? false }, activeStateId, actor);
+    return this.crud.create(dto.codRiskType, dto.desRiskType, {}, activeStateId, actor);
   }
 
   update(id: string, dto: UpdateRiskTypeDto, actor: string): Promise<SRiskType> {
-    const extra: Record<string, unknown> = {};
-    if (dto.indPersonRisk !== undefined) extra.IndPersonRisk = dto.indPersonRisk;
-    return this.crud.update(id, dto.desRiskType, extra, actor);
+    return this.crud.update(id, dto.desRiskType, {}, actor);
   }
 
   async setState(id: string, codState: string, actor: string): Promise<SRiskType> {

@@ -1375,7 +1375,7 @@ export class QuotesComponent {
   /** Campos de RIESGO de etapa CONTRACT, por riesgo de la cotizacion (solo los que tienen alguno). */
   readonly contractRiskFields = signal<Array<{ risk: QuoteRisk; state: RiskFieldsState }>>([]);
 
-  /** Asegurados de los riesgos de tipo persona (`SRiskType.IndPersonRisk`): datos minimos que pide el producto. */
+  /** Asegurados de los riesgos de tipo persona (`SRisk.IndPersonRisk`): datos minimos que pide el producto. */
   readonly insuredPersons = signal<Array<{ risk: QuoteRisk; form: FormGroup }>>([]);
   readonly insuredConfig = signal<InsuredPersonConfig>(resolveInsuredPersonConfig(null));
   readonly identificationTypes = signal<CatalogRow[]>([]);
@@ -1396,8 +1396,8 @@ export class QuotesComponent {
 
   private isPersonRisk(ideRiskProduct: string): boolean {
     const row = this.allRiskProducts.find((r) => r['IdeRiskProduct'] === ideRiskProduct);
-    const riskType = row?.['SRiskType'] as Record<string, unknown> | undefined;
-    return riskType?.['IndPersonRisk'] === true;
+    const risk = row?.['SRisk'] as Record<string, unknown> | undefined;
+    return risk?.['IndPersonRisk'] === true;
   }
 
   private buildInsuredForm(config: InsuredPersonConfig): FormGroup {
