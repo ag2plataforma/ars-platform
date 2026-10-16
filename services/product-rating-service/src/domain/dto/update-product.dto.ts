@@ -41,6 +41,11 @@ export class UpdateProductDto {
   @IsBoolean()
   indProportionalPrime?: boolean;
 
+  /** Multirriesgo: la cotizacion admite N riesgos (ej. viaje familiar). */
+  @IsOptional()
+  @IsBoolean()
+  indMultiRisk?: boolean;
+
   @IsOptional()
   @IsDateString()
   tstInitial?: string;

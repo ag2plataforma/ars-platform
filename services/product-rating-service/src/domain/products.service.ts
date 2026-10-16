@@ -114,6 +114,7 @@ export class ProductsService {
     if (dto.indProportionalPrime !== undefined) {
       extra.IndProportionalPrime = dto.indProportionalPrime;
     }
+    if (dto.indMultiRisk !== undefined) extra.IndMultiRisk = dto.indMultiRisk;
     if (dto.tstInitial !== undefined) extra.TstInitial = new Date(dto.tstInitial);
     if (dto.tstEnd !== undefined) extra.TstEnd = new Date(dto.tstEnd);
 

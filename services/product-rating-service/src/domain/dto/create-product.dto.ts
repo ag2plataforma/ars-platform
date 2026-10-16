@@ -54,6 +54,11 @@ export class CreateProductDto {
   @IsBoolean()
   indProportionalPrime?: boolean;
 
+  /** Multirriesgo: la cotizacion admite N riesgos (ej. viaje familiar). Si se omite, queda false (un solo riesgo). */
+  @IsOptional()
+  @IsBoolean()
+  indMultiRisk?: boolean;
+
   @IsDateString()
   tstInitial!: string;
 

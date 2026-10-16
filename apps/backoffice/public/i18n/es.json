@@ -396,6 +396,8 @@
     "validityDaysLabel": "Días de vigencia (opcional)",
     "generateAllFractionLabel": "Generar todas las fracciones",
     "proportionalPrimeLabel": "Prima proporcional",
+    "multiRiskLabel": "Multirriesgo (la cotización admite varios riesgos)",
+    "multiRiskHelp": "Si está desmarcado, la cotización tiene un solo riesgo. Márcalo cuando se asegure a varias personas/bienes en una misma cotización (ej. viaje familiar).",
     "validFromLabel": "Vigencia desde",
     "validToLabel": "Vigencia hasta (opcional)",
     "loadErrorDetail": "No se pudieron cargar los productos.",
