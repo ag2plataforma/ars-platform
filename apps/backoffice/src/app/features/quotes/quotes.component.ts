@@ -510,6 +510,22 @@ export class QuotesComponent {
     });
   }
 
+  /** Planes con el desglose de cálculo desplegado (`ideQuoteRiskPlan`). */
+  readonly openBreakdowns = signal<ReadonlySet<string>>(new Set());
+
+  toggleBreakdown(ideQuoteRiskPlan: string): void {
+    this.openBreakdowns.update((current) => {
+      const next = new Set(current);
+      if (!next.delete(ideQuoteRiskPlan)) next.add(ideQuoteRiskPlan);
+      return next;
+    });
+  }
+
+  /** Solo las coberturas seleccionadas con algún concepto calculado. */
+  breakdownCoverages(plan: QuotePlan): QuoteCoverage[] {
+    return [...plan.mandatoryCoverages, ...plan.optionalCoverages].filter((c) => c.indSelected && c.concepts.length > 0);
+  }
+
   unitLabel(desUnit: string): string {
     if (desUnit === 'Month') return this.transloco.translate('quotes.unitMonth');
     if (desUnit === 'Day') return this.transloco.translate('quotes.unitDay');

@@ -955,7 +955,9 @@ export class QuotesService {
             TQuoteRiskPlan: {
               include: {
                 SPlanProductRisk: { include: { SPlanProduct: true } },
-                TQuoteCoverage: { include: { SCoveragePlan: true } },
+                TQuoteCoverage: {
+                  include: { SCoveragePlan: true, TQuoteCoverageConcept: { include: { SConcept: true } } },
+                },
               },
             },
           },
@@ -965,6 +967,27 @@ export class QuotesService {
     if (!quote) {
       throw new NotFoundException(`No existe cotización con id "${ideQuote}"`);
     }
+
+    // Orden y regla de cada concepto (desglose del cálculo por cobertura): un
+    // `TQuoteCoverageConcept` no guarda de qué regla salió, pero cada regla
+    // lleva su concepto y su `Order` dentro de la cobertura (`SCoveragePlan`).
+    const coveragePlanIds = new Set<string>();
+    for (const risk of quote.TQuoteRisk) {
+      for (const plan of risk.TQuoteRiskPlan) {
+        for (const coverage of plan.TQuoteCoverage) coveragePlanIds.add(coverage.IdeCoveragePlan);
+      }
+    }
+    const ruleRows = await this.prisma.sCalculationRule.findMany({
+      where: { IdeCoveragePlan: { in: [...coveragePlanIds] } },
+      select: { IdeCoveragePlan: true, IdeConcept: true, CodCalculationRule: true, Order: true },
+      orderBy: { Order: 'asc' },
+    });
+    const ruleByConcept = new Map<string, { codRule: string; order: number }>();
+    for (const rule of ruleRows) {
+      const key = `${rule.IdeCoveragePlan}|${rule.IdeConcept}`;
+      if (!ruleByConcept.has(key)) ruleByConcept.set(key, { codRule: rule.CodCalculationRule, order: rule.Order });
+    }
+    const mapCoverage = (coverage: Parameters<typeof mapCoverageBase>[0]) => mapCoverageBase(coverage, ruleByConcept);
 
     const productValidityType = await this.prisma.sProductValidityType.findFirst({
       where: { IdeProduct: quote.IdeProduct, SState: { CodState: 'ACTIVO' } },
@@ -1297,14 +1320,36 @@ export class QuotesService {
   }
 }
 
-function mapCoverage(coverage: {
-  IdeQuoteCoverage: string;
-  IndSelected: boolean;
-  Amount: unknown;
-  Rate: unknown;
-  Prime: unknown;
-  SCoveragePlan: { DesShort: string | null; DesLarge: string | null };
-}) {
+function mapCoverageBase(
+  coverage: {
+    IdeQuoteCoverage: string;
+    IdeCoveragePlan: string;
+    IndSelected: boolean;
+    Amount: unknown;
+    Rate: unknown;
+    Prime: unknown;
+    SCoveragePlan: { DesShort: string | null; DesLarge: string | null };
+    TQuoteCoverageConcept: Array<{
+      IdeConcept: string;
+      ConceptValue: unknown;
+      SConcept: { CodConcept: string; DesConcept: string };
+    }>;
+  },
+  ruleByConcept: Map<string, { codRule: string; order: number }>,
+) {
+  // Desglose del cálculo, en el orden de las reglas (los conceptos sin regla, al final).
+  const concepts = coverage.TQuoteCoverageConcept.map((c) => {
+    const rule = ruleByConcept.get(`${coverage.IdeCoveragePlan}|${c.IdeConcept}`);
+    return {
+      codConcept: c.SConcept.CodConcept,
+      desConcept: c.SConcept.DesConcept,
+      value: Number(c.ConceptValue),
+      codRule: rule?.codRule ?? null,
+      order: rule?.order ?? Number.MAX_SAFE_INTEGER,
+    };
+  })
+    .sort((a, b) => a.order - b.order)
+    .map(({ order: _order, ...rest }) => rest);
   return {
     ideQuoteCoverage: coverage.IdeQuoteCoverage,
     desShortCoverage: coverage.SCoveragePlan.DesShort,
@@ -1313,6 +1358,7 @@ function mapCoverage(coverage: {
     amount: Number(coverage.Amount),
     rate: Number(coverage.Rate),
     prime: Number(coverage.Prime),
+    concepts,
   };
 }
 

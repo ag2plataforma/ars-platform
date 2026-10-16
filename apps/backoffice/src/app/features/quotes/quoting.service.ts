@@ -9,6 +9,14 @@ import { fileToBase64 } from '../../core/files/file.util';
  * la forma de esta respuesta es una decisión de API propia del backend,
  * no una réplica literal de `FQuote('QUOTEPRICING',...)`; el algoritmo y
  * los valores sí lo son). */
+/** Un paso del cálculo de una cobertura (`TQuoteCoverageConcept`), en el orden de las reglas. */
+export interface QuoteCoverageConcept {
+  codConcept: string;
+  desConcept: string;
+  value: number;
+  codRule: string | null;
+}
+
 export interface QuoteCoverage {
   ideQuoteCoverage: string;
   desShortCoverage: string | null;
@@ -17,6 +25,7 @@ export interface QuoteCoverage {
   amount: number;
   rate: number;
   prime: number;
+  concepts: QuoteCoverageConcept[];
 }
 
 export interface QuotePlanUnit {

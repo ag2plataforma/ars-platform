@@ -839,7 +839,9 @@
     "contractGeneratedDetail": "Contrato {{num}}.",
     "invalidValueFallback": "Valor inválido.",
     "unitMonth": "mes",
-    "unitDay": "día"
+    "unitDay": "día",
+    "unitPeriodTotal": "total del periodo",
+    "breakdownToggle": "Ver desglose del cálculo"
   },
   "quotesList": {
     "title": "Cotizaciones",
