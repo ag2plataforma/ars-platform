@@ -91,6 +91,7 @@ model SAttributeProperty {
   IdeModelAttribute    String          @db.Uuid
   IdeAttribute         String          @db.Uuid
   AttributeContent     String          @db.VarChar
+  CodStage             String          @default("PRICING") @db.VarChar(10)
   IdeTextContent       String?         @db.Uuid
   IdeState             String          @db.Uuid
   UsrCreation          String          @db.VarChar(60)
@@ -1376,6 +1377,7 @@ model SProduct {
   CodStartTime            String                    @db.VarChar(15)
   IndGenerateAllFraction  Boolean
   IndProportionalPrime    Boolean                   @default(true)
+  IndMultiRisk            Boolean                   @default(false)
   TstInitial              DateTime                  @db.Date
   TstEnd                  DateTime?                 @db.Date
   IdeTextContent          String?                   @db.Uuid
@@ -2573,6 +2575,7 @@ model TContractFile {
   TstEnd              DateTime              @db.Timestamp(6)
   TstCancellation     DateTime?             @db.Timestamp(6)
   DesCancellation     String?               @db.VarChar
+  GenericAttributeValue Json?               @db.Json
   IdeState            String                @db.Uuid
   UsrCreation         String                @db.VarChar(60)
   TstCreation         DateTime              @db.Timestamp(6)
@@ -3008,6 +3011,7 @@ model TQuote {
   IdeProduct               String                    @db.Uuid
   IdeDistributionWay       String                    @db.Uuid
   TstQuote                 DateTime                  @db.Timestamp(6)
+  GenericAttributeValue    Json?                     @db.Json
   IdeState                 String                    @db.Uuid
   UsrCreation              String                    @db.VarChar(60)
   TstCreation              DateTime                  @db.Timestamp(6)
