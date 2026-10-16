@@ -396,6 +396,7 @@
     "validityDaysLabel": "Días de vigencia (opcional)",
     "generateAllFractionLabel": "Generar todas las fracciones",
     "proportionalPrimeLabel": "Prima proporcional",
+    "productFieldsButton": "Campos del producto",
     "multiRiskLabel": "Multirriesgo (la cotización admite varios riesgos)",
     "multiRiskHelp": "Si está desmarcado, la cotización tiene un solo riesgo. Márcalo cuando se asegure a varias personas/bienes en una misma cotización (ej. viaje familiar).",
     "validFromLabel": "Vigencia desde",
@@ -692,6 +693,14 @@
       "title": "Campos personalizados",
       "openButton": "Campos personalizados",
       "subtitle": "Datos que se piden de cada riesgo al cotizar (por ejemplo la raza de una mascota o el año de un vehículo). Solo influyen en la tarifa si una tabla de factores los usa.",
+      "subtitleProduct": "Datos generales de la cotización/contratación, comunes a todos los riesgos (por ejemplo días de viaje, tipo de viaje o zona). Solo influyen en la tarifa si una tabla de factores o una regla los usa.",
+      "emptyStateProduct": "Este producto todavía no tiene campos propios (a nivel de producto).",
+      "stageColumn": "Se pide",
+      "stageHint": "Al cotizar: se pide en la cotización y el contrato lo hereda (puede influir en el precio). Solo al contratar: se pide únicamente al emitir el contrato (no influye en el precio).",
+      "stage": {
+        "PRICING": "Al cotizar",
+        "CONTRACT": "Solo al contratar"
+      },
       "newButton": "Agregar campo",
       "labelColumn": "Etiqueta",
       "typeColumn": "Tipo",

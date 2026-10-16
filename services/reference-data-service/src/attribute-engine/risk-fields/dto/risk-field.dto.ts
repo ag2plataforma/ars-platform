@@ -1,13 +1,28 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsIn, IsNumber, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsNumber, IsOptional, IsString, IsUUID, MaxLength, MinLength, ValidateIf } from 'class-validator';
 
 export const RISK_FIELD_TYPES = ['text', 'number', 'date', 'select', 'radio', 'checkbox'] as const;
 export type RiskFieldType = (typeof RISK_FIELD_TYPES)[number];
 
+/** Etapa en la que se pide el campo: al cotizar (y el contrato lo hereda) o solo al contratar. */
+export const FIELD_STAGES = ['PRICING', 'CONTRACT'] as const;
+export type FieldStage = (typeof FIELD_STAGES)[number];
+
 export class CreateRiskFieldDto {
-  /** `IdeRiskProduct` al que se le agrega el campo personalizado. */
+  /** `IdeRiskProduct` al que se le agrega el campo personalizado (campo de RIESGO). */
+  @ValidateIf((o: CreateRiskFieldDto) => !o.ideProduct)
   @IsUUID()
-  ideRiskProduct!: string;
+  ideRiskProduct?: string;
+
+  /** `IdeProduct` al que se le agrega el campo (campo de PRODUCTO, comun a todos los riesgos). Excluyente con `ideRiskProduct`. */
+  @ValidateIf((o: CreateRiskFieldDto) => !o.ideRiskProduct)
+  @IsUUID()
+  ideProduct?: string;
+
+  /** `PRICING` (default): se pide al cotizar. `CONTRACT`: solo al contratar. */
+  @IsOptional()
+  @IsIn(FIELD_STAGES)
+  codStage?: FieldStage;
 
   @IsString()
   @MinLength(1)
@@ -52,6 +67,10 @@ export class CreateRiskFieldDto {
 }
 
 export class UpdateRiskFieldDto {
+  @IsOptional()
+  @IsIn(FIELD_STAGES)
+  codStage?: FieldStage;
+
   @IsOptional()
   @IsString()
   @MinLength(1)

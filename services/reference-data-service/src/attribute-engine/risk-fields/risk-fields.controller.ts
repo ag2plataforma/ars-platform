@@ -16,7 +16,12 @@ export class RiskFieldsController {
 
   @Get('by-risk-product/:ideRiskProduct')
   findByRiskProduct(@Param('ideRiskProduct', ParseUUIDPipe) ideRiskProduct: string) {
-    return this.service.findByRiskProduct(ideRiskProduct);
+    return this.service.findByReference(ideRiskProduct);
+  }
+
+  @Get('by-product/:ideProduct')
+  findByProduct(@Param('ideProduct', ParseUUIDPipe) ideProduct: string) {
+    return this.service.findByReference(ideProduct);
   }
 
   @Roles('ADMIN')

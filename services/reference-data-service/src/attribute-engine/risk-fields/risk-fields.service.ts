@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, PrismaService } from '@ars-platform/database';
 import { StateMachineService } from '@ars-platform/shared-common';
-import { CreateRiskFieldDto, RISK_FIELD_TYPES, UpdateRiskFieldDto } from './dto/risk-field.dto';
+import { CreateRiskFieldDto, FIELD_STAGES, RISK_FIELD_TYPES, UpdateRiskFieldDto } from './dto/risk-field.dto';
 
 /** Prefijo de los diccionarios creados desde esta pantalla (el resto, p. ej. razas, son compartidos/solo lectura). */
 const OWN_DICTIONARY_PREFIX = 'RF_';
@@ -26,6 +26,8 @@ export interface RiskFieldView {
   /** `true` si las opciones se editan acá (diccionario creado desde esta pantalla). */
   ownDictionary: boolean;
   options: RiskFieldOption[];
+  /** `PRICING` (se pide al cotizar) o `CONTRACT` (solo al contratar). */
+  codStage: string;
   codState: string;
 }
 
@@ -78,8 +80,9 @@ export class RiskFieldsService {
       .filter((d) => d.optionCount > 0);
   }
 
-  async findByRiskProduct(ideRiskProduct: string): Promise<RiskFieldView[]> {
-    const models = await this.prisma.sModelAttribute.findMany({ where: { IdeReference: ideRiskProduct } });
+  /** Campos de un set de atributos por su referencia: `IdeRiskProduct` (campos de riesgo) o `IdeProduct` (campos de producto). */
+  async findByReference(ideReference: string): Promise<RiskFieldView[]> {
+    const models = await this.prisma.sModelAttribute.findMany({ where: { IdeReference: ideReference } });
     if (models.length === 0) return [];
     const properties = await this.prisma.sAttributeProperty.findMany({
       where: { IdeModelAttribute: { in: models.map((m) => m.IdeModelAttribute) } },
@@ -111,6 +114,7 @@ export class RiskFieldsService {
           desFieldValue: v.DesFieldValue,
           active: v.SState.CodState === 'ACTIVO',
         })).sort((a, b) => a.desFieldValue.localeCompare(b.desFieldValue)),
+        codStage: p.CodStage,
         codState: p.SState.CodState,
       };
     });
@@ -118,11 +122,14 @@ export class RiskFieldsService {
 
   async create(dto: CreateRiskFieldDto, actor: string): Promise<RiskFieldView[]> {
     if (!RISK_FIELD_TYPES.includes(dto.type)) throw new BadRequestException(`Tipo de campo inválido: "${dto.type}"`);
-    const riskProduct = await this.prisma.sRiskProduct.findUnique({
-      where: { IdeRiskProduct: dto.ideRiskProduct },
-      select: { IdeRiskProduct: true, CodRiskProduct: true },
-    });
-    if (!riskProduct) throw new NotFoundException(`No existe el tipo de riesgo "${dto.ideRiskProduct}"`);
+    if (dto.codStage !== undefined && !FIELD_STAGES.includes(dto.codStage)) {
+      throw new BadRequestException(`Etapa inválida: "${dto.codStage}"`);
+    }
+    if (dto.ideRiskProduct && dto.ideProduct) {
+      throw new BadRequestException('Indica solo uno: ideRiskProduct (campo de riesgo) o ideProduct (campo de producto)');
+    }
+    // `riskProduct` conserva el nombre por historia: aqui es el "dueno" del campo (tipo de riesgo O producto).
+    const riskProduct = await this.resolveOwner(dto);
 
     const isList = dto.type === 'select' || dto.type === 'radio';
     const options = this.cleanOptions(dto.options);
@@ -140,7 +147,7 @@ export class RiskFieldsService {
     }
 
     const ideState = await this.stateMachine.getStateByCode('ACTIVO');
-    const entities = await this.resolveEntities();
+    const entities = await this.resolveEntities(riskProduct.entityCode, actor);
     const audit = (now: Date) => ({ UsrCreation: actor, TstCreation: now, UsrModification: actor, TstModification: now });
 
     await this.prisma.$transaction(async (tx) => {
@@ -148,17 +155,17 @@ export class RiskFieldsService {
 
       // 1. Set de atributos del riesgo (uno por tipo de riesgo; si ya hay uno activo se reutiliza).
       let model = await tx.sModelAttribute.findFirst({
-        where: { IdeReference: riskProduct.IdeRiskProduct, IdeState: ideState },
+        where: { IdeReference: riskProduct.IdeReference, IdeState: ideState },
         orderBy: { TstCreation: 'asc' },
       });
       if (!model) {
         model = await tx.sModelAttribute.create({
           data: {
-            CodModelAttribute: await this.uniqueCode(tx, 'sModelAttribute', 'CodModelAttribute', `${riskProduct.CodRiskProduct}.CAMPOS`, 200),
-            DesModelAttribute: `Campos personalizados ${riskProduct.CodRiskProduct}`,
+            CodModelAttribute: await this.uniqueCode(tx, 'sModelAttribute', 'CodModelAttribute', `${riskProduct.Code}.CAMPOS`, 200),
+            DesModelAttribute: `Campos personalizados ${riskProduct.Code}`,
             IdeEntityApply: entities.apply,
             IdeEntityReference: entities.reference,
-            IdeReference: riskProduct.IdeRiskProduct,
+            IdeReference: riskProduct.IdeReference,
             IdeState: ideState,
             ...audit(now),
           },
@@ -192,7 +199,7 @@ export class RiskFieldsService {
       }
 
       // 3. Atributo reutilizable + 4. propiedad (el campo de formulario real).
-      const codBase = `${riskProduct.CodRiskProduct}.${slug}`;
+      const codBase = `${riskProduct.Code}.${slug}`;
       const attribute = await tx.sAttribute.create({
         data: {
           CodAttribute: await this.uniqueCode(tx, 'sAttribute', 'CodAttribute', codBase, 200),
@@ -216,13 +223,14 @@ export class RiskFieldsService {
           IdeModelAttribute: model.IdeModelAttribute,
           IdeAttribute: attribute.IdeAttribute,
           AttributeContent: JSON.stringify(content),
+          CodStage: dto.codStage ?? 'PRICING',
           IdeState: ideState,
           ...audit(now),
         },
       });
     });
 
-    return this.findByRiskProduct(dto.ideRiskProduct);
+    return this.findByReference(riskProduct.IdeReference);
   }
 
   async update(ideAttributeProperty: string, dto: UpdateRiskFieldDto, actor: string): Promise<RiskFieldView[]> {
@@ -272,6 +280,7 @@ export class RiskFieldsService {
         data: {
           DesAttributeProperty: label,
           AttributeContent: JSON.stringify(merged),
+          ...(dto.codStage !== undefined ? { CodStage: dto.codStage } : {}),
           UsrModification: actor,
           TstModification: now,
         },
@@ -312,7 +321,7 @@ export class RiskFieldsService {
         }
       }
     });
-    return this.findByRiskProduct(property.SModelAttribute.IdeReference);
+    return this.findByReference(property.SModelAttribute.IdeReference);
   }
 
   async setState(ideAttributeProperty: string, codState: string, actor: string): Promise<RiskFieldView[]> {
@@ -326,7 +335,7 @@ export class RiskFieldsService {
       where: { IdeAttributeProperty: ideAttributeProperty },
       data: { IdeState: stateId, UsrModification: actor, TstModification: new Date() },
     });
-    return this.findByRiskProduct(property.SModelAttribute.IdeReference);
+    return this.findByReference(property.SModelAttribute.IdeReference);
   }
 
   // ---------------------------------------------------------------- helpers
@@ -404,10 +413,49 @@ export class RiskFieldsService {
     throw new ConflictException(`No se pudo generar un código único a partir de "${base}"`);
   }
 
-  /** Entidad `SRiskProduct` de `SEntity`; si el catálogo la nombra distinto, se copia de un set de atributos existente. */
-  private async resolveEntities(): Promise<{ apply: string; reference: string }> {
-    const byCode = await this.prisma.sEntity.findFirst({ where: { CodEntity: { equals: 'SRiskProduct', mode: 'insensitive' } } });
+  /** Dueno del campo: un tipo de riesgo (`SRiskProduct`) o un producto (`SProduct`). */
+  private async resolveOwner(
+    dto: CreateRiskFieldDto,
+  ): Promise<{ IdeReference: string; Code: string; entityCode: 'SRiskProduct' | 'SProduct' }> {
+    if (dto.ideProduct) {
+      const product = await this.prisma.sProduct.findUnique({
+        where: { IdeProduct: dto.ideProduct },
+        select: { IdeProduct: true, CodProduct: true },
+      });
+      if (!product) throw new NotFoundException(`No existe el producto "${dto.ideProduct}"`);
+      return { IdeReference: product.IdeProduct, Code: product.CodProduct, entityCode: 'SProduct' };
+    }
+    const riskProduct = await this.prisma.sRiskProduct.findUnique({
+      where: { IdeRiskProduct: dto.ideRiskProduct as string },
+      select: { IdeRiskProduct: true, CodRiskProduct: true },
+    });
+    if (!riskProduct) throw new NotFoundException(`No existe el tipo de riesgo "${dto.ideRiskProduct}"`);
+    return { IdeReference: riskProduct.IdeRiskProduct, Code: riskProduct.CodRiskProduct, entityCode: 'SRiskProduct' };
+  }
+
+  /**
+   * Entidad (`SEntity`) a la que se aplica el set de atributos: `SRiskProduct` o `SProduct`.
+   * `SProduct` se crea en el catalogo si todavia no existe (es el mismo codigo de la tabla); para
+   * `SRiskProduct`, si el catalogo la nombra distinto, se copia de un set de atributos existente.
+   */
+  private async resolveEntities(entityCode: 'SRiskProduct' | 'SProduct', actor: string): Promise<{ apply: string; reference: string }> {
+    const byCode = await this.prisma.sEntity.findFirst({ where: { CodEntity: { equals: entityCode, mode: 'insensitive' } } });
     if (byCode) return { apply: byCode.IdeEntity, reference: byCode.IdeEntity };
+    if (entityCode === 'SProduct') {
+      const now = new Date();
+      const created = await this.prisma.sEntity.create({
+        data: {
+          CodEntity: 'SProduct',
+          DesEntity: 'Producto',
+          IdeState: await this.stateMachine.getStateByCode('ACTIVO'),
+          UsrCreation: actor,
+          TstCreation: now,
+          UsrModification: actor,
+          TstModification: now,
+        },
+      });
+      return { apply: created.IdeEntity, reference: created.IdeEntity };
+    }
     const existing = await this.prisma.sModelAttribute.findFirst({ orderBy: { TstCreation: 'asc' } });
     if (existing) return { apply: existing.IdeEntityApply, reference: existing.IdeEntityReference };
     throw new BadRequestException('No se encontró la entidad "SRiskProduct" en SEntity para crear el set de atributos');

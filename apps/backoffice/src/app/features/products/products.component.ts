@@ -18,6 +18,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { CatalogService } from '../../core/catalogs/catalog.service';
 import { CatalogRow } from '../../core/catalogs/catalog.model';
 import { RiskProductsTabComponent } from './risk-products-tab.component';
+import { RiskFieldsDialogComponent } from './risk-fields-dialog.component';
 import { PlanProductsTabComponent } from './plan-products-tab.component';
 import { PlanProductRisksTabComponent } from './plan-product-risks-tab.component';
 import { CoveragePlansTabComponent } from './coverage-plans-tab.component';
@@ -64,6 +65,7 @@ const CURRENCIES_PATH = '/product-rating/currencies';
     ConfirmDialogModule,
     TranslocoPipe,
     RiskProductsTabComponent,
+    RiskFieldsDialogComponent,
     PlanProductsTabComponent,
     PlanProductRisksTabComponent,
     CoveragePlansTabComponent,
@@ -102,6 +104,10 @@ export class ProductsComponent {
 
   readonly selectedProduct = signal<CatalogRow | null>(null);
   readonly activeChildTab = signal<string | number>('risk-products');
+  /** Diálogo de campos personalizados a nivel de producto (comunes a todos los riesgos). */
+  readonly productFieldsVisible = signal(false);
+  readonly selectedProductId = computed(() => String(this.selectedProduct()?.['IdeProduct'] ?? '') || null);
+  readonly selectedProductLabel = computed(() => String(this.selectedProduct()?.['DesProduct'] ?? ''));
   /** Lista de 0-1 elementos: permite `@for ... track IdeProduct` para recrear las pestañas al cambiar de producto. */
   readonly selectedProductList = computed(() => {
     const p = this.selectedProduct();

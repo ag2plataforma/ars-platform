@@ -1,4 +1,4 @@
-import { Component, effect, inject, input, model, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, model, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -38,6 +38,7 @@ interface RiskField {
   desFieldDictionary: string;
   ownDictionary: boolean;
   options: RiskFieldOption[];
+  codStage: string;
   codState: string;
 }
 
@@ -49,6 +50,7 @@ interface DictionaryOption {
   label: string;
 }
 
+const FIELD_STAGES = ['PRICING', 'CONTRACT'] as const;
 const FIELD_TYPES = ['text', 'number', 'date', 'select', 'radio', 'checkbox'] as const;
 
 /**
@@ -79,7 +81,10 @@ const FIELD_TYPES = ['text', 'number', 'date', 'select', 'radio', 'checkbox'] as
   templateUrl: './risk-fields-dialog.component.html',
 })
 export class RiskFieldsDialogComponent {
+  /** Campos de RIESGO: id del tipo de riesgo. */
   readonly ideRiskProduct = input<string | null>(null);
+  /** Campos de PRODUCTO (comunes a todos los riesgos): id del producto. Si viene, tiene prioridad. */
+  readonly ideProduct = input<string | null>(null);
   readonly riskLabel = input<string>('');
   readonly visible = model<boolean>(false);
 
@@ -95,13 +100,19 @@ export class RiskFieldsDialogComponent {
   readonly saving = signal(false);
   readonly editing = signal<RiskField | null>(null);
 
+  /** `product` si se configuran los campos del producto; `risk` si son los de un tipo de riesgo. */
+  readonly scope = computed<'product' | 'risk'>(() => (this.ideProduct() ? 'product' : 'risk'));
+  private readonly ownerId = computed(() => this.ideProduct() ?? this.ideRiskProduct());
+
+  readonly stageOptions = FIELD_STAGES.map((value) => ({ value, key: `products.riskFields.stage.${value}` }));
+
   readonly typeOptions = FIELD_TYPES.map((value) => ({ value, key: `products.riskFields.type.${value}` }));
 
   form = this.buildForm();
 
   constructor() {
     effect(() => {
-      if (this.visible() && this.ideRiskProduct()) this.load();
+      if (this.visible() && this.ownerId()) this.load();
     });
   }
 
@@ -110,6 +121,7 @@ export class RiskFieldsDialogComponent {
       label: [field?.label ?? '', Validators.required],
       type: [{ value: field?.type ?? 'text', disabled: !!field }, Validators.required],
       required: [field?.required ?? false],
+      codStage: [field?.codStage ?? 'PRICING'],
       min: [field?.min as number | null],
       max: [field?.max as number | null],
       maxLength: [field?.maxLength as number | null],
@@ -120,10 +132,11 @@ export class RiskFieldsDialogComponent {
   }
 
   load(): void {
-    const id = this.ideRiskProduct();
+    const id = this.ownerId();
     if (!id) return;
     this.loading.set(true);
-    this.http.get<RiskField[]>(`${BASE}/by-risk-product/${id}`).subscribe({
+    const path = this.scope() === 'product' ? 'by-product' : 'by-risk-product';
+    this.http.get<RiskField[]>(`${BASE}/${path}/${id}`).subscribe({
       next: (rows) => {
         this.fields.set(rows);
         this.loading.set(false);
@@ -133,6 +146,12 @@ export class RiskFieldsDialogComponent {
         this.showError(err);
       },
     });
+  }
+
+  stageLabel(stage: string): string {
+    return (FIELD_STAGES as readonly string[]).includes(stage)
+      ? this.transloco.translate(`products.riskFields.stage.${stage}`)
+      : stage;
   }
 
   typeLabel(type: string): string {
@@ -191,7 +210,7 @@ export class RiskFieldsDialogComponent {
     const raw = this.form.getRawValue();
     const editing = this.editing();
     const type = editing?.type ?? raw.type;
-    const body: Record<string, unknown> = { label: raw.label.trim(), required: raw.required };
+    const body: Record<string, unknown> = { label: raw.label.trim(), required: raw.required, codStage: raw.codStage };
     if (type === 'number') {
       body['min'] = raw.min ?? (editing ? null : undefined);
       body['max'] = raw.max ?? (editing ? null : undefined);
@@ -203,7 +222,8 @@ export class RiskFieldsDialogComponent {
       if (this.isList(type) && editing.ownDictionary) body['options'] = this.parseOptions(raw.optionsText);
       request$ = this.http.patch(`${BASE}/${editing.ideAttributeProperty}`, body);
     } else {
-      body['ideRiskProduct'] = this.ideRiskProduct();
+      if (this.scope() === 'product') body['ideProduct'] = this.ideProduct();
+      else body['ideRiskProduct'] = this.ideRiskProduct();
       body['type'] = type;
       if (this.isList(type)) {
         if (raw.optionsSource === 'existing') {

@@ -90,8 +90,12 @@
           </h2>
           <p class="text-sm text-slate-500">{{ 'products.configuringSubtitle' | transloco }}</p>
         </div>
-        <button pButton type="button" icon="pi pi-times" [label]="'products.closeButton' | transloco" [text]="true" severity="secondary" (click)="closeDetail()"></button>
+        <div class="flex items-center gap-1">
+          <button pButton type="button" icon="pi pi-list" [label]="'products.productFieldsButton' | transloco" [text]="true" severity="info" (click)="productFieldsVisible.set(true)"></button>
+          <button pButton type="button" icon="pi pi-times" [label]="'products.closeButton' | transloco" [text]="true" severity="secondary" (click)="closeDetail()"></button>
+        </div>
       </div>
+      <app-risk-fields-dialog [ideProduct]="selectedProductId()" [riskLabel]="selectedProductLabel()" [(visible)]="productFieldsVisible" />
 
       <p-tabs [value]="activeChildTab()" (valueChange)="activeChildTab.set($event ?? 'risk-products')">
         <p-tablist>
