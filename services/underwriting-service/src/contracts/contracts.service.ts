@@ -3178,6 +3178,11 @@ export class ContractsService {
       where: { IdeContract: contractFile.IdeContract, IdeState: ideActivo },
     });
     const numDiasPeriodo = activeBilling ? daysBetween(activeBilling.TstInitial, activeBilling.TstEnd) : NaN;
+    // La prima NO proporcional se prorratea por dias (periodo de facturacion / dias del contrato). Si no hay
+    // periodo de facturacion activo o el contrato dura 0 dias, esa cuenta da NaN/Infinity (y Prisma falla con
+    // "Argument ConceptNetValue is missing"): en ese caso se usa la formula por fracciones, que no depende de dias.
+    const canProrateByDays = Number.isFinite(numDiasPeriodo) && numDiasContract > 0;
+    const useFractionFormula = indProportionalPrime || !canProrateByDays;
 
     const primaTotalConcept = await tx.sConcept.findFirst({ where: { CodConcept: 'PrimaTotal' } });
     const riskCoverages = await tx.tRiskCoverage.findMany({
@@ -3204,7 +3209,7 @@ export class ContractsService {
           // Movimiento inicial: misma fórmula para TODOS sus conceptos, sin redondear (literal del original).
           for (const concept of newConcepts) {
             const grossValue = Number(concept.ConceptValue);
-            const netValue = indProportionalPrime
+            const netValue = useFractionFormula
               ? grossValue / numFraction + (grossValue / numFraction) * (porSurcharge / 100)
               : (grossValue / numDiasContract) * numDiasPeriodo +
                 ((grossValue / numDiasContract) * numDiasPeriodo) * (porSurcharge / 100);
@@ -3242,7 +3247,7 @@ export class ContractsService {
               });
             } else if (followsIntoActivePeriod) {
               const grossValue = Number(newConcept.ConceptValue);
-              const netValue = indProportionalPrime
+              const netValue = useFractionFormula
                 ? round2(grossValue / numFraction + (grossValue / numFraction) * (porSurcharge / 100))
                 : round2(
                     (grossValue / numDiasContract) * numDiasPeriodo +
