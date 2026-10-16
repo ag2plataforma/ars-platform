@@ -211,7 +211,7 @@ export class ContractsService {
           const allRiskCoverages: Awaited<ReturnType<ContractsService['copyRisksAndCoverages']>> = [];
           const fileIds: string[] = [];
           for (const [index, quoteRisk] of quoteRisks.entries()) {
-            const contractFile = await this.createContractFile(contract, actor, tx, index + 1);
+            const contractFile = await this.createContractFile(contract, actor, tx, index + 1, quote.GenericAttributeValue);
             fileIds.push(contractFile.IdeContractFile);
             try {
               allRiskCoverages.push(
@@ -243,7 +243,7 @@ export class ContractsService {
             await this.setNetPrime(ideContractFile, actor, tx);
           }
         } else {
-          const contractFile = await this.createContractFile(contract, actor, tx);
+          const contractFile = await this.createContractFile(contract, actor, tx, 1, quote.GenericAttributeValue);
           await this.createInitialContractOperation(contract.IdeContract, actor, tx);
 
           const riskCoverages = await this.copyRisksAndCoverages(
@@ -1043,6 +1043,12 @@ export class ContractsService {
           _max: { NumContractFile: true },
         });
         let nextNumFile = (maxFile._max.NumContractFile ?? 0) + 1;
+        // Los certificados nuevos heredan los valores de nivel producto del primer certificado del colectivo.
+        const firstFile = await tx.tContractFile.findFirst({
+          where: { IdeContract: ideContract },
+          orderBy: { NumContractFile: 'asc' },
+          select: { GenericAttributeValue: true },
+        });
         const allNewCoverages: { ideRiskCoverage: string }[] = [];
         const newFileIds: string[] = [];
 
@@ -1053,6 +1059,7 @@ export class ContractsService {
             actor,
             tx,
             nextNumFile++,
+            firstFile?.GenericAttributeValue,
           );
           const nextFileState = await this.stateMachine.getNextState('TContractFile', newFile.IdeState, 'Activar');
           await tx.tContractFile.update({
@@ -2686,6 +2693,7 @@ export class ContractsService {
     actor: string,
     tx: Prisma.TransactionClient = this.prisma,
     numContractFile = 1,
+    genericAttributeValue?: Prisma.JsonValue | null,
   ) {
     const ideStateInitial = await this.stateMachine.getInitialState('TContractFile');
     const now = new Date();
@@ -2696,6 +2704,8 @@ export class ContractsService {
         TstInclusion: now,
         TstInitial: contract.TstInitial,
         TstEnd: contract.TstEnd ?? contract.TstInitial,
+        // Valores de los campos de nivel producto: la cotizacion los pasa al certificado (en colectivos, a cada uno).
+        GenericAttributeValue: (genericAttributeValue as Prisma.InputJsonValue | null) ?? undefined,
         IdeState: ideStateInitial,
         UsrCreation: actor,
         TstCreation: now,

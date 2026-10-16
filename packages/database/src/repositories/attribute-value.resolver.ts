@@ -55,8 +55,12 @@ export class PrismaAttributeValueResolver implements AttributeValueResolver {
       return '0';
     }
 
-    const riskAttributeValue = await this.getRiskAttributeValue(origin, ideOriginRisk, db);
-    const ideFieldValue = extractJsonStringValue(riskAttributeValue, property.IdeAttributeProperty);
+    const { risk, generic } = await this.getAttributeValues(origin, ideOriginRisk, db);
+    // Primero el JSON del riesgo; si el campo no esta ahi, el de nivel producto (cotizacion/ficha de
+    // contrato). Asi las cotizaciones antiguas (campos en el riesgo) siguen funcionando.
+    const ideFieldValue =
+      extractJsonStringValue(risk, property.IdeAttributeProperty) ??
+      extractJsonStringValue(generic, property.IdeAttributeProperty);
     if (!ideFieldValue) {
       return '0';
     }
@@ -68,23 +72,24 @@ export class PrismaAttributeValueResolver implements AttributeValueResolver {
     return fieldValue?.CodFieldValue ?? '0';
   }
 
-  private async getRiskAttributeValue(
+  /** JSON de valores del riesgo y JSON de valores genericos (nivel producto) de su cotizacion/certificado. */
+  private async getAttributeValues(
     origin: RuleOrigin,
     ideOriginRisk: string,
     db: Prisma.TransactionClient,
-  ): Promise<Prisma.JsonValue | null> {
+  ): Promise<{ risk: Prisma.JsonValue | null; generic: Prisma.JsonValue | null }> {
     if (origin === 'Quote') {
       const risk = await db.tQuoteRisk.findUnique({
         where: { IdeQuoteRisk: ideOriginRisk },
-        select: { RiskAttributeValue: true },
+        select: { RiskAttributeValue: true, TQuote: { select: { GenericAttributeValue: true } } },
       });
-      return risk?.RiskAttributeValue ?? null;
+      return { risk: risk?.RiskAttributeValue ?? null, generic: risk?.TQuote?.GenericAttributeValue ?? null };
     }
     const risk = await db.tFileRisk.findUnique({
       where: { IdeFileRisk: ideOriginRisk },
-      select: { RiskAttributeValue: true },
+      select: { RiskAttributeValue: true, TContractFile: { select: { GenericAttributeValue: true } } },
     });
-    return risk?.RiskAttributeValue ?? null;
+    return { risk: risk?.RiskAttributeValue ?? null, generic: risk?.TContractFile?.GenericAttributeValue ?? null };
   }
 }
 

@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsString, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { CreateQuoteRiskDto } from './create-quote-risk.dto';
 
 export class CreateQuoteDto {
@@ -14,6 +14,14 @@ export class CreateQuoteDto {
   /** CodDistributionWay de la vía de distribución (debe existir). */
   @IsString()
   codDistributionWay!: string;
+
+  /**
+   * Valores de los campos de nivel producto (comunes a todos los riesgos, ej. dias de viaje), como
+   * `{ "<IdeAttributeProperty>": "<valor o IdeFieldValue>" }`. Se guardan en `TQuote.GenericAttributeValue`.
+   */
+  @IsOptional()
+  @IsObject()
+  genericAttributeValue?: Record<string, string>;
 
   /** Al menos un riesgo a cotizar (ej. una mascota, un smartphone). */
   @IsArray()

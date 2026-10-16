@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { UnicaTiersService } from './unica-tiers.service';
 import { Prisma, PrismaService } from '@ars-platform/database';
 import {
@@ -85,6 +85,16 @@ export class QuotesService {
       this.resolveDistributionWay(dto.codDistributionWay),
     ]);
 
+    const product = await this.prisma.sProduct.findUniqueOrThrow({
+      where: { IdeProduct: ideProduct },
+      select: { IndMultiRisk: true, DesProduct: true },
+    });
+    if (!product.IndMultiRisk && dto.risks.length > 1) {
+      throw new BadRequestException(
+        `El producto "${product.DesProduct}" no es multirriesgo: la cotización admite un solo riesgo`,
+      );
+    }
+
     const risks = await Promise.all(
       dto.risks.map(async (risk) => ({
         ideRiskProduct: await this.resolveRiskProduct(risk.codRiskProduct),
@@ -108,6 +118,7 @@ export class QuotesService {
         IdeProduct: ideProduct,
         IdeDistributionWay: ideDistributionWay,
         TstQuote: now,
+        GenericAttributeValue: dto.genericAttributeValue ?? {},
         IdeState: ideQuoteInitial,
         UsrCreation: actor,
         TstCreation: now,
