@@ -254,7 +254,7 @@ export class ContractsService {
           const contractFile = await this.createContractFile(contract, actor, tx, 1, fileGenericValues as Prisma.JsonObject);
           await this.createInitialContractOperation(contract.IdeContract, actor, tx);
 
-          const insuredPersons = await this.resolveInsuredPersons(quote.IdeQuote, quote.IdePerson, dto.riskPersons, actor, tx);
+          const insuredPersons = await this.resolveInsuredPersons(quote.IdeQuote, dto.riskPersons, actor, tx);
           const riskCoverages = await this.copyRisksAndCoverages(
             quote.IdeQuote,
             contract.IdeProduct,
@@ -2873,7 +2873,6 @@ export class ContractsService {
    */
   private async resolveInsuredPersons(
     ideQuote: string,
-    ideHolder: string | null,
     riskPersons: Record<string, unknown> | undefined,
     actor: string,
     tx: Prisma.TransactionClient,
@@ -2895,11 +2894,15 @@ export class ContractsService {
     const personRisks = quoteRisks.filter((r) => personRiskProducts.has(r.IdeRiskProduct) && r.TQuoteRiskPlan.length > 0);
     if (personRisks.length === 0) return result;
 
-    const [holder, ideActive] = await Promise.all([
-      ideHolder ? tx.tPerson.findUnique({ where: { IdePerson: ideHolder }, select: { DesEmail: true } }) : Promise.resolve(null),
-      this.stateMachine.getStateByCode('ACTIVO'),
-    ]);
-    if (!holder) throw new BadRequestException('La cotización no tiene tomador: no se puede asignar el correo de los asegurados');
+    // Correo por defecto de los asegurados: el del Tomador (o el del Titular si no hay Tomador). Las personas de la
+    // cotizacion estan en `TQuotePerson` (no en `TQuote.IdePerson`).
+    const holderRows = await tx.tQuotePerson.findMany({
+      where: { IdeQuote: ideQuote, SPersonRol: { CodPersonRol: { in: ['TOMADOR', 'TITULAR'] } } },
+      select: { SPersonRol: { select: { CodPersonRol: true } }, TPerson: { select: { DesEmail: true } } },
+    });
+    const holder = (holderRows.find((r) => r.SPersonRol.CodPersonRol === 'TOMADOR') ?? holderRows[0])?.TPerson;
+    const ideActive = await this.stateMachine.getStateByCode('ACTIVO');
+    if (!holder) throw new BadRequestException('La cotización no tiene Tomador ni Titular: no se puede asignar el correo de los asegurados');
 
     for (const risk of personRisks) {
       const label = `Riesgo nº ${risk.NumRisk}`;
