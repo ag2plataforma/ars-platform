@@ -1049,6 +1049,7 @@
     "filesEmpty": "Sin certificados asociados.",
     "selectFileHint": "Seleccioná un certificado para ver sus riesgos.",
     "riskColumn": "Riesgo",
+    "insuredColumn": "Persona asegurada",
     "planColumn": "Plan",
     "risksEmpty": "Este certificado no tiene riesgos.",
     "attributesButton": "Atributos",

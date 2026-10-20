@@ -270,6 +270,7 @@
               <ng-template pTemplate="header">
                 <tr>
                   <th pSortableColumn="DesFileRisk"><span class="ars-th-flex">{{ 'contractDetail.riskColumn' | transloco }} <p-sortIcon field="DesFileRisk" /> <p-columnFilter type="text" field="DesFileRisk" display="menu" /></span></th>
+                  <th><span class="ars-th-flex">{{ 'contractDetail.insuredColumn' | transloco }}</span></th>
                   <th pSortableColumn="SPlanProductRisk.SPlanProduct.DesShort"><span class="ars-th-flex">{{ 'contractDetail.planColumn' | transloco }} <p-sortIcon field="SPlanProductRisk.SPlanProduct.DesShort" /></span></th>
                   <th pSortableColumn="TstInclusion"><span class="ars-th-flex">{{ 'contractDetail.inclusionColumn' | transloco }} <p-sortIcon field="TstInclusion" /></span></th>
                   <th pSortableColumn="TstInitial"><span class="ars-th-flex">{{ 'contractsList.startColumn' | transloco }} <p-sortIcon field="TstInitial" /></span></th>
@@ -281,6 +282,16 @@
               <ng-template pTemplate="body" let-risk>
                 <tr [pSelectableRow]="risk" class="cursor-pointer">
                   <td>{{ risk.DesFileRisk ?? risk.SRiskProduct.DesShort ?? ('quotes.coverageFallback' | transloco) }}</td>
+                  <td>
+                    @if (riskInsuredOf(risk); as insured) {
+                      <div>{{ insured.name }}</div>
+                      @if (insured.document) {
+                        <div class="text-xs text-slate-500">{{ insured.document }}</div>
+                      }
+                    } @else {
+                      <span class="text-slate-400">{{ 'common.dash' | transloco }}</span>
+                    }
+                  </td>
                   <td>{{ risk.SPlanProductRisk.SPlanProduct.DesShort ?? risk.SPlanProductRisk.SPlanProduct.DesPlanProduct }}</td>
                   <td>{{ risk.TstInclusion | date: 'dd/MM/yyyy' }}</td>
                   <td>{{ risk.TstInitial | date: 'dd/MM/yyyy' }}</td>
@@ -311,7 +322,7 @@
               </ng-template>
               <ng-template pTemplate="emptymessage">
                 <tr>
-                  <td colspan="7" class="py-6 text-center text-sm text-slate-500">{{ 'contractDetail.risksEmpty' | transloco }}</td>
+                  <td colspan="8" class="py-6 text-center text-sm text-slate-500">{{ 'contractDetail.risksEmpty' | transloco }}</td>
                 </tr>
               </ng-template>
             </p-table>

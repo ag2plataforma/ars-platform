@@ -292,6 +292,18 @@ export interface ContractRisk {
    *  `RiskAttributesService.getSchema(SRiskProduct.IdeRiskProduct)` al
    *  abrir el popup de "atributos personalizados". */
   RiskAttributeValue: Record<string, unknown> | null;
+  /** Persona asegurada del riesgo (riesgos de tipo persona); vacio en los demas. */
+  TFileRiskPerson?: Array<{
+    TPerson: {
+      IdePerson: string;
+      DesFirstName: string;
+      DesMiddleName: string | null;
+      DesLastName1: string | null;
+      DesLastName2: string | null;
+      NumIdentification: string | null;
+    };
+    SPersonRol: { CodPersonRol: string };
+  }>;
   SState: ContractStateRef;
   TRiskCoverage: ContractCoverage[];
   TContractRequirement: ContractRequirement[];

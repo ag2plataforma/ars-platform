@@ -1574,6 +1574,8 @@ export class ContractsService {
             TFileRisk: {
               include: {
                 SRiskProduct: true,
+                /** Persona asegurada del riesgo (riesgos de tipo persona, ver `resolveInsuredPersons`). */
+                TFileRiskPerson: { include: { TPerson: true, SPersonRol: true } },
                 /** Plan del riesgo (columna "Plan" del detalle de
                  *  contrato) -- `SPlanProductRisk` no tiene su propia
                  *  descripción, hay que bajar un nivel más a

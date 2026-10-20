@@ -1627,7 +1627,17 @@ export class ContractDetailComponent implements OnInit {
       });
   }
 
-  stateSeverity(codState: string): 'info' | 'warn' | 'success' | 'secondary' {
+  /** Persona asegurada del riesgo (riesgos de tipo persona): nombre completo y documento. */
+  riskInsuredOf(risk: ContractRisk): { name: string; document: string | null } | null {
+    const person = risk.TFileRiskPerson?.find((p) => p.SPersonRol.CodPersonRol === 'ASEGURADO')?.TPerson;
+    if (!person) return null;
+    const name = [person.DesFirstName, person.DesMiddleName, person.DesLastName1, person.DesLastName2]
+      .filter((part) => !!part)
+      .join(' ');
+    return { name, document: person.NumIdentification };
+  }
+
+    stateSeverity(codState: string): 'info' | 'warn' | 'success' | 'secondary' {
     switch (codState) {
       case 'ACTIVO':
         return 'success';
