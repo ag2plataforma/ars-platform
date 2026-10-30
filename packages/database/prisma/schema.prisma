@@ -3159,6 +3159,7 @@ model TQuoteRisk {
   IdeRiskProduct     String              @db.Uuid
   NumRisk            Int
   RiskAttributeValue Json?               @db.Json
+  ObjInsuredPerson   Json?               @db.Json
   IdeState           String              @db.Uuid
   UsrCreation        String              @db.VarChar(60)
   TstCreation        DateTime            @db.Timestamp(6)

@@ -6,6 +6,7 @@ import { CreateCollectiveQuoteDto, SelectCollectivePlanDto } from './dto/create-
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { ToggleCoverageDto } from './dto/toggle-coverage.dto';
 import { SetQuotePersonDto } from './dto/set-quote-person.dto';
+import { SetInsuredDraftDto } from './dto/set-insured-draft.dto';
 import { TransitionQuoteStateDto } from './dto/transition-quote-state.dto';
 import { ListQuotesDto } from './dto/list-quotes.dto';
 import { SubmitSocialImpactAnswersDto } from '../social-impact/dto/submit-social-impact-answers.dto';
@@ -113,6 +114,17 @@ export class QuotesController {
     @CurrentUser() actor: JwtPayload,
   ) {
     return this.service.toggleCoverage(id, ideQuoteRiskPlan, ideQuoteCoverage, dto.selected, actor.code);
+  }
+
+  /** Guarda el borrador de la persona asegurada de un riesgo para recuperarlo al retomar la cotizacion. */
+  @Put(':id/risks/:ideQuoteRisk/insured-draft')
+  saveInsuredDraft(
+    @Param('id') id: string,
+    @Param('ideQuoteRisk') ideQuoteRisk: string,
+    @Body() dto: SetInsuredDraftDto,
+    @CurrentUser() actor: JwtPayload,
+  ) {
+    return this.service.saveInsuredDraft(id, ideQuoteRisk, dto.data, actor.code);
   }
 
   @Get(':id/persons')

@@ -322,6 +322,22 @@ export class QuotesService {
   }
 
   /**
+   * Guarda (reemplaza) el borrador de los datos de la persona asegurada de un riesgo de la cotizacion. No crea
+   * ni modifica personas: eso ocurre al contratar. Solo sirve para no perder lo tecleado si se retoma la cotizacion.
+   */
+  async saveInsuredDraft(ideQuote: string, ideQuoteRisk: string, data: Record<string, unknown>, actor: string) {
+    const risk = await this.prisma.tQuoteRisk.findFirst({ where: { IdeQuoteRisk: ideQuoteRisk, IdeQuote: ideQuote } });
+    if (!risk) {
+      throw new NotFoundException(`No existe el riesgo "${ideQuoteRisk}" en la cotizacion "${ideQuote}"`);
+    }
+    await this.prisma.tQuoteRisk.update({
+      where: { IdeQuoteRisk: ideQuoteRisk },
+      data: { ObjInsuredPerson: data as Prisma.InputJsonValue, UsrModification: actor, TstModification: new Date() },
+    });
+    return { ok: true };
+  }
+
+  /**
    * Selecciona un plan para un riesgo -- el original lo hacía con un
    * UPDATE directo de `TQuoteRiskPlan.IndSelected` desde la capa CRUD de
    * LoopBack (no hay función PL/pgSQL para esto). Regla agregada acá,
@@ -1053,6 +1069,7 @@ export class QuotesService {
         ideRiskProduct: risk.IdeRiskProduct,
         numRisk: risk.NumRisk,
         desRisk: risk.SRiskProduct.SRisk.DesRisk,
+        insuredDraft: (risk.ObjInsuredPerson as Record<string, unknown> | null) ?? null,
         plans: risk.TQuoteRiskPlan.map((plan) => {
           const selectedCoverages = plan.TQuoteCoverage.filter((coverage) => coverage.IndSelected);
           const basePrice = round2(selectedCoverages.reduce((sum, coverage) => sum + Number(coverage.Prime), 0));

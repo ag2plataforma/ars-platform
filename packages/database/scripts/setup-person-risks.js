@@ -8,6 +8,7 @@
  *    ficha propia). Con 'PERSON', al contratar la app pide los datos minimos
  *    de cada asegurado y crea/busca la persona. (SRiskType NO se usa: indica
  *    si el riesgo es principal u opcional.)
+ *  - TQuoteRisk."ObjInsuredPerson" json: borrador del asegurado de ese riesgo en la cotizacion.
  *  - SRiskProduct."ObjInsuredPersonFields" json: configuracion, por riesgo de
  *    cada producto, de los datos de persona a pedir del asegurado
  *    ({ campo: "NONE" | "OPTIONAL" | "REQUIRED" }). Null = minimo por defecto
@@ -59,6 +60,8 @@ async function main() {
   const statements = [
     `ALTER TABLE ars_platform."SRisk" ADD COLUMN IF NOT EXISTS "CodInsuredObject" varchar(15)`,
     `ALTER TABLE ars_platform."SRiskProduct" ADD COLUMN IF NOT EXISTS "ObjInsuredPersonFields" json`,
+    // Borrador de los datos del asegurado de un riesgo de la cotizacion (se recupera al retomarla).
+    `ALTER TABLE ars_platform."TQuoteRisk" ADD COLUMN IF NOT EXISTS "ObjInsuredPerson" json`,
     `ALTER TABLE ars_platform."TPerson" DROP CONSTRAINT IF EXISTS "UK_TPerson_02"`,
     `DROP INDEX IF EXISTS ars_platform."UK_TPerson_02"`,
     `CREATE INDEX IF NOT EXISTS "IX_TPerson_DesEmail" ON ars_platform."TPerson" ("DesEmail")`,

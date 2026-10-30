@@ -51,6 +51,8 @@ export interface QuoteRisk {
   ideRiskProduct: string;
   numRisk: number;
   desRisk: string;
+  /** Borrador de los datos de la persona asegurada de este riesgo (si el riesgo es una persona). */
+  insuredDraft?: Record<string, unknown> | null;
   plans: QuotePlan[];
 }
 
@@ -469,6 +471,11 @@ export class QuotingService {
    * del backend, no de este cliente). */
   setPerson(ideQuote: string, idePerson: string, codPersonRol: string): Observable<QuotePerson> {
     return this.http.put<QuotePerson>(`${this.base}/${ideQuote}/persons`, { idePerson, codPersonRol });
+  }
+
+  /** `PUT :id/risks/:ideQuoteRisk/insured-draft` -- guarda el borrador del asegurado para recuperarlo al retomar la cotización. */
+  saveInsuredDraft(ideQuote: string, ideQuoteRisk: string, data: Record<string, unknown>): Observable<{ ok: boolean }> {
+    return this.http.put<{ ok: boolean }>(`${this.base}/${ideQuote}/risks/${ideQuoteRisk}/insured-draft`, { data });
   }
 
   /** `GET :id/summary`, equivalente a `FGetQuoteSummary`. */

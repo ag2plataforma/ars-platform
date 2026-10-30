@@ -2,7 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
-import { Observable, concat, forkJoin, last, of, shareReplay } from 'rxjs';
+import { Observable, concat, debounceTime, forkJoin, last, of, shareReplay } from 'rxjs';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { CheckboxModule } from 'primeng/checkbox';
@@ -1438,7 +1438,9 @@ export class QuotesComponent {
       if (!riskProduct) continue;
       // Datos que pide este riesgo del producto (`SRiskProduct.ObjInsuredPersonFields`; null = minimo por defecto).
       const config = resolveInsuredPersonConfig(riskProduct['ObjInsuredPersonFields']);
-      items.push({ risk, config, form: this.buildInsuredForm(config) });
+      const form = this.buildInsuredForm(config);
+      this.restoreInsuredDraft(risk, form);
+      items.push({ risk, config, form });
     }
     if (items.length === 0) return;
     this.insuredPersons.set(items.sort((a, b) => a.risk.numRisk - b.risk.numRisk));
@@ -1449,6 +1451,24 @@ export class QuotesComponent {
       this.catalogService.list(MARITAL_STATUSES_PATH).subscribe({ next: (rows) => this.maritalStatuses.set(rows) });
       this.catalogService.list(PROFESSIONS_PATH).subscribe({ next: (rows) => this.professions.set(rows) });
     }
+  }
+
+  /** Borradores del asegurado por riesgo de la cotizacion (lo ultimo tecleado; tambien viaja al backend). */
+  private readonly insuredDrafts = new Map<string, Record<string, unknown>>();
+
+  /** Rellena el formulario con el borrador guardado (el de esta sesion, o el que trajo la cotizacion) y lo mantiene guardado. */
+  private restoreInsuredDraft(risk: QuoteRisk, form: FormGroup): void {
+    const draft = this.insuredDrafts.get(risk.ideQuoteRisk) ?? risk.insuredDraft;
+    if (draft) form.patchValue(draft, { emitEvent: false });
+    form.valueChanges.pipe(debounceTime(600)).subscribe(() => this.saveInsuredDraft(risk, form));
+  }
+
+  private saveInsuredDraft(risk: QuoteRisk, form: FormGroup): void {
+    const data = form.getRawValue() as Record<string, unknown>;
+    this.insuredDrafts.set(risk.ideQuoteRisk, data);
+    if (!this.ideQuote) return;
+    // Borrador "en segundo plano": si falla no se molesta al usuario, se reintenta con el siguiente cambio.
+    this.quoting.saveInsuredDraft(this.ideQuote, risk.ideQuoteRisk, data).subscribe({ error: () => undefined });
   }
 
   /** Precarga los datos ya conocidos de una persona registrada con ese documento (si existe; si no, se creara al contratar).
@@ -1720,6 +1740,7 @@ export class QuotesComponent {
     this.contractFields.fields.set([]);
     this.contractRiskFields.set([]);
     this.insuredPersons.set([]);
+    this.insuredDrafts.clear();
     this.paymentFraction.set('');
     this.accepting.set(false);
     this.contracting.set(false);
