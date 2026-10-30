@@ -126,9 +126,15 @@ export async function findOrCreateInsuredPerson(
   const numDoc = normalizeIdentification(person.numIdentification);
 
   if (ideType && numDoc) {
-    const byDoc = await tx.tPerson.findFirst({
-      where: { IdeIdentificationType: ideType, NumIdentification: { equals: numDoc, mode: 'insensitive' } },
-    });
+    // Misma persona si coincide tipo+numero, o si se registro con ese numero pero SIN tipo (ej. el tomador creado
+    // en el paso Personas de la cotizacion): se reutiliza y se le completa el tipo, en vez de duplicarla.
+    const byDoc =
+      (await tx.tPerson.findFirst({
+        where: { IdeIdentificationType: ideType, NumIdentification: { equals: numDoc, mode: 'insensitive' } },
+      })) ??
+      (await tx.tPerson.findFirst({
+        where: { IdeIdentificationType: null, NumIdentification: { equals: numDoc, mode: 'insensitive' } },
+      }));
     if (byDoc) {
       await fillMissingPersonData(byDoc, person, numDoc, actor, tx);
       return byDoc.IdePerson;
@@ -178,6 +184,7 @@ export async function findOrCreateInsuredPerson(
 
 type ExistingPerson = {
   IdePerson: string;
+  IdeIdentificationType: string | null;
   NumIdentification: string | null;
   DesMiddleName: string | null;
   DesLastName1: string | null;
@@ -203,6 +210,7 @@ async function fillMissingPersonData(
 ): Promise<void> {
   const text = (value?: string | null) => value?.trim() || undefined;
   const data: Prisma.TPersonUncheckedUpdateInput = {};
+  if (!existing.IdeIdentificationType && text(person.ideIdentificationType)) data.IdeIdentificationType = person.ideIdentificationType;
   if (!existing.DesMiddleName && text(person.desMiddleName)) data.DesMiddleName = text(person.desMiddleName);
   if (!existing.DesLastName1 && text(person.desLastName1)) data.DesLastName1 = text(person.desLastName1);
   if (!existing.DesLastName2 && text(person.desLastName2)) data.DesLastName2 = text(person.desLastName2);

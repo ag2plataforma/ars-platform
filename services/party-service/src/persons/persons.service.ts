@@ -298,16 +298,19 @@ export class PersonsService {
     if (!query.idePerson && !query.numIdentification && !query.email) {
       throw new BadRequestException('Debe suministrarse al menos un criterio de búsqueda');
     }
-    const person = await this.prisma.tPerson.findFirst({
-      where: {
-        ...(query.idePerson ? { IdePerson: query.idePerson } : {}),
-        ...(query.email ? { DesEmail: query.email } : {}),
-        ...(query.numIdentification
-          ? { NumIdentification: { equals: normalizeIdentification(query.numIdentification), mode: 'insensitive' as const } }
-          : {}),
-        ...(query.ideIdentificationType ? { IdeIdentificationType: query.ideIdentificationType } : {}),
-      },
-    });
+    const base = {
+      ...(query.idePerson ? { IdePerson: query.idePerson } : {}),
+      ...(query.email ? { DesEmail: query.email } : {}),
+      ...(query.numIdentification
+        ? { NumIdentification: { equals: normalizeIdentification(query.numIdentification), mode: 'insensitive' as const } }
+        : {}),
+    };
+    // Con tipo de documento: primero tipo+numero; si no hay, una persona registrada con ese numero pero SIN tipo
+    // (ej. el tomador creado desde la cotizacion, que solo pide el numero).
+    const person = query.ideIdentificationType
+      ? ((await this.prisma.tPerson.findFirst({ where: { ...base, IdeIdentificationType: query.ideIdentificationType } })) ??
+        (await this.prisma.tPerson.findFirst({ where: { ...base, IdeIdentificationType: null } })))
+      : await this.prisma.tPerson.findFirst({ where: base });
     if (!person) {
       throw new NotFoundException('No se encontró ninguna persona con esos criterios');
     }
