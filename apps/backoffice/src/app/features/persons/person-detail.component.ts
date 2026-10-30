@@ -226,7 +226,24 @@ export class PersonDetailComponent implements OnInit {
     this.router.navigate(['/contratos', row.ideContract]);
   }
 
+  /** Ruta a la que volver si se llego desde otra pantalla (ej. el contrato); solo rutas internas. */
+  private readonly returnTo = (() => {
+    const value = this.route.snapshot.queryParamMap.get('volverA');
+    return value && value.startsWith('/') && !value.startsWith('//') ? value : null;
+  })();
+  readonly cameFromElsewhere = this.returnTo !== null;
+
   volver(): void {
+    if (this.returnTo) {
+      const query = this.route.snapshot.queryParamMap;
+      const queryParams: Record<string, string> = {};
+      for (const key of ['tab', 'certificado']) {
+        const value = query.get(key);
+        if (value) queryParams[key] = value;
+      }
+      this.router.navigate([this.returnTo], { queryParams });
+      return;
+    }
     this.router.navigate(['/personas']);
   }
 }

@@ -589,12 +589,25 @@ export class ContractDetailComponent implements OnInit {
       next: (result) => {
         this.contract.set(result);
         this.loading.set(false);
+        this.restoreViewFromQuery(result);
       },
       error: (err: HttpErrorResponse) => {
         this.loading.set(false);
         this.showError(err);
       },
     });
+  }
+
+  /** Al volver de otra pantalla (ej. ficha de persona) se recupera la pestana y el certificado que se estaban viendo. */
+  private restoreViewFromQuery(result: ContractDetail): void {
+    const query = this.route.snapshot.queryParamMap;
+    const certificado = query.get('certificado');
+    const tab = query.get('tab');
+    if (certificado) {
+      const file = result.TContractFile.find((f) => f.IdeContractFile === certificado);
+      if (file) this.selectedFile.set(file);
+    }
+    if (tab && (tab !== 'riesgos' || this.selectedFile())) this.activeTab.set(tab);
   }
 
   private showError(err: HttpErrorResponse): void {
@@ -1692,13 +1705,24 @@ export class ContractDetailComponent implements OnInit {
   }
 
   /** Persona asegurada del riesgo (riesgos de tipo persona): nombre completo y documento. */
-  riskInsuredOf(risk: ContractRisk): { name: string; document: string | null } | null {
+  /** Abre la ficha de la persona asegurada; "Volver" en esa pantalla regresa a este contrato (misma pestana y certificado). */
+  abrirPersona(idePerson: string, event: Event): void {
+    event.stopPropagation();
+    const c = this.contract();
+    if (!c) return;
+    const certificado = this.selectedFile()?.IdeContractFile;
+    this.router.navigate(['/personas', idePerson], {
+      queryParams: { volverA: `/contratos/${c.IdeContract}`, tab: 'riesgos', ...(certificado ? { certificado } : {}) },
+    });
+  }
+
+  riskInsuredOf(risk: ContractRisk): { idePerson: string; name: string; document: string | null } | null {
     const person = risk.TFileRiskPerson?.find((p) => p.SPersonRol.CodPersonRol === 'ASEGURADO')?.TPerson;
     if (!person) return null;
     const name = [person.DesFirstName, person.DesMiddleName, person.DesLastName1, person.DesLastName2]
       .filter((part) => !!part)
       .join(' ');
-    return { name, document: person.NumIdentification };
+    return { idePerson: person.IdePerson, name, document: person.NumIdentification };
   }
 
     stateSeverity(codState: string): 'info' | 'warn' | 'success' | 'secondary' {

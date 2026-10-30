@@ -6,7 +6,7 @@
       <h1 class="text-lg font-semibold text-slate-900">{{ 'personDetail.title' | transloco }}</h1>
       <p class="text-sm text-slate-500">{{ 'personDetail.subtitle' | transloco }}</p>
     </div>
-    <button pButton type="button" [label]="'personDetail.backButton' | transloco" [text]="true" icon="pi pi-arrow-left" (click)="volver()"></button>
+    <button pButton type="button" [label]="(cameFromElsewhere ? 'personDetail.backToPreviousButton' : 'personDetail.backButton') | transloco" [text]="true" icon="pi pi-arrow-left" (click)="volver()"></button>
   </div>
 
   @if (loading()) {

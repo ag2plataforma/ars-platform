@@ -284,7 +284,13 @@
                   <td>{{ risk.DesFileRisk ?? risk.SRiskProduct.DesShort ?? ('quotes.coverageFallback' | transloco) }}</td>
                   <td>
                     @if (riskInsuredOf(risk); as insured) {
-                      <div>{{ insured.name }}</div>
+                      <a
+                        href="javascript:void(0)"
+                        class="text-sky-700 hover:underline"
+                        [title]="'contractDetail.openPersonHint' | transloco"
+                        (click)="abrirPersona(insured.idePerson, $event)"
+                        >{{ insured.name }}</a
+                      >
                       @if (insured.document) {
                         <div class="text-xs text-slate-500">{{ insured.document }}</div>
                       }
