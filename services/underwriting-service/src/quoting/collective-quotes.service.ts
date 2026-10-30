@@ -1,3 +1,4 @@
+import { normalizeIdentification } from '../contracts/normalize-identification';
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, PrismaService } from '@ars-platform/database';
 import { StateMachineService } from '@ars-platform/shared-common';
@@ -256,7 +257,7 @@ export class CollectiveQuotesService {
       if (!type) throw new Error(`no existe el tipo de documento "${insured.codIdentificationType}"`);
       ideIdentificationType = type.IdeIdentificationType;
     }
-    const numIdentification = insured.numIdentification?.trim() || undefined;
+    const numIdentification = normalizeIdentification(insured.numIdentification);
     if (numIdentification && !ideIdentificationType) {
       throw new Error('si se indica el documento hay que indicar también su tipo');
     }
@@ -266,7 +267,10 @@ export class CollectiveQuotesService {
     // un correo compartido por si solo NO identifica a nadie (familias).
     if (numIdentification && ideIdentificationType) {
       const byDoc = await tx.tPerson.findFirst({
-        where: { IdeIdentificationType: ideIdentificationType, NumIdentification: numIdentification },
+        where: {
+          IdeIdentificationType: ideIdentificationType,
+          NumIdentification: { equals: numIdentification, mode: 'insensitive' },
+        },
       });
       if (byDoc) return byDoc.IdePerson;
     } else {

@@ -6,11 +6,14 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
+import { SelectModule } from 'primeng/select';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { CatalogService } from '../../core/catalogs/catalog.service';
+import { CatalogRow } from '../../core/catalogs/catalog.model';
 import {
   PersonDetail,
   PersonRelated,
@@ -34,12 +37,11 @@ import {
  * `findRelated`) porque la lista de cotizaciones de una sola persona es
  * chica -- no amerita ida y vuelta al backend por cambiar el filtro.
  *
- * Edición acotada a los campos que acepta `UpdatePersonPayload`/
- * `PersonsService.update` (`PATCH /persons/:id`) -- datos demográficos
- * con catálogo propio (género, país/localidad, profesión, actividad
- * económica, estado civil, tipo de documento) NO se editan acá todavía
- * (ver doc-comment de `UpdatePersonPayload`: esos catálogos no tienen
- * selector construido). Dirección/teléfono se muestran de solo lectura
+ * Se editan todos los datos de `TPerson` que acepta `UpdatePersonPayload`/
+ * `PersonsService.update` (`PATCH /persons/:id`): nombre, documento (tipo y
+ * número), email, fecha y lugar de nacimiento, sexo, estado civil,
+ * profesión, actividad económica y país de nacimiento (la localidad de
+ * nacimiento, jerárquica, queda fuera). Dirección/teléfono se muestran de solo lectura
  * -- su edición ya vive en el diálogo "Cambiar datos" de Tomador/Titular
  * (`ContractsService.changePersonData`, dentro del contrato, para que
  * quede atómico con una operación de trazabilidad); no se duplica ese
@@ -48,13 +50,14 @@ import {
 @Component({
   selector: 'app-person-detail',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, ButtonModule, InputTextModule, TableModule, TagModule, ToastModule, TranslocoPipe],
+  imports: [CommonModule, ReactiveFormsModule, ButtonModule, InputTextModule, SelectModule, TableModule, TagModule, ToastModule, TranslocoPipe],
   providers: [MessageService],
   templateUrl: './person-detail.component.html',
 })
 export class PersonDetailComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly persons = inject(PersonsService);
+  private readonly catalogService = inject(CatalogService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly messages = inject(MessageService);
@@ -86,8 +89,33 @@ export class PersonDetailComponent implements OnInit {
     desLastName1: ['', Validators.required],
     desLastName2: [''],
     desEmail: ['', [Validators.required, Validators.email]],
+    ideIdentificationType: [''],
     numIdentification: [''],
+    tstBirthdate: [''],
+    ideGender: [''],
+    ideMaritalStatus: [''],
+    ideProfession: [''],
+    ideBusinessActivity: [''],
+    desBirthPlace: [''],
+    ideCountryBirth: [''],
   });
+
+  /** Catalogos de los desplegables de datos demograficos. */
+  readonly identificationTypes = signal<CatalogRow[]>([]);
+  readonly genders = signal<CatalogRow[]>([]);
+  readonly maritalStatuses = signal<CatalogRow[]>([]);
+  readonly professions = signal<CatalogRow[]>([]);
+  readonly businessActivities = signal<CatalogRow[]>([]);
+  readonly countries = signal<CatalogRow[]>([]);
+
+  constructor() {
+    this.catalogService.list('/reference-data/identification-types').subscribe({ next: (r) => this.identificationTypes.set(r) });
+    this.catalogService.list('/reference-data/genders').subscribe({ next: (r) => this.genders.set(r) });
+    this.catalogService.list('/reference-data/marital-statuses').subscribe({ next: (r) => this.maritalStatuses.set(r) });
+    this.catalogService.list('/reference-data/professions').subscribe({ next: (r) => this.professions.set(r) });
+    this.catalogService.list('/reference-data/business-activities').subscribe({ next: (r) => this.businessActivities.set(r) });
+    this.catalogService.list('/reference-data/countries').subscribe({ next: (r) => this.countries.set(r) });
+  }
 
   ngOnInit(): void {
     this.idePerson = this.route.snapshot.paramMap.get('id') ?? '';
@@ -109,7 +137,15 @@ export class PersonDetailComponent implements OnInit {
           desLastName1: person.DesLastName1 ?? '',
           desLastName2: person.DesLastName2 ?? '',
           desEmail: person.DesEmail,
+          ideIdentificationType: person.IdeIdentificationType ?? '',
           numIdentification: person.NumIdentification ?? '',
+          tstBirthdate: person.TstBirthdate ? String(person.TstBirthdate).slice(0, 10) : '',
+          ideGender: person.IdeGender ?? '',
+          ideMaritalStatus: person.IdeMaritalStatus ?? '',
+          ideProfession: person.IdeProfession ?? '',
+          ideBusinessActivity: person.IdeBusinessActivity ?? '',
+          desBirthPlace: person.DesBirthPlace ?? '',
+          ideCountryBirth: person.IdeCountryBirth ?? '',
         });
         this.loading.set(false);
       },
@@ -136,7 +172,15 @@ export class PersonDetailComponent implements OnInit {
       desLastName1: raw.desLastName1 || undefined,
       desLastName2: raw.desLastName2 || undefined,
       desEmail: raw.desEmail,
+      ideIdentificationType: raw.ideIdentificationType || undefined,
       numIdentification: raw.numIdentification || undefined,
+      tstBirthdate: raw.tstBirthdate || undefined,
+      ideGender: raw.ideGender || undefined,
+      ideMaritalStatus: raw.ideMaritalStatus || undefined,
+      ideProfession: raw.ideProfession || undefined,
+      ideBusinessActivity: raw.ideBusinessActivity || undefined,
+      desBirthPlace: raw.desBirthPlace || undefined,
+      ideCountryBirth: raw.ideCountryBirth || undefined,
     };
     this.saving.set(true);
     this.persons.update(this.idePerson, payload).subscribe({

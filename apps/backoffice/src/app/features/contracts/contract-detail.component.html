@@ -1,6 +1,6 @@
 <p-toast />
 
-<div class="mx-auto flex max-w-6xl flex-col gap-4">
+<div class="flex w-full flex-col gap-4">
   <div class="flex items-center gap-3">
     <button pButton type="button" icon="pi pi-arrow-left" severity="secondary" [text]="true" (click)="volver()"></button>
     <div>
@@ -514,8 +514,6 @@
           <p-table
             [value]="c.TContractOperation"
             dataKey="IdeContractOperation"
-            selectionMode="single"
-            (onRowSelect)="onOperationSelect($event)"
             [paginator]="true"
             [rows]="10"
             [showCurrentPageReport]="true"
@@ -532,7 +530,11 @@
               </tr>
             </ng-template>
             <ng-template pTemplate="body" let-op>
-              <tr [pSelectableRow]="op" class="cursor-pointer">
+              <tr
+                [class.cursor-pointer]="operationHasReceipts(op)"
+                [class.bg-sky-50]="selectedOperation()?.IdeContractOperation === op.IdeContractOperation"
+                (click)="onOperationClick(op)"
+              >
                 <td>{{ op.NumOperation }}</td>
                 <td>{{ op.SOperationProduct.SProcess.DesProcess }}</td>
                 <td>{{ op.SOperationProduct.SOperation.DesOperation }}</td>
@@ -546,6 +548,187 @@
               </tr>
             </ng-template>
           </p-table>
+
+          <!-- Detalle apilado del movimiento: recibos -> certificados -> riesgos -> coberturas -> conceptos -->
+          @if (selectedOperation(); as op) {
+            <div class="mt-4 flex flex-col gap-4">
+              <section>
+                <h3 class="mb-2 text-sm font-semibold text-slate-700">{{ 'contractDetail.receiptsDialogTitle' | transloco: { num: op.NumOperation } }}</h3>
+                <p-table [value]="selectedOperationReceipts()" dataKey="IdeReceipt" styleClass="rounded-lg border border-slate-200 text-sm">
+                  <ng-template pTemplate="header">
+                    <tr>
+                      <th>{{ 'contractDetail.receiptNumberColumn' | transloco }}</th>
+                      <th>{{ 'contractDetail.receiptTypeColumn' | transloco }}</th>
+                      <th>{{ 'contractDetail.receiptIssueColumn' | transloco }}</th>
+                      <th>{{ 'contractsList.startColumn' | transloco }}</th>
+                      <th>{{ 'contractsList.endColumn' | transloco }}</th>
+                      <th class="text-right">{{ 'contractDetail.commissionColumn' | transloco }}</th>
+                      <th class="text-right">{{ 'contractDetail.primeColumn' | transloco }}</th>
+                      <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+                      @if (contract()?.IndCollective) {
+                        <th></th>
+                      }
+                    </tr>
+                  </ng-template>
+                  <ng-template pTemplate="body" let-receipt>
+                    <tr
+                      class="cursor-pointer"
+                      [class.bg-sky-50]="selectedReceipt()?.IdeReceipt === receipt.IdeReceipt"
+                      (click)="onReceiptClick(receipt)"
+                    >
+                      <td>{{ receipt.NumReceipt }}</td>
+                      <td>{{ receipt.SReceiptType.DesReceiptType }}</td>
+                      <td>{{ receipt.TstIssue | date: 'dd/MM/yyyy' }}</td>
+                      <td>{{ receipt.TstInitial | date: 'dd/MM/yyyy' }}</td>
+                      <td>{{ receipt.TstEnd | date: 'dd/MM/yyyy' }}</td>
+                      <td class="text-right">{{ receipt.Fee | number: '1.2-2' }}</td>
+                      <td class="text-right">{{ receipt.Prime | number: '1.2-2' }}</td>
+                      <td><p-tag [value]="receipt.SState.DesState" [severity]="stateSeverity(receipt.SState.CodState)" /></td>
+                      @if (contract()?.IndCollective) {
+                        <td>
+                          <p-button
+                            [label]="'contractDetail.breakdownButton' | transloco"
+                            icon="pi pi-list"
+                            size="small"
+                            [text]="true"
+                            (onClick)="$event.stopPropagation(); openBreakdown(receipt.IdeReceipt)"
+                          />
+                        </td>
+                      }
+                    </tr>
+                  </ng-template>
+                </p-table>
+              </section>
+
+              @if (selectedReceipt(); as receipt) {
+                @if (receiptTreeLoading()) {
+                  <p class="text-sm text-slate-500">{{ 'common.loading' | transloco }}</p>
+                } @else if (receiptTree(); as tree) {
+                  @if (tree.certificates.length === 0) {
+                    <p class="text-sm text-slate-500">{{ 'contractDetail.receiptTreeEmpty' | transloco }}</p>
+                  }
+
+                  @if (tree.certificates.length > 1) {
+                    <section>
+                      <h3 class="mb-2 text-sm font-semibold text-slate-700">{{ 'contractDetail.treeCertificatesTitle' | transloco: { num: receipt.NumReceipt } }}</h3>
+                      <p-table [value]="tree.certificates" dataKey="ideContractFile" [paginator]="tree.certificates.length > 10" [rows]="10" styleClass="rounded-lg border border-slate-200 text-sm">
+                        <ng-template pTemplate="header">
+                          <tr>
+                            <th>{{ 'contractDetail.breakdownCertificate' | transloco }}</th>
+                            <th>{{ 'contractDetail.insuredColumn' | transloco }}</th>
+                            <th>{{ 'contractDetail.treeRisksCount' | transloco }}</th>
+                          </tr>
+                        </ng-template>
+                        <ng-template pTemplate="body" let-cert>
+                          <tr class="cursor-pointer" [class.bg-sky-50]="treeCertificateId() === cert.ideContractFile" (click)="onTreeCertificateClick(cert)">
+                            <td>{{ cert.numCertificate }}</td>
+                            <td>
+                              {{ cert.insured }}
+                              @if (cert.identification) {
+                                <span class="text-xs text-slate-500"> · {{ cert.identification }}</span>
+                              }
+                            </td>
+                            <td>{{ cert.risks.length }}</td>
+                          </tr>
+                        </ng-template>
+                      </p-table>
+                    </section>
+                  }
+
+                  @if (treeCertificate(); as cert) {
+                    <section>
+                      <h3 class="mb-2 text-sm font-semibold text-slate-700">
+                        {{ 'contractDetail.treeRisksTitle' | transloco }}
+                        @if (tree.certificates.length > 1) {
+                          <span class="font-normal text-slate-500"> · {{ 'contractDetail.breakdownCertificate' | transloco }} {{ cert.numCertificate }}</span>
+                        }
+                      </h3>
+                      <p-table [value]="cert.risks" dataKey="ideFileRisk" styleClass="rounded-lg border border-slate-200 text-sm">
+                        <ng-template pTemplate="header">
+                          <tr>
+                            <th>#</th>
+                            <th>{{ 'contractDetail.riskColumn' | transloco }}</th>
+                            <th>{{ 'contractDetail.insuredColumn' | transloco }}</th>
+                            <th>{{ 'contractDetail.treeCoveragesCount' | transloco }}</th>
+                          </tr>
+                        </ng-template>
+                        <ng-template pTemplate="body" let-risk>
+                          <tr class="cursor-pointer" [class.bg-sky-50]="treeRiskId() === risk.ideFileRisk" (click)="onTreeRiskClick(risk)">
+                            <td>{{ risk.numRisk }}</td>
+                            <td>{{ risk.desRisk }}</td>
+                            <td>
+                              {{ risk.insured || ('common.dash' | transloco) }}
+                              @if (risk.identification) {
+                                <span class="text-xs text-slate-500"> · {{ risk.identification }}</span>
+                              }
+                            </td>
+                            <td>{{ risk.coverages.length }}</td>
+                          </tr>
+                        </ng-template>
+                      </p-table>
+                    </section>
+                  }
+
+                  @if (treeRisk(); as risk) {
+                    <section>
+                      <h3 class="mb-2 text-sm font-semibold text-slate-700">
+                        {{ 'contractDetail.treeCoveragesTitle' | transloco }}
+                        <span class="font-normal text-slate-500"> · {{ risk.desRisk }}</span>
+                      </h3>
+                      <p-table [value]="risk.coverages" dataKey="ideRiskCoverage" styleClass="rounded-lg border border-slate-200 text-sm">
+                        <ng-template pTemplate="header">
+                          <tr>
+                            <th>{{ 'contractDetail.coverageColumn' | transloco }}</th>
+                            <th class="text-right">{{ 'contractDetail.treeAmount' | transloco }}</th>
+                            <th class="text-right">{{ 'contractDetail.treeRate' | transloco }}</th>
+                            <th class="text-right">{{ 'contractDetail.primeColumn' | transloco }}</th>
+                          </tr>
+                        </ng-template>
+                        <ng-template pTemplate="body" let-coverage>
+                          <tr class="cursor-pointer" [class.bg-sky-50]="treeCoverageId() === coverage.ideRiskCoverage" (click)="onTreeCoverageClick(coverage)">
+                            <td>{{ coverage.desCoverage }}</td>
+                            <td class="text-right">{{ coverage.amount | number: '1.2-2' }}</td>
+                            <td class="text-right">{{ coverage.rate | number: '1.2-6' }}</td>
+                            <td class="text-right">{{ coverage.prime | number: '1.2-2' }}</td>
+                          </tr>
+                        </ng-template>
+                      </p-table>
+                    </section>
+                  }
+
+                  @if (treeCoverage(); as coverage) {
+                    <section>
+                      <h3 class="mb-2 text-sm font-semibold text-slate-700">
+                        {{ 'contractDetail.treeConceptsTitle' | transloco }}
+                        <span class="font-normal text-slate-500"> · {{ coverage.desCoverage }}</span>
+                      </h3>
+                      <p-table [value]="coverage.concepts" dataKey="codConcept" styleClass="rounded-lg border border-slate-200 text-sm">
+                        <ng-template pTemplate="header">
+                          <tr>
+                            <th>{{ 'contractDetail.treeConcept' | transloco }}</th>
+                            <th class="text-right">{{ 'contractDetail.treeConceptValue' | transloco }}</th>
+                            <th class="text-right">{{ 'contractDetail.treeConceptNetValue' | transloco }}</th>
+                          </tr>
+                        </ng-template>
+                        <ng-template pTemplate="body" let-concept>
+                          <tr>
+                            <td>{{ concept.desConcept }}</td>
+                            <td class="text-right">{{ concept.value | number: '1.2-6' }}</td>
+                            <td class="text-right">{{ concept.netValue | number: '1.2-6' }}</td>
+                          </tr>
+                        </ng-template>
+                        <ng-template pTemplate="emptymessage">
+                          <tr>
+                            <td colspan="3" class="py-4 text-center text-sm text-slate-500">{{ 'contractDetail.treeConceptsEmpty' | transloco }}</td>
+                          </tr>
+                        </ng-template>
+                      </p-table>
+                    </section>
+                  }
+                }
+              }
+            </div>
+          }
         </p-tabpanel>
 
         <p-tabpanel value="documentos">
@@ -669,59 +852,6 @@
   (closed)="extractionTarget.set(null)"
   (saved)="onExtractionSaved($event)"
 />
-
-<!-- ============================== Popup: Recibos del movimiento ============================== -->
-<p-dialog
-  [header]="selectedOperation() ? ('contractDetail.receiptsDialogTitle' | transloco: { num: selectedOperation()!.NumOperation }) : ''"
-  [visible]="receiptsDialogVisible()"
-  (visibleChange)="!$event && closeReceiptsDialog()"
-  [modal]="true"
-  [style]="{ width: '40rem' }"
->
-  <p-table [value]="selectedOperationReceipts()" dataKey="IdeReceipt" styleClass="text-sm">
-    <ng-template pTemplate="header">
-      <tr>
-        <th>{{ 'contractDetail.receiptNumberColumn' | transloco }}</th>
-        <th>{{ 'contractDetail.receiptTypeColumn' | transloco }}</th>
-        <th>{{ 'contractsList.startColumn' | transloco }}</th>
-        <th>{{ 'contractsList.endColumn' | transloco }}</th>
-        <th>{{ 'contractDetail.commissionColumn' | transloco }}</th>
-        <th>{{ 'contractDetail.primeColumn' | transloco }}</th>
-        <th>{{ 'catalogs.stateColumn' | transloco }}</th>
-        @if (contract()?.IndCollective) {
-          <th></th>
-        }
-      </tr>
-    </ng-template>
-    <ng-template pTemplate="body" let-receipt>
-      <tr>
-        <td>{{ receipt.NumReceipt }}</td>
-        <td>{{ receipt.SReceiptType.DesReceiptType }}</td>
-        <td>{{ receipt.TstInitial | date: 'dd/MM/yyyy' }}</td>
-        <td>{{ receipt.TstEnd | date: 'dd/MM/yyyy' }}</td>
-        <td>{{ receipt.Fee | number: '1.2-2' }}</td>
-        <td>{{ receipt.Prime | number: '1.2-2' }}</td>
-        <td><p-tag [value]="receipt.SState.DesState" [severity]="stateSeverity(receipt.SState.CodState)" /></td>
-        @if (contract()?.IndCollective) {
-          <td>
-            <p-button
-              [label]="'contractDetail.breakdownButton' | transloco"
-              icon="pi pi-list"
-              size="small"
-              [text]="true"
-              (onClick)="openBreakdown(receipt.IdeReceipt)"
-            />
-          </td>
-        }
-      </tr>
-    </ng-template>
-    <ng-template pTemplate="emptymessage">
-      <tr>
-        <td colspan="8" class="py-6 text-center text-sm text-slate-500">{{ 'contractDetail.receiptsEmpty' | transloco }}</td>
-      </tr>
-    </ng-template>
-  </p-table>
-</p-dialog>
 
 <!-- ============================== Popup: Desglose del recibo por certificado ============================== -->
 <p-dialog

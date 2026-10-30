@@ -199,6 +199,11 @@ export class ContractsController {
     return this.service.receiptBreakdown(id, ideReceipt);
   }
 
+  @Get('contracts/:id/receipts/:ideReceipt/tree')
+  receiptTree(@Param('id') id: string, @Param('ideReceipt') ideReceipt: string) {
+    return this.service.receiptTree(id, ideReceipt);
+  }
+
   /** Colectivos, alta MASIVA de asegurados (un suplemento, un recibo) -- ver `ContractsService.addCertificates`. */
   @Post('contracts/:id/add-certificates')
   addCertificates(@Param('id') id: string, @Body() dto: AddCertificatesBulkDto, @CurrentUser() actor: JwtPayload) {

@@ -36,8 +36,97 @@
           <input pInputText type="email" formControlName="desEmail" />
         </div>
         <div class="flex flex-col gap-2">
+          <label class="text-sm font-medium text-slate-700">{{ 'personDetail.documentTypeLabel' | transloco }}</label>
+          <p-select
+            appendTo="body"
+            formControlName="ideIdentificationType"
+            [options]="identificationTypes()"
+            optionLabel="DesIdentificationType"
+            optionValue="IdeIdentificationType"
+            [showClear]="true"
+            [placeholder]="'personDetail.selectPlaceholder' | transloco"
+            styleClass="w-full"
+          />
+        </div>
+        <div class="flex flex-col gap-2">
           <label class="text-sm font-medium text-slate-700">{{ 'personDetail.documentLabel' | transloco }}</label>
           <input pInputText type="text" formControlName="numIdentification" />
+        </div>
+        <div class="flex flex-col gap-2">
+          <label class="text-sm font-medium text-slate-700">{{ 'personDetail.birthdateLabel' | transloco }}</label>
+          <input pInputText type="date" formControlName="tstBirthdate" />
+        </div>
+        <div class="flex flex-col gap-2">
+          <label class="text-sm font-medium text-slate-700">{{ 'personDetail.genderLabel' | transloco }}</label>
+          <p-select
+            appendTo="body"
+            formControlName="ideGender"
+            [options]="genders()"
+            optionLabel="DesGender"
+            optionValue="IdeGender"
+            [showClear]="true"
+            [placeholder]="'personDetail.selectPlaceholder' | transloco"
+            styleClass="w-full"
+          />
+        </div>
+        <div class="flex flex-col gap-2">
+          <label class="text-sm font-medium text-slate-700">{{ 'personDetail.maritalStatusLabel' | transloco }}</label>
+          <p-select
+            appendTo="body"
+            formControlName="ideMaritalStatus"
+            [options]="maritalStatuses()"
+            optionLabel="DesMaritalStatus"
+            optionValue="IdeMaritalStatus"
+            [showClear]="true"
+            [placeholder]="'personDetail.selectPlaceholder' | transloco"
+            styleClass="w-full"
+          />
+        </div>
+        <div class="flex flex-col gap-2">
+          <label class="text-sm font-medium text-slate-700">{{ 'personDetail.professionLabel' | transloco }}</label>
+          <p-select
+            appendTo="body"
+            formControlName="ideProfession"
+            [options]="professions()"
+            optionLabel="DesProfession"
+            optionValue="IdeProfession"
+            [filter]="true"
+            [showClear]="true"
+            [placeholder]="'personDetail.selectPlaceholder' | transloco"
+            styleClass="w-full"
+          />
+        </div>
+        <div class="flex flex-col gap-2">
+          <label class="text-sm font-medium text-slate-700">{{ 'personDetail.businessActivityLabel' | transloco }}</label>
+          <p-select
+            appendTo="body"
+            formControlName="ideBusinessActivity"
+            [options]="businessActivities()"
+            optionLabel="DesBusinessActivity"
+            optionValue="IdeBusinessActivity"
+            [filter]="true"
+            [showClear]="true"
+            [placeholder]="'personDetail.selectPlaceholder' | transloco"
+            styleClass="w-full"
+          />
+        </div>
+        <div class="flex flex-col gap-2">
+          <label class="text-sm font-medium text-slate-700">{{ 'personDetail.birthPlaceLabel' | transloco }}</label>
+          <input pInputText type="text" formControlName="desBirthPlace" />
+        </div>
+        <div class="flex flex-col gap-2">
+          <label class="text-sm font-medium text-slate-700">{{ 'personDetail.birthCountryLabel' | transloco }}</label>
+          <p-select
+            appendTo="body"
+            formControlName="ideCountryBirth"
+            [options]="countries()"
+            optionLabel="DesCountry"
+            optionValue="IdeCountry"
+            [filter]="true"
+            [showClear]="true"
+            [placeholder]="'personDetail.selectPlaceholder' | transloco"
+            styleClass="w-full"
+          />
         </div>
       </div>
       <div class="flex items-center gap-2">

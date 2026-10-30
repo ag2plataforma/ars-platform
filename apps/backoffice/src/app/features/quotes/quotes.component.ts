@@ -32,7 +32,7 @@ import {
   QuotingService,
   SubmitSocialImpactAnswersPayload,
 } from './quoting.service';
-import { MOBILE_PHONE_CONTACT_CLASS, Person, PersonsService } from '../../core/party/persons.service';
+import { MOBILE_PHONE_CONTACT_CLASS, Person, PersonDetail, PersonsService } from '../../core/party/persons.service';
 import { downloadBlob } from '../../core/files/file.util';
 import { DocumentTemplatesService } from '../documents/document-templates.service';
 import { PaymentFractionPickerComponent } from './payment-fraction-picker.component';
@@ -1451,19 +1451,38 @@ export class QuotesComponent {
     }
   }
 
-  /** Precarga nombre/apellidos/correo de una persona ya registrada con ese documento (si existe; si no, se creara al contratar). */
+  /** Precarga los datos ya conocidos de una persona registrada con ese documento (si existe; si no, se creara al contratar).
+   *  El backend solo completa vacios al contratar: nunca pisa lo ya guardado, asi que aqui se muestra lo guardado. */
   lookupInsured(item: InsuredPersonItem): void {
     const num = String(item.form.get('numIdentification')?.value ?? '').trim();
     if (!num) return;
+    const type = String(item.form.get('ideIdentificationType')?.value ?? '').trim();
     this.insuredSearching.set(item.risk.ideQuoteRisk);
-    this.persons.lookup({ numIdentification: num }).subscribe({
-      next: (person) => {
+    this.persons.lookup({ numIdentification: num, ...(type ? { ideIdentificationType: type } : {}) }).subscribe({
+      next: (found) => {
         this.insuredSearching.set(null);
-        const patch: Record<string, string> = { desFirstName: person.DesFirstName };
-        if (person.DesMiddleName) patch['desMiddleName'] = person.DesMiddleName;
-        if (person.DesLastName1) patch['desLastName1'] = person.DesLastName1;
-        if (person.DesLastName2) patch['desLastName2'] = person.DesLastName2;
-        for (const [key, value] of Object.entries(patch)) item.form.get(key)?.setValue(value);
+        const person = found as Partial<PersonDetail> & Person;
+        const candidates: Record<string, string | null | undefined> = {
+          desFirstName: person.DesFirstName,
+          desMiddleName: person.DesMiddleName,
+          desLastName1: person.DesLastName1,
+          desLastName2: person.DesLastName2,
+          ideIdentificationType: person.IdeIdentificationType,
+          tstBirthdate: person.TstBirthdate ? String(person.TstBirthdate).slice(0, 10) : null,
+          ideGender: person.IdeGender,
+          ideMaritalStatus: person.IdeMaritalStatus,
+          ideProfession: person.IdeProfession,
+          desBirthPlace: person.DesBirthPlace,
+          desEmail: person.DesEmail,
+        };
+        for (const [key, value] of Object.entries(candidates)) {
+          if (!value) continue;
+          const control = item.form.get(key);
+          if (!control) continue;
+          // Correo: solo si esta vacio (el asegurado puede compartir el del tomador).
+          if (key === 'desEmail' && control.value) continue;
+          control.setValue(value);
+        }
         this.messages.add({
           severity: 'info',
           summary: this.transloco.translate('quotes.insuredFoundSummary'),
@@ -1665,6 +1684,12 @@ export class QuotesComponent {
    *  la suscripción a `route.paramMap` del constructor cuando cambia la
    *  URL; este método es el que usa el botón "Nueva cotización". */
   irANueva(): void {
+    // Si ya estamos en `/cotizacion/nueva` (cotizacion hecha de principio a fin sin salir de la ruta), navegar a la
+    // misma URL no hace nada y la suscripcion a `paramMap` no se dispara: hay que reiniciar el estado a mano.
+    if (this.router.url.split('?')[0] === '/cotizacion/nueva') {
+      this.nuevaCotizacion();
+      return;
+    }
     this.router.navigateByUrl('/cotizacion/nueva');
   }
 
@@ -1691,6 +1716,10 @@ export class QuotesComponent {
     this.submittingSocialImpact.set(false);
     this.quoteAccepted.set(false);
     this.contractResult.set(null);
+    for (const key of Object.keys(this.contractFields.form.controls)) this.contractFields.form.removeControl(key);
+    this.contractFields.fields.set([]);
+    this.contractRiskFields.set([]);
+    this.insuredPersons.set([]);
     this.paymentFraction.set('');
     this.accepting.set(false);
     this.contracting.set(false);

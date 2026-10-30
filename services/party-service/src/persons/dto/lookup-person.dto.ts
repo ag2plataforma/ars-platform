@@ -18,6 +18,11 @@ export class LookupPersonDto {
   @IsString()
   numIdentification?: string;
 
+  /** Tipo de documento: junto con `numIdentification` evita confundir documentos iguales de tipos distintos. */
+  @IsOptional()
+  @IsUUID()
+  ideIdentificationType?: string;
+
   @IsOptional()
   @IsEmail()
   email?: string;

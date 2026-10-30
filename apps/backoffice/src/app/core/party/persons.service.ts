@@ -89,11 +89,22 @@ export interface UpdatePersonPayload {
   desLastName1?: string;
   desLastName2?: string;
   desEmail?: string;
+  ideIdentificationType?: string;
   numIdentification?: string;
+  ideGender?: string;
+  /** `YYYY-MM-DD`. */
+  tstBirthdate?: string;
+  desBirthPlace?: string;
+  ideCountryBirth?: string;
+  ideProfession?: string;
+  ideBusinessActivity?: string;
+  ideMaritalStatus?: string;
 }
 
 export interface LookupPersonCriteria {
   numIdentification?: string;
+  /** Tipo de documento: junto con el numero evita confundir documentos iguales de tipos distintos. */
+  ideIdentificationType?: string;
   email?: string;
 }
 
@@ -146,6 +157,15 @@ export interface PersonContactData {
 }
 
 export interface PersonDetail extends Person {
+  IdeIdentificationType: string | null;
+  IdeGender: string | null;
+  TstBirthdate: string | null;
+  DesBirthPlace: string | null;
+  IdeCountryBirth: string | null;
+  IdeProfession: string | null;
+  IdeBusinessActivity: string | null;
+  IdeMaritalStatus: string | null;
+  TstCreation: string;
   IndLead: boolean;
   IndClient: boolean;
   TAddress: PersonAddress[];
@@ -197,6 +217,7 @@ export class PersonsService {
   lookup(criteria: LookupPersonCriteria): Observable<Person> {
     let params = new HttpParams();
     if (criteria.numIdentification) params = params.set('numIdentification', criteria.numIdentification);
+    if (criteria.ideIdentificationType) params = params.set('ideIdentificationType', criteria.ideIdentificationType);
     if (criteria.email) params = params.set('email', criteria.email);
     return this.http.get<Person>(`${this.base}/lookup`, { params });
   }

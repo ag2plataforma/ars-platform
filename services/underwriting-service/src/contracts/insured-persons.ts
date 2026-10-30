@@ -3,6 +3,7 @@ import { Prisma } from '@ars-platform/database';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import { InsuredPersonDto } from './dto/insured-person.dto';
+import { normalizeIdentification } from './normalize-identification';
 
 /** Campos de persona que un producto puede pedir para el asegurado de un riesgo tipo persona. */
 export const INSURED_PERSON_FIELDS = [
@@ -122,11 +123,16 @@ export async function findOrCreateInsuredPerson(
   const lastName1 = person.desLastName1?.trim() || null;
   const email = (config.email !== 'NONE' && person.desEmail?.trim()) || holderEmail;
   const ideType = person.ideIdentificationType?.trim() || undefined;
-  const numDoc = person.numIdentification?.trim() || undefined;
+  const numDoc = normalizeIdentification(person.numIdentification);
 
   if (ideType && numDoc) {
-    const byDoc = await tx.tPerson.findFirst({ where: { IdeIdentificationType: ideType, NumIdentification: numDoc } });
-    if (byDoc) return byDoc.IdePerson;
+    const byDoc = await tx.tPerson.findFirst({
+      where: { IdeIdentificationType: ideType, NumIdentification: { equals: numDoc, mode: 'insensitive' } },
+    });
+    if (byDoc) {
+      await fillMissingPersonData(byDoc, person, numDoc, actor, tx);
+      return byDoc.IdePerson;
+    }
   } else {
     const same = await tx.tPerson.findFirst({
       where: {
@@ -137,7 +143,10 @@ export async function findOrCreateInsuredPerson(
         ...(person.tstBirthdate ? { TstBirthdate: new Date(person.tstBirthdate) } : {}),
       },
     });
-    if (same) return same.IdePerson;
+    if (same) {
+      await fillMissingPersonData(same, person, undefined, actor, tx);
+      return same.IdePerson;
+    }
   }
 
   const now = new Date();
@@ -165,4 +174,49 @@ export async function findOrCreateInsuredPerson(
     },
   });
   return created.IdePerson;
+}
+
+type ExistingPerson = {
+  IdePerson: string;
+  NumIdentification: string | null;
+  DesMiddleName: string | null;
+  DesLastName1: string | null;
+  DesLastName2: string | null;
+  TstBirthdate: Date | null;
+  IdeGender: string | null;
+  IdeMaritalStatus: string | null;
+  IdeProfession: string | null;
+  DesBirthPlace: string | null;
+};
+
+/**
+ * Una persona que ya existe se COMPLETA con los datos que se hayan informado al contratar y que ella no tenia
+ * (ej. la fecha de nacimiento). Lo que ya tiene valor NO se pisa: un dato mal tecleado en una contratacion no
+ * debe alterar la ficha de la persona para el resto de contratos. Tambien deja el documento en mayusculas.
+ */
+async function fillMissingPersonData(
+  existing: ExistingPerson,
+  person: InsuredPersonDto,
+  normalizedDocument: string | undefined,
+  actor: string,
+  tx: Prisma.TransactionClient,
+): Promise<void> {
+  const text = (value?: string | null) => value?.trim() || undefined;
+  const data: Prisma.TPersonUncheckedUpdateInput = {};
+  if (!existing.DesMiddleName && text(person.desMiddleName)) data.DesMiddleName = text(person.desMiddleName);
+  if (!existing.DesLastName1 && text(person.desLastName1)) data.DesLastName1 = text(person.desLastName1);
+  if (!existing.DesLastName2 && text(person.desLastName2)) data.DesLastName2 = text(person.desLastName2);
+  if (!existing.TstBirthdate && text(person.tstBirthdate)) data.TstBirthdate = new Date(person.tstBirthdate!);
+  if (!existing.IdeGender && text(person.ideGender)) data.IdeGender = person.ideGender;
+  if (!existing.IdeMaritalStatus && text(person.ideMaritalStatus)) data.IdeMaritalStatus = person.ideMaritalStatus;
+  if (!existing.IdeProfession && text(person.ideProfession)) data.IdeProfession = person.ideProfession;
+  if (!existing.DesBirthPlace && text(person.desBirthPlace)) data.DesBirthPlace = text(person.desBirthPlace);
+  if (normalizedDocument && existing.NumIdentification && existing.NumIdentification !== normalizedDocument) {
+    data.NumIdentification = normalizedDocument;
+  }
+  if (Object.keys(data).length === 0) return;
+  await tx.tPerson.update({
+    where: { IdePerson: existing.IdePerson },
+    data: { ...data, UsrModification: actor, TstModification: new Date() },
+  });
 }

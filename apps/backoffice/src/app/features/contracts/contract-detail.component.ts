@@ -38,6 +38,10 @@ import {
   ContractRisk,
   ContractsService,
   ReceiptBreakdown,
+  ReceiptTree,
+  ReceiptTreeCertificate,
+  ReceiptTreeCoverage,
+  ReceiptTreeRisk,
 } from './contracts.service';
 import { ContractDocumentsComponent } from '../documents/contract-documents.component';
 import { BulkCertificatesComponent } from './bulk-certificates.component';
@@ -237,15 +241,34 @@ export class ContractDetailComponent implements OnInit {
     return rows;
   });
 
-  /** Movimiento (`TContractOperation`) seleccionado -- alimenta el popup
-   *  de Recibos. */
+  /** Movimiento (`TContractOperation`) seleccionado -- alimenta el desglose apilado de la pestaña
+   *  Movimientos: recibo -> certificados (se omite si hay uno solo) -> riesgos -> coberturas -> conceptos. */
   readonly selectedOperation = signal<ContractOperation | null>(null);
-  readonly receiptsDialogVisible = signal(false);
   readonly selectedOperationReceipts = computed(() => {
     const op = this.selectedOperation();
     if (!op) return [];
     return this.contract()?.TReceipt.filter((r) => r.IdeContractOperation === op.IdeContractOperation) ?? [];
   });
+  readonly selectedReceipt = signal<ContractReceipt | null>(null);
+  readonly receiptTree = signal<ReceiptTree | null>(null);
+  readonly receiptTreeLoading = signal(false);
+  readonly treeCertificateId = signal<string | null>(null);
+  readonly treeRiskId = signal<string | null>(null);
+  readonly treeCoverageId = signal<string | null>(null);
+
+  readonly treeCertificates = computed<ReceiptTreeCertificate[]>(() => this.receiptTree()?.certificates ?? []);
+  /** Con un solo certificado el nivel "certificados" no se muestra y ese certificado queda seleccionado. */
+  readonly treeCertificate = computed<ReceiptTreeCertificate | null>(() => {
+    const list = this.treeCertificates();
+    if (list.length === 1) return list[0];
+    return list.find((c) => c.ideContractFile === this.treeCertificateId()) ?? null;
+  });
+  readonly treeRisk = computed<ReceiptTreeRisk | null>(
+    () => this.treeCertificate()?.risks.find((r) => r.ideFileRisk === this.treeRiskId()) ?? null,
+  );
+  readonly treeCoverage = computed<ReceiptTreeCoverage | null>(
+    () => this.treeRisk()?.coverages.find((cv) => cv.ideRiskCoverage === this.treeCoverageId()) ?? null,
+  );
 
   /** Popup "atributos personalizados" de un riesgo -- resuelve
    *  `TFileRisk.RiskAttributeValue` (`{ IdeAttributeProperty: valor }`)
@@ -680,9 +703,54 @@ export class ContractDetailComponent implements OnInit {
     this.activeTab.set('coberturas');
   }
 
-  onOperationSelect(event: TableRowSelectEvent): void {
-    this.selectedOperation.set(event.data as ContractOperation);
-    this.receiptsDialogVisible.set(true);
+  /** Un movimiento sin recibos no abre nada. */
+  operationHasReceipts(op: ContractOperation): boolean {
+    return (this.contract()?.TReceipt ?? []).some((r) => r.IdeContractOperation === op.IdeContractOperation);
+  }
+
+  onOperationClick(op: ContractOperation): void {
+    if (!this.operationHasReceipts(op)) return;
+    if (this.selectedOperation()?.IdeContractOperation === op.IdeContractOperation) return;
+    this.selectedOperation.set(op);
+    this.resetReceiptSelection();
+  }
+
+  private resetReceiptSelection(): void {
+    this.selectedReceipt.set(null);
+    this.receiptTree.set(null);
+    this.treeCertificateId.set(null);
+    this.treeRiskId.set(null);
+    this.treeCoverageId.set(null);
+  }
+
+  onReceiptClick(receipt: ContractReceipt): void {
+    const c = this.contract();
+    if (!c || this.selectedReceipt()?.IdeReceipt === receipt.IdeReceipt) return;
+    this.resetReceiptSelection();
+    this.selectedReceipt.set(receipt);
+    this.receiptTreeLoading.set(true);
+    this.contracts.receiptTree(c.IdeContract, receipt.IdeReceipt).subscribe({
+      next: (tree) => {
+        this.receiptTree.set(tree);
+        this.receiptTreeLoading.set(false);
+      },
+      error: () => this.receiptTreeLoading.set(false),
+    });
+  }
+
+  onTreeCertificateClick(cert: ReceiptTreeCertificate): void {
+    this.treeCertificateId.set(cert.ideContractFile);
+    this.treeRiskId.set(null);
+    this.treeCoverageId.set(null);
+  }
+
+  onTreeRiskClick(risk: ReceiptTreeRisk): void {
+    this.treeRiskId.set(risk.ideFileRisk);
+    this.treeCoverageId.set(null);
+  }
+
+  onTreeCoverageClick(coverage: ReceiptTreeCoverage): void {
+    this.treeCoverageId.set(coverage.ideRiskCoverage);
   }
 
   /** Desglose por certificado de un recibo colectivo. */
@@ -706,10 +774,6 @@ export class ContractDetailComponent implements OnInit {
         this.breakdownVisible.set(false);
       },
     });
-  }
-
-  closeReceiptsDialog(): void {
-    this.receiptsDialogVisible.set(false);
   }
 
   openAttributesDialog(risk: ContractRisk): void {

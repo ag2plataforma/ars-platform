@@ -21,6 +21,7 @@ import {
 } from './dto/certificate.dto';
 import { AddRiskDto } from './dto/add-risk.dto';
 import { RemoveRiskDto } from './dto/remove-risk.dto';
+import { normalizeIdentification } from './normalize-identification';
 import { assertInsuredPersonComplete, findOrCreateInsuredPerson, parseInsuredPerson, resolveInsuredPersonConfig } from './insured-persons';
 import { ChangePersonDataDto } from './dto/change-person-data.dto';
 import { ListContractsDto } from './dto/list-contracts.dto';
@@ -1516,6 +1517,189 @@ export class ContractsService {
   }
 
   /**
+   * Arbol completo de un recibo para el detalle del contrato (pestana Movimientos):
+   * certificados -> riesgos -> coberturas -> conceptos de calculo. Se arma desde las lineas
+   * del recibo (`TReceiptDetail` -> `TCoverageMovement`) y los conceptos de cada movimiento de
+   * cobertura (`TMovementConcept`). Es solo lectura. El frontend omite el nivel de certificados
+   * cuando el recibo tiene uno solo.
+   */
+  async receiptTree(ideContract: string, ideReceipt: string) {
+    const receipt = await this.prisma.tReceipt.findFirst({
+      where: { IdeReceipt: ideReceipt, IdeContract: ideContract },
+      select: { IdeReceipt: true, NumReceipt: true },
+    });
+    if (!receipt) {
+      throw new NotFoundException(`No existe el recibo "${ideReceipt}" en el contrato "${ideContract}"`);
+    }
+    const lines = await this.prisma.tReceiptDetail.findMany({
+      where: { IdeReceipt: ideReceipt },
+      select: { IdeCoverageMovement: true },
+    });
+    const ideMovements = [...new Set(lines.map((l) => l.IdeCoverageMovement))];
+    const movements = ideMovements.length
+      ? await this.prisma.tCoverageMovement.findMany({
+          where: { IdeCoverageMovement: { in: ideMovements } },
+          select: {
+            IdeCoverageMovement: true,
+            Amount: true,
+            Rate: true,
+            Prime: true,
+            TMovementConcept: {
+              orderBy: { TstCreation: 'asc' },
+              select: {
+                IdeConcept: true,
+                ConceptValue: true,
+                ConceptNetValue: true,
+                SConcept: { select: { CodConcept: true, DesConcept: true } },
+              },
+            },
+            TRiskCoverage: {
+              select: {
+                IdeRiskCoverage: true,
+                SCoveragePlan: { select: { DesShort: true, SCoverage: { select: { DesCoverage: true } } } },
+                TFileRisk: {
+                  select: {
+                    IdeFileRisk: true,
+                    NumFileRisk: true,
+                    DesFileRisk: true,
+                    SRiskProduct: { select: { DesShort: true } },
+                    TFileRiskPerson: {
+                      where: { SPersonRol: { CodPersonRol: 'ASEGURADO' } },
+                      take: 1,
+                      select: {
+                        TPerson: {
+                          select: { NumIdentification: true, DesFirstName: true, DesMiddleName: true, DesLastName1: true, DesLastName2: true },
+                        },
+                      },
+                    },
+                    TContractFile: {
+                      select: {
+                        IdeContractFile: true,
+                        NumContractFile: true,
+                        TContractFilePerson: {
+                          where: { SPersonRol: { CodPersonRol: 'ASEGURADO' } },
+                          take: 1,
+                          select: {
+                            TPerson: {
+                              select: { NumIdentification: true, DesFirstName: true, DesMiddleName: true, DesLastName1: true, DesLastName2: true },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        })
+      : [];
+
+    type PersonRow = { NumIdentification: string | null; DesFirstName: string; DesMiddleName: string | null; DesLastName1: string | null; DesLastName2: string | null };
+    const fullName = (p?: PersonRow | null) =>
+      p ? [p.DesFirstName, p.DesMiddleName, p.DesLastName1, p.DesLastName2].filter(Boolean).join(' ') : '';
+
+    type Concept = { codConcept: string; desConcept: string; value: number; netValue: number };
+    type Coverage = { ideRiskCoverage: string; desCoverage: string; amount: number; rate: number; prime: number; concepts: Map<string, Concept> };
+    type Risk = { ideFileRisk: string; numRisk: number; desRisk: string; insured: string; identification: string | null; coverages: Map<string, Coverage> };
+    type Certificate = { ideContractFile: string; numCertificate: number; insured: string; identification: string | null; risks: Map<string, Risk> };
+    const certificates = new Map<string, Certificate>();
+
+    for (const m of movements) {
+      const cov = m.TRiskCoverage;
+      const risk = cov.TFileRisk;
+      const file = risk.TContractFile;
+      let cert = certificates.get(file.IdeContractFile);
+      if (!cert) {
+        const person = file.TContractFilePerson[0]?.TPerson;
+        cert = {
+          ideContractFile: file.IdeContractFile,
+          numCertificate: file.NumContractFile,
+          insured: fullName(person),
+          identification: person?.NumIdentification ?? null,
+          risks: new Map(),
+        };
+        certificates.set(file.IdeContractFile, cert);
+      }
+      let riskRow = cert.risks.get(risk.IdeFileRisk);
+      if (!riskRow) {
+        const person = risk.TFileRiskPerson[0]?.TPerson;
+        riskRow = {
+          ideFileRisk: risk.IdeFileRisk,
+          numRisk: risk.NumFileRisk,
+          desRisk: risk.DesFileRisk ?? risk.SRiskProduct.DesShort ?? '',
+          insured: fullName(person),
+          identification: person?.NumIdentification ?? null,
+          coverages: new Map(),
+        };
+        cert.risks.set(risk.IdeFileRisk, riskRow);
+      }
+      let covRow = riskRow.coverages.get(cov.IdeRiskCoverage);
+      if (!covRow) {
+        covRow = {
+          ideRiskCoverage: cov.IdeRiskCoverage,
+          desCoverage: cov.SCoveragePlan.DesShort ?? cov.SCoveragePlan.SCoverage.DesCoverage,
+          amount: 0,
+          rate: Number(m.Rate),
+          prime: 0,
+          concepts: new Map(),
+        };
+        riskRow.coverages.set(cov.IdeRiskCoverage, covRow);
+      }
+      covRow.amount += Number(m.Amount);
+      covRow.prime += Number(m.Prime);
+      for (const c of m.TMovementConcept) {
+        const existing = covRow.concepts.get(c.IdeConcept);
+        if (existing) {
+          existing.value += Number(c.ConceptValue);
+          existing.netValue += Number(c.ConceptNetValue);
+        } else {
+          covRow.concepts.set(c.IdeConcept, {
+            codConcept: c.SConcept.CodConcept,
+            desConcept: c.SConcept.DesConcept,
+            value: Number(c.ConceptValue),
+            netValue: Number(c.ConceptNetValue),
+          });
+        }
+      }
+    }
+
+    return {
+      ideReceipt: receipt.IdeReceipt,
+      numReceipt: receipt.NumReceipt,
+      certificates: [...certificates.values()]
+        .sort((a, b) => a.numCertificate - b.numCertificate)
+        .map((cert) => ({
+          ideContractFile: cert.ideContractFile,
+          numCertificate: cert.numCertificate,
+          insured: cert.insured,
+          identification: cert.identification,
+          risks: [...cert.risks.values()]
+            .sort((a, b) => a.numRisk - b.numRisk)
+            .map((risk) => ({
+              ideFileRisk: risk.ideFileRisk,
+              numRisk: risk.numRisk,
+              desRisk: risk.desRisk,
+              insured: risk.insured,
+              identification: risk.identification,
+              coverages: [...risk.coverages.values()].map((cov) => ({
+                ideRiskCoverage: cov.ideRiskCoverage,
+                desCoverage: cov.desCoverage,
+                amount: round2(cov.amount),
+                rate: cov.rate,
+                prime: round2(cov.prime),
+                concepts: [...cov.concepts.values()].map((c) => ({
+                  ...c,
+                  value: round2(c.value),
+                  netValue: round2(c.netValue),
+                })),
+              })),
+            })),
+        })),
+    };
+  }
+
+  /**
    * `GET /contracts/:id` -- pantalla de detalle de contrato (ver
    * docs/02-roadmap.md, pendiente cerrado a pedido explícito del
    * usuario). Además de producto/riesgos/coberturas (ya existente),
@@ -2286,7 +2470,7 @@ export class ContractsService {
     const idePaymentFraction = await this.resolvePaymentFraction(quote.IdeProduct, dto.codPaymentFraction, tx);
     const [ideContractInitial, numContract] = await Promise.all([
       this.stateMachine.getInitialState('TContract'),
-      this.generateNumContract(tx),
+      this.generateNumContract(quote.IdeProduct, tx),
     ]);
 
     const now = new Date();
@@ -2380,23 +2564,51 @@ export class ContractsService {
   }
 
   /**
-   * Genera `NumContract` con una secuencia real de Postgres, mismo
-   * criterio explícito que `QuotesService.generateNumQuote` (ver
-   * `packages/database/scripts/setup-contract-number-sequence.js`): el
-   * original (`FContract('GETNUMBER', ...)`) tiene el mismo riesgo real de
-   * colisión bajo concurrencia que tenía `FQuote('GETQUOTENUMBER', ...)`.
-   * A diferencia de `NumQuote` (que lleva el `CodProduct` como prefijo
-   * visible), el formato real de `NumContract` no se confirmó carácter por
-   * carácter contra el código fuente en esta ronda -- se usa un formato
-   * `CONT-<Año>-<N>` razonable y estable, documentado como decisión de
-   * esta implementación (no una réplica literal del formato original).
+   * Genera `NumContract` con el formato `<CodProducto>-<Año>-<N>` (ej. `2060-2026-1`): con solo ver el numero se
+   * sabe de que producto es. `N` es un contador por producto y año SIN SALTOS (`nextSequenceValue`): se incrementa
+   * dentro de la misma transaccion que crea el contrato, asi que si la contratacion falla y se deshace, el numero
+   * vuelve a quedar libre. (Antes se usaba `nextval` de una secuencia de Postgres compartida con los recibos, que
+   * no se deshace con la transaccion y dejaba huecos.)
    */
-  private async generateNumContract(tx: Prisma.TransactionClient = this.prisma): Promise<string> {
-    const result = await tx.$queryRaw<{ nextval: number }[]>`
-      SELECT nextval('ars_platform."SeqTContractNumber"')::int AS nextval
-    `;
-    const year = new Date().getFullYear();
-    return `CONT-${year}-${result[0].nextval}`;
+  private async generateNumContract(ideProduct: string, tx: Prisma.TransactionClient): Promise<string> {
+    const product = await tx.sProduct.findUniqueOrThrow({ where: { IdeProduct: ideProduct }, select: { CodProduct: true } });
+    const year = this.currentYear();
+    const prefix = `${product.CodProduct}-${year}-`;
+    const next = await this.nextSequenceValue(tx, `CONTRACT:${product.CodProduct}:${year}`, async () => {
+      const rows = await tx.$queryRaw<{ max: number | null }[]>`
+        SELECT max(substring("NumContract" from '-([0-9]+)$')::int) AS max
+          FROM ars_platform."TContract" WHERE left("NumContract", ${prefix.length}) = ${prefix}`;
+      return rows[0]?.max ?? 0;
+    });
+    const numContract = `${prefix}${next}`;
+    if (numContract.length > 30) {
+      throw new BadRequestException(`El numero de contrato "${numContract}" supera los 30 caracteres: el codigo del producto es demasiado largo`);
+    }
+    return numContract;
+  }
+
+  /** Año actual en la zona horaria de negocio (Madrid): evita que el contador cambie de año a destiempo en servidores en UTC. */
+  private currentYear(): number {
+    return Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Madrid', year: 'numeric' }).format(new Date()));
+  }
+
+  /**
+   * Siguiente valor de un contador numerico SIN SALTOS (`SNumberSequence`). Va dentro de la transaccion del llamador:
+   * el `UPDATE` bloquea la fila del contador hasta el commit/rollback, asi dos contrataciones simultaneas del mismo
+   * producto se numeran una detras de otra, y si una falla, su numero se libera. La primera vez que se usa un contador
+   * parte del mayor numero ya existente (`seed`) para no repetir numeros de datos anteriores.
+   */
+  private async nextSequenceValue(tx: Prisma.TransactionClient, code: string, seed: () => Promise<number>): Promise<number> {
+    const existing = await tx.$queryRaw<{ n: number }[]>`
+      SELECT "NumLast"::int AS n FROM ars_platform."SNumberSequence" WHERE "CodSequence" = ${code}`;
+    const start = existing.length > 0 ? 0 : await seed();
+    const rows = await tx.$queryRaw<{ n: number }[]>`
+      INSERT INTO ars_platform."SNumberSequence" ("CodSequence", "NumLast", "TstModification")
+      VALUES (${code}, ${start + 1}, now())
+      ON CONFLICT ("CodSequence")
+      DO UPDATE SET "NumLast" = ars_platform."SNumberSequence"."NumLast" + 1, "TstModification" = now()
+      RETURNING "NumLast"::int AS n`;
+    return rows[0].n;
   }
 
   /**
@@ -3457,26 +3669,24 @@ export class ContractsService {
   }
 
   /**
-   * `NumReceipt` -- formato alineado al real de `FReceipt_GetNumber`
-   * ('Rec'||CodProduct||'-'||Año||'-'||secuencia, confirmado contra el
-   * código fuente en `packages/database/scripts/investigate-contract-engine.js`),
-   * pero con la secuencia resuelta vía una secuencia real de Postgres
-   * (`SeqTContractNumber`, compartida con `NumContract`) en vez del
-   * escaneo `split_part(NumReceipt,'-',3)` del original -- ese escaneo
-   * tiene el mismo riesgo real de colisión bajo concurrencia que ya se
-   * evitó para `NumQuote`/`NumContract` (ver `generateNumContract`), y
-   * acá se evita de la misma forma sin cambiar el formato visible.
+   * `NumReceipt` -- formato `Rec<CodProducto>-<Año>-<N>` (el del original, `FReceipt_GetNumber`), con `N` tomado de un
+   * contador por producto y año SIN SALTOS (`nextSequenceValue`), dentro de la transaccion que crea el recibo. Antes
+   * compartia con los contratos una secuencia de Postgres que no se deshace con la transaccion y dejaba huecos.
    */
-  private async generateNumReceipt(ideProduct: string): Promise<string> {
-    const product = await this.prisma.sProduct.findUniqueOrThrow({
+  private async generateNumReceipt(ideProduct: string, tx: Prisma.TransactionClient): Promise<string> {
+    const product = await tx.sProduct.findUniqueOrThrow({
       where: { IdeProduct: ideProduct },
       select: { CodProduct: true },
     });
-    const result = await this.prisma.$queryRaw<{ nextval: number }[]>`
-      SELECT nextval('ars_platform."SeqTContractNumber"')::int AS nextval
-    `;
-    const year = new Date().getFullYear();
-    return `Rec${product.CodProduct}-${year}-${result[0].nextval}`;
+    const year = this.currentYear();
+    const prefix = `Rec${product.CodProduct}-${year}-`;
+    const next = await this.nextSequenceValue(tx, `RECEIPT:${product.CodProduct}:${year}`, async () => {
+      const rows = await tx.$queryRaw<{ max: number | null }[]>`
+        SELECT max(substring("NumReceipt" from '-([0-9]+)$')::int) AS max
+          FROM ars_platform."TReceipt" WHERE left("NumReceipt", ${prefix.length}) = ${prefix}`;
+      return rows[0]?.max ?? 0;
+    });
+    return `${prefix}${next}`;
   }
 
   // ==========================================================================
@@ -4904,7 +5114,7 @@ export class ContractsService {
     ) {
       const idTaken = await tx.tPerson.findFirst({
         where: {
-          NumIdentification: dto.numIdentification,
+          NumIdentification: { equals: normalizeIdentification(dto.numIdentification), mode: 'insensitive' },
           IdeIdentificationType: currentPerson.IdeIdentificationType,
           NOT: { IdePerson: idePerson },
         },
@@ -4920,7 +5130,7 @@ export class ContractsService {
         DesFirstName: dto.desFirstName,
         DesLastName1: dto.desLastName1 ?? null,
         DesEmail: dto.desEmail,
-        NumIdentification: dto.numIdentification ?? null,
+        NumIdentification: normalizeIdentification(dto.numIdentification) ?? null,
         UsrModification: actor,
         TstModification: new Date(),
       },
@@ -5207,7 +5417,7 @@ export class ContractsService {
           IdeContractOperation: contractOperation.IdeContractOperation,
           IdeContract: ideContract,
           IdeReceiptType: ideReceiptType,
-          NumReceipt: await this.generateNumReceipt(contract.IdeProduct),
+          NumReceipt: await this.generateNumReceipt(contract.IdeProduct, tx),
           TstIssue: now,
           TstInitial: initialDate,
           TstEnd: endDate,
@@ -5408,7 +5618,7 @@ export class ContractsService {
           IdeContractOperation: contractOperation.IdeContractOperation,
           IdeContract: contract.IdeContract,
           IdeReceiptType: base.IdeReceiptType,
-          NumReceipt: await this.generateNumReceipt(contract.IdeProduct),
+          NumReceipt: await this.generateNumReceipt(contract.IdeProduct, tx),
           TstIssue: now,
           TstInitial: period.TstInitial,
           TstEnd: period.TstEnd,

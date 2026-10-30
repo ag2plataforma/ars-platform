@@ -3522,3 +3522,11 @@ model TBackgroundTask {
   @@index([IdeEntity, TstCreation(sort: Desc)], map: "IX_TBackgroundTask_IdeEntity")
   @@index([CodStatus, TstNextAttempt], map: "IX_TBackgroundTask_Status_NextAttempt")
 }
+
+/// Contadores numericos sin saltos (numero de contrato y de recibo por producto y año). Se incrementan dentro de la
+/// transaccion que crea el documento (ver `ContractsService.nextSequenceValue`).
+model SNumberSequence {
+  CodSequence     String   @id(map: "PK_SNumberSequence") @db.VarChar(80)
+  NumLast         Int
+  TstModification DateTime @db.Timestamp(6)
+}

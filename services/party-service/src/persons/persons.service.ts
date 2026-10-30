@@ -1,3 +1,4 @@
+import { normalizeIdentification } from './normalize-identification';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, PrismaService, TPerson } from '@ars-platform/database';
 import { StateMachineService } from '@ars-platform/shared-common';
@@ -260,7 +261,7 @@ export class PersonsService {
       TstModification: now,
     };
     if (dto.ideIdentificationType !== undefined) data.IdeIdentificationType = dto.ideIdentificationType;
-    if (dto.numIdentification !== undefined) data.NumIdentification = dto.numIdentification;
+    if (dto.numIdentification !== undefined) data.NumIdentification = normalizeIdentification(dto.numIdentification) ?? null;
     if (dto.desMiddleName !== undefined) data.DesMiddleName = dto.desMiddleName;
     if (dto.desLastName1 !== undefined) data.DesLastName1 = dto.desLastName1;
     if (dto.desLastName2 !== undefined) data.DesLastName2 = dto.desLastName2;
@@ -301,7 +302,10 @@ export class PersonsService {
       where: {
         ...(query.idePerson ? { IdePerson: query.idePerson } : {}),
         ...(query.email ? { DesEmail: query.email } : {}),
-        ...(query.numIdentification ? { NumIdentification: query.numIdentification } : {}),
+        ...(query.numIdentification
+          ? { NumIdentification: { equals: normalizeIdentification(query.numIdentification), mode: 'insensitive' as const } }
+          : {}),
+        ...(query.ideIdentificationType ? { IdeIdentificationType: query.ideIdentificationType } : {}),
       },
     });
     if (!person) {
@@ -355,7 +359,7 @@ export class PersonsService {
 
     const data: Record<string, unknown> = { UsrModification: actor, TstModification: new Date() };
     if (dto.ideIdentificationType !== undefined) data.IdeIdentificationType = dto.ideIdentificationType;
-    if (dto.numIdentification !== undefined) data.NumIdentification = dto.numIdentification;
+    if (dto.numIdentification !== undefined) data.NumIdentification = normalizeIdentification(dto.numIdentification) ?? null;
     if (dto.desFirstName !== undefined) data.DesFirstName = dto.desFirstName;
     if (dto.desMiddleName !== undefined) data.DesMiddleName = dto.desMiddleName;
     if (dto.desLastName1 !== undefined) data.DesLastName1 = dto.desLastName1;
@@ -515,7 +519,10 @@ export class PersonsService {
     void desEmail;
     if (numIdentification && ideIdentificationType) {
       const existing = await this.prisma.tPerson.findFirst({
-        where: { NumIdentification: numIdentification, IdeIdentificationType: ideIdentificationType },
+        where: {
+          NumIdentification: { equals: normalizeIdentification(numIdentification), mode: 'insensitive' },
+          IdeIdentificationType: ideIdentificationType,
+        },
       });
       if (existing && existing.IdePerson !== excludeId) {
         throw new ConflictException('Ya existe una persona con esa identificación');

@@ -478,6 +478,42 @@ export interface ReceiptBreakdown {
   }>;
 }
 
+/** Arbol de un recibo (`GET /contracts/:id/receipts/:ideReceipt/tree`): certificados -> riesgos -> coberturas -> conceptos. */
+export interface ReceiptTreeConcept {
+  codConcept: string;
+  desConcept: string;
+  value: number;
+  netValue: number;
+}
+export interface ReceiptTreeCoverage {
+  ideRiskCoverage: string;
+  desCoverage: string;
+  amount: number;
+  rate: number;
+  prime: number;
+  concepts: ReceiptTreeConcept[];
+}
+export interface ReceiptTreeRisk {
+  ideFileRisk: string;
+  numRisk: number;
+  desRisk: string;
+  insured: string;
+  identification: string | null;
+  coverages: ReceiptTreeCoverage[];
+}
+export interface ReceiptTreeCertificate {
+  ideContractFile: string;
+  numCertificate: number;
+  insured: string;
+  identification: string | null;
+  risks: ReceiptTreeRisk[];
+}
+export interface ReceiptTree {
+  ideReceipt: string;
+  numReceipt: string;
+  certificates: ReceiptTreeCertificate[];
+}
+
 export interface AddCertificatesBulkPayload {
   ideProductEndorsement: string;
   tstSupplement: string;
@@ -682,6 +718,11 @@ export class ContractsService {
   /** `GET /contracts/:id/receipts/:ideReceipt/breakdown` -- colectivos: prima neta y comisión por certificado. */
   receiptBreakdown(ideContract: string, ideReceipt: string): Observable<ReceiptBreakdown> {
     return this.http.get<ReceiptBreakdown>(`${this.base}/${ideContract}/receipts/${ideReceipt}/breakdown`);
+  }
+
+  /** `GET /contracts/:id/receipts/:ideReceipt/tree` -- certificados, riesgos, coberturas y conceptos de cálculo de un recibo. */
+  receiptTree(ideContract: string, ideReceipt: string): Observable<ReceiptTree> {
+    return this.http.get<ReceiptTree>(`${this.base}/${ideContract}/receipts/${ideReceipt}/tree`);
   }
 
   /** `POST /contracts/:id/add-certificates` -- colectivos: alta masiva (un suplemento, un recibo). */
