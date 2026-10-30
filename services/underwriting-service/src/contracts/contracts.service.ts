@@ -2577,7 +2577,7 @@ export class ContractsService {
     const next = await this.nextSequenceValue(tx, `CONTRACT:${product.CodProduct}:${year}`, async () => {
       const rows = await tx.$queryRaw<{ max: number | null }[]>`
         SELECT max(substring("NumContract" from '-([0-9]+)$')::int) AS max
-          FROM ars_platform."TContract" WHERE left("NumContract", ${prefix.length}) = ${prefix}`;
+          FROM ars_platform."TContract" WHERE left("NumContract", char_length(${prefix}::text)) = ${prefix}::text`;
       return rows[0]?.max ?? 0;
     });
     const numContract = `${prefix}${next}`;
@@ -2600,11 +2600,11 @@ export class ContractsService {
    */
   private async nextSequenceValue(tx: Prisma.TransactionClient, code: string, seed: () => Promise<number>): Promise<number> {
     const existing = await tx.$queryRaw<{ n: number }[]>`
-      SELECT "NumLast"::int AS n FROM ars_platform."SNumberSequence" WHERE "CodSequence" = ${code}`;
+      SELECT "NumLast"::int AS n FROM ars_platform."SNumberSequence" WHERE "CodSequence" = ${code}::text`;
     const start = existing.length > 0 ? 0 : await seed();
     const rows = await tx.$queryRaw<{ n: number }[]>`
       INSERT INTO ars_platform."SNumberSequence" ("CodSequence", "NumLast", "TstModification")
-      VALUES (${code}, ${start + 1}, now())
+      VALUES (${code}::text, ${start + 1}::int, now())
       ON CONFLICT ("CodSequence")
       DO UPDATE SET "NumLast" = ars_platform."SNumberSequence"."NumLast" + 1, "TstModification" = now()
       RETURNING "NumLast"::int AS n`;
@@ -3683,7 +3683,7 @@ export class ContractsService {
     const next = await this.nextSequenceValue(tx, `RECEIPT:${product.CodProduct}:${year}`, async () => {
       const rows = await tx.$queryRaw<{ max: number | null }[]>`
         SELECT max(substring("NumReceipt" from '-([0-9]+)$')::int) AS max
-          FROM ars_platform."TReceipt" WHERE left("NumReceipt", ${prefix.length}) = ${prefix}`;
+          FROM ars_platform."TReceipt" WHERE left("NumReceipt", char_length(${prefix}::text)) = ${prefix}::text`;
       return rows[0]?.max ?? 0;
     });
     return `${prefix}${next}`;
