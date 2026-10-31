@@ -918,7 +918,7 @@
     "title": "Cotizaciones",
     "subtitle": "Buscá una cotización existente o iniciá una nueva.",
     "allProductsPlaceholder": "Todos",
-    "showAllLabel": "Mostrar todas (no solo las mías)",
+    "onlyMineLabel": "Mostrar solo las mías",
     "numberColumn": "Número",
     "productColumn": "Producto",
     "createdColumn": "Creada",

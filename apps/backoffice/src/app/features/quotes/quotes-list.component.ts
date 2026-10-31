@@ -66,11 +66,11 @@ export class QuotesListComponent implements OnInit {
   readonly loading = signal(false);
   readonly products = signal<CatalogRow[]>([]);
 
-  /** `codProduct: ''` = "Todos los productos"; `showAll: false` (por
-   *  defecto) = solo las cotizaciones del usuario logueado. */
+  /** `codProduct: ''` = "Todos los productos"; `onlyMine: false` (por
+   *  defecto) = todas las cotizaciones; marcado = solo las del usuario logueado. */
   filters = this.fb.nonNullable.group({
     codProduct: [''],
-    showAll: [false],
+    onlyMine: [false],
   });
 
   private lastLimit = 20;
@@ -105,11 +105,11 @@ export class QuotesListComponent implements OnInit {
   private fetch(page: number, limit: number): void {
     this.lastLimit = limit;
     this.loading.set(true);
-    const { codProduct, showAll } = this.filters.getRawValue();
+    const { codProduct, onlyMine } = this.filters.getRawValue();
     const params: ListQuotesParams = {
       page,
       limit,
-      all: showAll,
+      all: !onlyMine,
       codProduct: codProduct || undefined,
       sortField: this.lastSortField,
       sortOrder: this.lastSortOrder,
