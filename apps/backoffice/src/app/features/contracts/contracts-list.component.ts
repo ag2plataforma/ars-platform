@@ -66,11 +66,12 @@ export class ContractsListComponent implements OnInit {
   readonly loading = signal(false);
   readonly products = signal<CatalogRow[]>([]);
 
-  /** `codProduct: ''` = "Todos los productos"; `showAll: false` (por
-   *  defecto) = solo los contratos generados por el usuario logueado. */
+  /** `codProduct: ''` = "Todos los productos"; `onlyMine: false` (por
+   *  defecto) = todos los contratos; marcado = solo los generados por el
+   *  usuario logueado. */
   filters = this.fb.nonNullable.group({
     codProduct: [''],
-    showAll: [false],
+    onlyMine: [false],
   });
 
   private lastLimit = 20;
@@ -104,11 +105,11 @@ export class ContractsListComponent implements OnInit {
   private fetch(page: number, limit: number): void {
     this.lastLimit = limit;
     this.loading.set(true);
-    const { codProduct, showAll } = this.filters.getRawValue();
+    const { codProduct, onlyMine } = this.filters.getRawValue();
     const params: ListContractsParams = {
       page,
       limit,
-      all: showAll,
+      all: !onlyMine,
       codProduct: codProduct || undefined,
       sortField: this.lastSortField,
       sortOrder: this.lastSortOrder,

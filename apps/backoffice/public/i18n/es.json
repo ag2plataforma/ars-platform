@@ -929,7 +929,7 @@
   "contractsList": {
     "title": "Contratos",
     "subtitle": "Buscá un contrato ya emitido.",
-    "showAllLabel": "Mostrar todos (no solo los míos)",
+    "onlyMineLabel": "Mostrar solo los míos",
     "numberColumn": "Número",
     "initialChannelColumn": "Canal inicial",
     "startColumn": "Inicio",
