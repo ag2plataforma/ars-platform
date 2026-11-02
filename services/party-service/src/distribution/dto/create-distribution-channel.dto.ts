@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsUUID, Matches } from 'class-validator';
+import { IsOptional, IsString, IsUUID, Matches, ValidateIf } from 'class-validator';
 
 export class CreateDistributionChannelDto {
   @IsString()
@@ -30,7 +30,9 @@ export class CreateDistributionChannelDto {
   codBroker?: string;
 
   /** `TPerson` ya existente asociada a este canal (no tiene código propio, se referencia por id). */
+  /** Pasar '' (string vacío) para desasociar la persona; omitir para no tocarla. */
   @IsOptional()
+  @ValidateIf((o: { idePerson?: string }) => o.idePerson !== '')
   @IsUUID()
   idePerson?: string;
 }

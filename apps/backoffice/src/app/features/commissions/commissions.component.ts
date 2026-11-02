@@ -7,6 +7,7 @@ import { CommissionTablesTabComponent } from './commission-tables-tab.component'
 import { CommissionsTabComponent } from './commissions-tab.component';
 import { CommissionProductsTabComponent } from './commission-products-tab.component';
 import { BrokersTabComponent } from './brokers-tab.component';
+import { DistributionChannelsTabComponent } from './distribution-channels-tab.component';
 
 /**
  * "Comisiones" (`BrokersModule` de `party-service`, sin la pestaña de
@@ -40,10 +41,11 @@ import { BrokersTabComponent } from './brokers-tab.component';
     CommissionsTabComponent,
     CommissionProductsTabComponent,
     BrokersTabComponent,
+    DistributionChannelsTabComponent,
     TranslocoPipe,
   ],
   templateUrl: './commissions.component.html',
 })
 export class CommissionsComponent {
-  readonly activeTab = signal<string | number>('trees');
+  readonly activeTab = signal<string | number>('channels');
 }

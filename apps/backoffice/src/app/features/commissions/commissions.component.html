@@ -4,8 +4,9 @@
     <p class="text-sm text-slate-500">{{ 'commissions.subtitle' | transloco }}</p>
   </div>
 
-  <p-tabs [value]="activeTab()" (valueChange)="activeTab.set($event ?? 'trees')">
+  <p-tabs [value]="activeTab()" (valueChange)="activeTab.set($event ?? 'channels')">
     <p-tablist>
+      <p-tab value="channels">{{ 'commissions.channelsTab' | transloco }}</p-tab>
       <p-tab value="trees">{{ 'commissions.treesTab' | transloco }}</p-tab>
       <p-tab value="tables">{{ 'commissions.tablesTab' | transloco }}</p-tab>
       <p-tab value="commissions">{{ 'commissions.commissionsTab' | transloco }}</p-tab>
@@ -13,6 +14,9 @@
       <p-tab value="brokers">{{ 'commissions.brokersTab' | transloco }}</p-tab>
     </p-tablist>
     <p-tabpanels>
+      <p-tabpanel value="channels">
+        <app-distribution-channels-tab />
+      </p-tabpanel>
       <p-tabpanel value="trees">
         <app-commission-trees-tab />
       </p-tabpanel>

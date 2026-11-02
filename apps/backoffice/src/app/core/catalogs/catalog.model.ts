@@ -453,27 +453,6 @@ export const PRODUCT_CATALOG_REGISTRY: CatalogConfig[] = [
     idField: 'IdeDistributionWay',
   },
   {
-    key: 'distribution-channels',
-    label: 'catalogsRegistry.distribution-channels.label',
-    singular: 'catalogsRegistry.distribution-channels.singular',
-    path: '/party/distribution-channels',
-    codField: 'CodDistributionChannel',
-    desField: 'DesDistributionChannel',
-    idField: 'IdeDistributionChannel',
-    extraFields: [
-      {
-        key: 'codChannelType',
-        label: 'catalogFields.codChannelType',
-        type: 'select',
-        required: false,
-        optionsPath: '/party/channel-types',
-        optionCodField: 'CodChannelType',
-        optionDesField: 'DesChannelType',
-        columnRelation: 'SChannelType',
-      },
-    ],
-  },
-  {
     // Agregado 2026-09-28 (backlog priorizado, ítem 1, Etapa 1 -- cierre
     // de Anulación): `SOperation`/`SEndorsement`/`SEndorsementReason` ya
     // existían en el esquema pero sin CRUD expuesto -- hacen falta para

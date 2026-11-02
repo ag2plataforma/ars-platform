@@ -1,0 +1,246 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="flex flex-col gap-4">
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold text-slate-900">{{ 'commissions.channels.title' | transloco }}</h2>
+      <p class="text-sm text-slate-500">{{ 'commissions.channels.subtitle' | transloco }}</p>
+    </div>
+    <div class="flex gap-2">
+      <button pButton type="button" icon="pi pi-angle-double-down" [label]="'commissions.channels.expandAll' | transloco" severity="secondary" [text]="true" (click)="expandAll()"></button>
+      <button pButton type="button" icon="pi pi-angle-double-up" [label]="'commissions.channels.collapseAll' | transloco" severity="secondary" [text]="true" (click)="collapseAll()"></button>
+      <button pButton type="button" icon="pi pi-plus" [label]="'commissions.channels.newButton' | transloco" (click)="openCreate()"></button>
+    </div>
+  </div>
+
+  <p-table [value]="visibleNodes()" [loading]="loading()" dataKey="id" styleClass="p-datatable-sm">
+    <ng-template #header>
+      <tr>
+        <th>{{ 'catalogs.codeColumn' | transloco }}</th>
+        <th>{{ 'catalogs.descriptionColumn' | transloco }}</th>
+        <th>{{ 'commissions.channels.typeColumn' | transloco }}</th>
+        <th>{{ 'commissions.channels.brokerColumn' | transloco }}</th>
+        <th>{{ 'commissions.channels.personColumn' | transloco }}</th>
+        <th>{{ 'commissions.channels.imageColumn' | transloco }}</th>
+        <th>{{ 'catalogs.stateColumn' | transloco }}</th>
+        <th class="w-40">{{ 'catalogs.actionsColumn' | transloco }}</th>
+      </tr>
+    </ng-template>
+    <ng-template #body let-node>
+      <tr>
+        <td>
+          <div class="flex items-center" [style.padding-left.rem]="node.depth * 1.5">
+            @if (node.childCount > 0) {
+              <button
+                type="button"
+                class="mr-1 flex h-6 w-6 items-center justify-center rounded text-slate-500 hover:bg-slate-100"
+                (click)="toggleNode(node)"
+              >
+                <i class="pi text-xs" [ngClass]="isCollapsed(node) ? 'pi-chevron-right' : 'pi-chevron-down'"></i>
+              </button>
+            } @else {
+              <span class="mr-1 inline-block h-6 w-6"></span>
+            }
+            <span class="font-medium">{{ node.row.CodDistributionChannel }}</span>
+            @if (node.childCount > 0 && isCollapsed(node)) {
+              <span class="ml-2 text-xs text-slate-400">({{ node.childCount }})</span>
+            }
+          </div>
+        </td>
+        <td>{{ node.row.DesDistributionChannel }}</td>
+        <td>{{ channelTypeName(node.row) }}</td>
+        <td>{{ brokerLabel(node.row) }}</td>
+        <td>{{ personLabel(node.row) }}</td>
+        <td>
+          @if (imageValue(node.row); as img) {
+            @if (isImageUrl(img)) {
+              <img [src]="img" alt="" class="h-8 w-8 rounded object-contain" />
+            } @else {
+              <span class="text-xs text-slate-500">{{ img }}</span>
+            }
+          }
+        </td>
+        <td>
+          <p-tag [value]="(isActive(node.row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isActive(node.row) ? 'success' : 'danger'" />
+        </td>
+        <td>
+          <div class="flex gap-1">
+            <button
+              pButton
+              type="button"
+              icon="pi pi-pencil"
+              [text]="true"
+              severity="secondary"
+              [pTooltip]="'locations.editTooltip' | transloco"
+              tooltipPosition="top"
+              (click)="openEdit(node.row)"
+            ></button>
+            <button
+              pButton
+              type="button"
+              icon="pi pi-sitemap"
+              [text]="true"
+              severity="secondary"
+              [pTooltip]="'commissions.channels.addChildTooltip' | transloco"
+              tooltipPosition="top"
+              (click)="openCreate(node.row)"
+            ></button>
+            <button
+              pButton
+              type="button"
+              [icon]="isActive(node.row) ? 'pi pi-ban' : 'pi pi-check'"
+              [text]="true"
+              [severity]="isActive(node.row) ? 'danger' : 'success'"
+              [pTooltip]="(isActive(node.row) ? 'catalogs.deactivateHeader' : 'catalogs.activateHeader') | transloco"
+              tooltipPosition="top"
+              (click)="toggleState(node.row)"
+            ></button>
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="8" class="text-center text-slate-500">{{ 'commissions.channels.emptyState' | transloco }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-dialog
+  [header]="(dialogMode() === 'create' ? 'commissions.channels.createDialogTitle' : 'commissions.channels.editDialogTitle') | transloco"
+  [visible]="dialogVisible()"
+  [modal]="true"
+  [style]="{ width: '34rem' }"
+  (visibleChange)="!$event && closeDialog()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-4 pt-2">
+    <div class="flex flex-col gap-2">
+      <label for="dc-cod" class="text-sm font-medium text-slate-700">{{ 'catalogs.codeColumn' | transloco }}</label>
+      <input pInputText id="dc-cod" formControlName="cod" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label for="dc-des" class="text-sm font-medium text-slate-700">{{ 'catalogs.descriptionColumn' | transloco }}</label>
+      <input pInputText id="dc-des" formControlName="des" class="w-full" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'commissions.channels.typeColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codChannelType"
+        [options]="channelTypes()"
+        optionLabel="DesChannelType"
+        optionValue="CodChannelType"
+        [showClear]="true"
+        [placeholder]="'commissions.channels.noType' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'commissions.channels.parentColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codParent"
+        [options]="parentOptions()"
+        optionLabel="label"
+        optionValue="code"
+        [filter]="true"
+        [showClear]="true"
+        [placeholder]="'commissions.channels.noParent' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+    <div class="flex flex-col gap-2">
+      <label class="text-sm font-medium text-slate-700">{{ 'commissions.channels.brokerColumn' | transloco }}</label>
+      <p-select
+        appendTo="body"
+        formControlName="codBroker"
+        [options]="brokers()"
+        optionLabel="DesBroker"
+        optionValue="CodBroker"
+        [filter]="true"
+        filterBy="CodBroker,DesBroker"
+        [showClear]="true"
+        [placeholder]="'commissions.channels.noBroker' | transloco"
+        styleClass="w-full"
+      />
+    </div>
+
+    <div class="flex flex-col gap-2 rounded-lg border border-slate-200 p-3">
+      <label class="text-sm font-medium text-slate-700">{{ 'commissions.channels.personColumn' | transloco }}</label>
+
+      @if (selectedPerson(); as person) {
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-slate-900">{{ person.DesFirstName }} {{ person.DesLastName1 }} ({{ person.NumIdentification ?? person.DesEmail }})</span>
+          <button pButton type="button" [label]="'commissions.channels.clearPersonButton' | transloco" severity="secondary" [text]="true" (click)="clearPerson()"></button>
+        </div>
+      } @else {
+        <div class="flex flex-col gap-2">
+          <p class="text-xs text-slate-500">{{ 'commissions.channels.noPersonHint' | transloco }}</p>
+          <div class="flex gap-2">
+            <input
+              pInputText
+              [formControl]="personSearchControl"
+              [placeholder]="'commissions.brokers.personSearchPlaceholder' | transloco"
+              class="w-full"
+              (keydown.enter)="$event.preventDefault(); searchPerson()"
+            />
+            <button pButton type="button" [label]="'quotes.searchButton' | transloco" [loading]="personSearching()" (click)="searchPerson()"></button>
+          </div>
+
+          @if (personFound(); as found) {
+            <div class="flex items-center justify-between rounded border border-emerald-200 bg-emerald-50 p-2 text-sm">
+              <span>{{ found.DesFirstName }} {{ found.DesLastName1 }}</span>
+              <button pButton type="button" [label]="'commissions.brokers.selectPersonButton' | transloco" severity="success" [text]="true" (click)="pickPerson(found)"></button>
+            </div>
+          }
+          @if (personNotFound()) {
+            <p class="text-xs text-amber-700">{{ 'commissions.channels.personNotFoundDetail' | transloco }}</p>
+          }
+
+          <div class="flex items-center gap-2">
+            <div class="h-px flex-1 bg-slate-200"></div>
+            <span class="text-xs uppercase tracking-wide text-slate-400">{{ 'commissions.brokers.orSearchByNameLabel' | transloco }}</span>
+            <div class="h-px flex-1 bg-slate-200"></div>
+          </div>
+
+          <div class="flex gap-2">
+            <input
+              pInputText
+              [formControl]="nameSearchControl"
+              [placeholder]="'commissions.brokers.nameSearchPlaceholder' | transloco"
+              class="w-full"
+              (keydown.enter)="$event.preventDefault(); searchByName()"
+            />
+            <button pButton type="button" [label]="'quotes.searchButton' | transloco" [loading]="nameSearching()" (click)="searchByName()"></button>
+          </div>
+
+          @if (nameSearchResults().length > 0) {
+            <div class="flex max-h-40 flex-col gap-1 overflow-y-auto">
+              @for (p of nameSearchResults(); track p.IdePerson) {
+                <div class="flex items-center justify-between rounded border border-slate-200 p-2 text-sm">
+                  <span>{{ p.DesFirstName }} {{ p.DesLastName1 }} <span class="text-slate-400">({{ p.NumIdentification ?? p.DesEmail }})</span></span>
+                  <button pButton type="button" [label]="'commissions.brokers.selectPersonButton' | transloco" severity="success" [text]="true" (click)="pickPerson(p)"></button>
+                </div>
+              }
+            </div>
+          }
+          @if (nameSearchedEmpty()) {
+            <p class="text-xs text-slate-500">{{ 'commissions.brokers.nameSearchEmptyDetail' | transloco }}</p>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="flex flex-col gap-2">
+      <label for="dc-image" class="text-sm font-medium text-slate-700">{{ 'commissions.channels.imageColumn' | transloco }}</label>
+      <input pInputText id="dc-image" formControlName="image" class="w-full" [placeholder]="'commissions.channels.imagePlaceholder' | transloco" />
+    </div>
+
+    <div class="mt-2 flex justify-end gap-2">
+      <button pButton type="button" [label]="'common.cancel' | transloco" severity="secondary" [text]="true" (click)="closeDialog()"></button>
+      <button pButton type="submit" [label]="'common.save' | transloco"></button>
+    </div>
+  </form>
+</p-dialog>
