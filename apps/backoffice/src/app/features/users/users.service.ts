@@ -15,6 +15,8 @@ export interface UserRow {
   UserName: string;
   TRol: { CodRol: string; DesRol: string };
   SState: { CodState: string; DesState: string };
+  /** Propiedades del usuario (ej. `ideDistributionChannel`, `idePerson`, `lang`). */
+  UserData?: Record<string, unknown> | null;
 }
 
 export interface UserListResponse {
@@ -35,11 +37,14 @@ export interface CreateUserPayload {
   userName: string;
   password: string;
   codRol: string;
+  userData?: Record<string, unknown>;
 }
 
 export interface UpdateUserPayload {
   userName?: string;
   codRol?: string;
+  /** Reemplaza TODO el `UserData` del usuario: enviar el objeto completo ya fusionado. */
+  userData?: Record<string, unknown>;
 }
 
 @Injectable({ providedIn: 'root' })

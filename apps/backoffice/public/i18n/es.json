@@ -1971,6 +1971,7 @@
     "codUserColumn": "Usuario",
     "userNameColumn": "Email",
     "roleColumn": "Rol",
+    "channelColumn": "Nodo comercial",
     "emptyState": "No hay usuarios registrados.",
     "createDialogTitle": "Nuevo usuario",
     "editDialogTitle": "Editar usuario",
@@ -1979,7 +1980,14 @@
     "passwordLabel": "Contraseña",
     "passwordHint": "Mínimo 8 caracteres. El usuario podrá cambiarla luego.",
     "createdDetail": "Usuario creado correctamente.",
-    "updatedDetail": "Usuario actualizado correctamente."
+    "updatedDetail": "Usuario actualizado correctamente.",
+    "userDataHint": "Propiedades del usuario. Si tiene un nodo comercial, sus cotizaciones y contratos se generan siempre por ese nodo.",
+    "channelLabel": "Nodo comercial (canal de distribución)",
+    "noChannelOption": "(sin nodo: lo elige al cotizar)",
+    "personLabel": "Persona vinculada",
+    "personSearchPlaceholder": "Documento o email de la persona",
+    "personNotFound": "No se encontró ninguna persona con ese documento o email.",
+    "langLabel": "Idioma"
   },
   "publicPayment": {
     "title": "Pago de tu póliza",

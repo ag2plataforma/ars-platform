@@ -5485,25 +5485,21 @@ export class ContractsService {
             ideProcess: commissionOperationProduct.IdeProcess,
             effectiveDate: commissionDate,
           }, tx);
-          // Un contrato nuevo no puede salir sin comision configurada (se deshace toda la contratacion). En
-          // suplementos y renovaciones se mantiene el comportamiento anterior (sin comision = 0) para no bloquear
-          // operaciones de contratos ya existentes.
-          if (percentage === null && receiptTypeCode === 'NEW') {
+          // Sin comision configurada no se genera el recibo (y se deshace toda la operacion: contratacion, suplemento,
+          // anulacion o renovacion): el recibo siempre debe llevar su comision calculada.
+          if (percentage === null) {
             const product = await tx.sProduct.findUnique({ where: { IdeProduct: contract.IdeProduct }, select: { CodProduct: true } });
             throw new ConflictException(
               `No hay comision configurada para el producto "${product?.CodProduct ?? contract.IdeProduct}" en el nodo comercial de la venta ` +
-                `(plan, cobertura o proceso sin comision vigente al ${commissionDate.toISOString().slice(0, 10)}): no se puede generar el contrato`,
+                `(plan, cobertura o proceso sin comision vigente al ${commissionDate.toISOString().slice(0, 10)}): no se puede generar el recibo`,
             );
           }
           const netValue = Number(concept.ConceptNetValue);
-          let commissionValue = 0;
-          if (percentage !== null) {
-            const suppressForRefundNo = netValue <= 0 && refundCommission === 'NO';
-            // Fiel al original: la comisión por línea NO se redondea acá --
-            // solo el total `Fee` del recibo se trunca a 2 decimales más
-            // abajo (`trunc(vFee,2)` en el `FReceipt` real).
-            commissionValue = suppressForRefundNo ? 0 : (netValue * percentage) / 100;
-          }
+          const suppressForRefundNo = netValue <= 0 && refundCommission === 'NO';
+          // Fiel al original: la comisión por línea NO se redondea acá --
+          // solo el total `Fee` del recibo se trunca a 2 decimales más
+          // abajo (`trunc(vFee,2)` en el `FReceipt` real).
+          const commissionValue = suppressForRefundNo ? 0 : (netValue * percentage) / 100;
           await tx.tReceiptDetail.create({
             data: {
               IdeReceipt: receipt.IdeReceipt,
