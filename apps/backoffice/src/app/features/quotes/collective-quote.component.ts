@@ -15,6 +15,8 @@ import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { AuthService } from '../../core/auth/auth.service';
+import { DISTRIBUTION_WAY_BACKOFFICE } from '../../core/distribution/distribution';
 import { CatalogService } from '../../core/catalogs/catalog.service';
 import { CatalogRow } from '../../core/catalogs/catalog.model';
 import { downloadBlob } from '../../core/files/file.util';
@@ -32,7 +34,6 @@ import {
 
 const PRODUCTS_PATH = '/product-rating/products';
 const DISTRIBUTION_CHANNELS_PATH = '/party/distribution-channels';
-const DISTRIBUTION_WAYS_PATH = '/party/distribution-ways';
 const RISK_PRODUCTS_PATH = '/product-rating/risk-products';
 const IDENTIFICATION_TYPES_PATH = '/reference-data/identification-types';
 
@@ -96,6 +97,7 @@ function buildValidators(validators: RiskAttributeField['validators']): Validato
 export class CollectiveQuoteComponent {
   private readonly fb = inject(FormBuilder);
   private readonly catalogService = inject(CatalogService);
+  private readonly auth = inject(AuthService);
   private readonly quoting = inject(QuotingService);
   private readonly riskAttributes = inject(RiskAttributesService);
   private readonly messages = inject(MessageService);
@@ -107,7 +109,8 @@ export class CollectiveQuoteComponent {
   // --- Paso 1: producto ---
   readonly products = signal<CatalogRow[]>([]);
   readonly distributionChannels = signal<CatalogRow[]>([]);
-  readonly distributionWays = signal<CatalogRow[]>([]);
+  /** Nodo comercial fijo del usuario (de su `UserData`); si es null, el canal se elige en el desplegable. */
+  readonly fixedChannel = signal<CatalogRow | null>(null);
   readonly identificationTypes = signal<CatalogRow[]>([]);
   private allRiskProducts: CatalogRow[] = [];
   readonly riskProductOptions = signal<CatalogRow[]>([]);
@@ -116,7 +119,7 @@ export class CollectiveQuoteComponent {
   setupForm = this.fb.nonNullable.group({
     codProduct: ['', Validators.required],
     codDistributionChannel: ['', Validators.required],
-    codDistributionWay: ['', Validators.required],
+    codDistributionWay: [DISTRIBUTION_WAY_BACKOFFICE, Validators.required],
     codRiskProduct: ['', Validators.required],
   });
 
@@ -184,8 +187,15 @@ export class CollectiveQuoteComponent {
     this.catalogService.list(PRODUCTS_PATH).subscribe({
       next: (rows) => this.products.set(rows.filter((row) => row['IndCollective'] === true)),
     });
-    this.catalogService.list(DISTRIBUTION_CHANNELS_PATH).subscribe({ next: (rows) => this.distributionChannels.set(rows) });
-    this.catalogService.list(DISTRIBUTION_WAYS_PATH).subscribe({ next: (rows) => this.distributionWays.set(rows) });
+    this.catalogService.list(DISTRIBUTION_CHANNELS_PATH).subscribe({
+      next: (rows) => {
+        this.distributionChannels.set(rows);
+        const ide = this.auth.payload()?.ideDistributionChannel;
+        const row = ide ? rows.find((r) => r['IdeDistributionChannel'] === ide) : undefined;
+        this.fixedChannel.set(row ?? null);
+        if (row) this.setupForm.controls.codDistributionChannel.setValue(String(row['CodDistributionChannel']));
+      },
+    });
     this.catalogService.list(IDENTIFICATION_TYPES_PATH).subscribe({ next: (rows) => this.identificationTypes.set(rows) });
     this.catalogService.list(RISK_PRODUCTS_PATH).subscribe({
       next: (rows) => {

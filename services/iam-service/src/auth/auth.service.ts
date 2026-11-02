@@ -142,13 +142,14 @@ export class AuthService {
     user: TUser & { TRol: TRol },
     extendedTokenDuration: boolean,
   ): Promise<LoginResult> {
-    const userData = user.UserData as { lang?: string } | null;
+    const userData = user.UserData as { lang?: string; ideDistributionChannel?: string } | null;
 
     const payload: JwtPayload = {
       sub: user.IdeUser,
       code: user.CodUser,
       role: user.TRol.CodRol,
       lang: userData?.lang ?? 'es',
+      ...(userData?.ideDistributionChannel ? { ideDistributionChannel: userData.ideDistributionChannel } : {}),
     };
 
     const expiresIn = extendedTokenDuration

@@ -7,9 +7,13 @@ export class CreateQuoteDto {
   @IsString()
   codProduct!: string;
 
-  /** CodDistributionChannel del canal de origen de la cotización (debe existir). */
+  /**
+   * CodDistributionChannel del nodo comercial de la cotización (debe existir). Solo hace falta si el usuario NO tiene
+   * nodo asignado en su `UserData`: si lo tiene, se usa siempre el suyo.
+   */
+  @IsOptional()
   @IsString()
-  codDistributionChannel!: string;
+  codDistributionChannel?: string;
 
   /** CodDistributionWay de la vía de distribución (debe existir). */
   @IsString()

@@ -14,4 +14,6 @@ export interface JwtPayload {
   /** CodRol */
   role: string;
   lang?: string;
+  /** Nodo comercial del usuario (`TUser.UserData.ideDistributionChannel`), si lo tiene asignado. */
+  ideDistributionChannel?: string;
 }

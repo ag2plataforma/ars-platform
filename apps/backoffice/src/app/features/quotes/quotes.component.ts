@@ -19,6 +19,8 @@ import {
   StoredExtraction,
   storedExtractionOf,
 } from '../requirements/requirement-extraction-dialog.component';
+import { AuthService } from '../../core/auth/auth.service';
+import { DISTRIBUTION_WAY_BACKOFFICE } from '../../core/distribution/distribution';
 import { CatalogService } from '../../core/catalogs/catalog.service';
 import { CatalogRow } from '../../core/catalogs/catalog.model';
 import {
@@ -51,7 +53,6 @@ import {
 
 const PRODUCTS_PATH = '/product-rating/products';
 const DISTRIBUTION_CHANNELS_PATH = '/party/distribution-channels';
-const DISTRIBUTION_WAYS_PATH = '/party/distribution-ways';
 const RISK_PRODUCTS_PATH = '/product-rating/risk-products';
 const IDENTIFICATION_TYPES_PATH = '/reference-data/identification-types';
 const GENDERS_PATH = '/reference-data/genders';
@@ -245,6 +246,7 @@ export interface CommonPlan {
 export class QuotesComponent {
   private readonly fb = inject(FormBuilder);
   private readonly catalogService = inject(CatalogService);
+  private readonly auth = inject(AuthService);
   private readonly quoting = inject(QuotingService);
   private readonly persons = inject(PersonsService);
   private readonly riskAttributes = inject(RiskAttributesService);
@@ -256,7 +258,6 @@ export class QuotesComponent {
 
   readonly products = signal<CatalogRow[]>([]);
   readonly distributionChannels = signal<CatalogRow[]>([]);
-  readonly distributionWays = signal<CatalogRow[]>([]);
   readonly riskProductOptions = signal<CatalogRow[]>([]);
   readonly selectedRisks = signal<RiskEntry[]>([]);
   private nextRiskKey = 0;
@@ -345,8 +346,11 @@ export class QuotesComponent {
   form = this.fb.nonNullable.group({
     codProduct: ['', Validators.required],
     codDistributionChannel: ['', Validators.required],
-    codDistributionWay: ['', Validators.required],
+    codDistributionWay: [DISTRIBUTION_WAY_BACKOFFICE, Validators.required],
   });
+
+  /** Nodo comercial fijo del usuario (de su `UserData`); si es null, el canal se elige en el desplegable. */
+  readonly fixedChannel = signal<CatalogRow | null>(null);
 
   riskToAddControl = this.fb.control<string | null>(null);
   riskQuantityControl = this.fb.nonNullable.control(1, [Validators.min(1), Validators.max(MAX_RISKS)]);
@@ -355,8 +359,12 @@ export class QuotesComponent {
     this.catalogService.list(PRODUCTS_PATH).subscribe({ next: (rows) => this.products.set(rows) });
     this.catalogService
       .list(DISTRIBUTION_CHANNELS_PATH)
-      .subscribe({ next: (rows) => this.distributionChannels.set(rows) });
-    this.catalogService.list(DISTRIBUTION_WAYS_PATH).subscribe({ next: (rows) => this.distributionWays.set(rows) });
+      .subscribe({
+        next: (rows) => {
+          this.distributionChannels.set(rows);
+          this.applyUserChannel(rows);
+        },
+      });
     this.catalogService.list(RISK_PRODUCTS_PATH).subscribe({
       next: (rows) => {
         this.allRiskProducts = rows;
@@ -1759,7 +1767,17 @@ export class QuotesComponent {
     this.riskToAddControl.setValue(null);
     this.riskQuantityControl.setValue(1);
     this.form.reset();
+    this.form.controls.codDistributionWay.setValue(DISTRIBUTION_WAY_BACKOFFICE);
+    this.applyUserChannel(this.distributionChannels());
     this.step.set('form');
+  }
+
+  /** Si el usuario tiene un nodo comercial asignado, la cotizacion va siempre por ese nodo (sin desplegable). */
+  private applyUserChannel(rows: CatalogRow[]): void {
+    const ide = this.auth.payload()?.ideDistributionChannel;
+    const row = ide ? rows.find((r) => r['IdeDistributionChannel'] === ide) : undefined;
+    this.fixedChannel.set(row ?? null);
+    if (row) this.form.controls.codDistributionChannel.setValue(String(row['CodDistributionChannel']));
   }
 
   private showError(err: HttpErrorResponse): void {

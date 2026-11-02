@@ -51,8 +51,10 @@ export class CreateCollectiveQuoteDto {
   @IsString()
   codProduct!: string;
 
+  /** Solo hace falta si el usuario no tiene nodo comercial asignado en su `UserData` (si lo tiene, se usa el suyo). */
+  @IsOptional()
   @IsString()
-  codDistributionChannel!: string;
+  codDistributionChannel?: string;
 
   @IsString()
   codDistributionWay!: string;

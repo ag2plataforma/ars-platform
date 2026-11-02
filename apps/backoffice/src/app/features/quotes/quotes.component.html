@@ -29,9 +29,13 @@
           />
         </div>
 
-        <div class="grid grid-cols-2 gap-4">
-          <div class="flex flex-col gap-2">
-            <label class="text-sm font-medium text-slate-700">{{ 'quotes.distributionChannelLabel' | transloco }}</label>
+        <div class="flex flex-col gap-2">
+          <label class="text-sm font-medium text-slate-700">{{ 'quotes.distributionChannelLabel' | transloco }}</label>
+          @if (fixedChannel(); as channel) {
+            <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              {{ channel['DesDistributionChannel'] }}
+            </div>
+          } @else {
             <p-select
               appendTo="body"
               formControlName="codDistributionChannel"
@@ -41,19 +45,7 @@
               [placeholder]="'quotes.distributionChannelPlaceholder' | transloco"
               styleClass="w-full"
             />
-          </div>
-          <div class="flex flex-col gap-2">
-            <label class="text-sm font-medium text-slate-700">{{ 'quotes.distributionWayLabel' | transloco }}</label>
-            <p-select
-              appendTo="body"
-              formControlName="codDistributionWay"
-              [options]="distributionWays()"
-              optionLabel="DesDistributionWay"
-              optionValue="CodDistributionWay"
-              [placeholder]="'quotes.distributionWayPlaceholder' | transloco"
-              styleClass="w-full"
-            />
-          </div>
+          }
         </div>
 
         @if (productFields.loading() || productFields.fields().length > 0) {

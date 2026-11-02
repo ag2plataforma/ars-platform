@@ -66,7 +66,7 @@ export class CollectiveQuotesService {
 
     const [ideProduct, ideDistributionChannel, ideDistributionWay, ideRiskProduct] = await Promise.all([
       this.quotes.resolveProduct(dto.codProduct),
-      this.quotes.resolveDistributionChannel(dto.codDistributionChannel),
+      this.quotes.resolveSaleChannel(dto.codDistributionChannel, actor),
       this.quotes.resolveDistributionWay(dto.codDistributionWay),
       this.quotes.resolveRiskProduct(dto.codRiskProduct),
     ]);

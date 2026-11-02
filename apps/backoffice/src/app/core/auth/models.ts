@@ -7,6 +7,8 @@ export interface JwtPayload {
   /** CodRol */
   role: string;
   lang?: string;
+  /** Nodo comercial del usuario, si lo tiene asignado en su `UserData`. */
+  ideDistributionChannel?: string;
   exp?: number;
   iat?: number;
 }

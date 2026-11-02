@@ -81,7 +81,7 @@ export class QuotesService {
   async create(dto: CreateQuoteDto, actor: string) {
     const [ideProduct, ideDistributionChannel, ideDistributionWay] = await Promise.all([
       this.resolveProduct(dto.codProduct),
-      this.resolveDistributionChannel(dto.codDistributionChannel),
+      this.resolveSaleChannel(dto.codDistributionChannel, actor),
       this.resolveDistributionWay(dto.codDistributionWay),
     ]);
 
@@ -1122,6 +1122,29 @@ export class QuotesService {
     const row = await this.prisma.sState.findFirst({ where: { CodState: codState } });
     if (!row) throw new NotFoundException(`No existe estado con código "${codState}"`);
     return row.IdeState;
+  }
+
+  /**
+   * Nodo comercial (`SDistributionChannel`) de la cotizacion. Si el usuario tiene uno asignado en su `UserData`
+   * (`ideDistributionChannel`) se usa SIEMPRE ese (un usuario no vende por un nodo que no es el suyo); si no lo
+   * tiene, debe indicarse el codigo del canal.
+   */
+  async resolveSaleChannel(codDistributionChannel: string | undefined, actorCode: string): Promise<string> {
+    const user = await this.prisma.tUser.findUnique({ where: { CodUser: actorCode }, select: { UserData: true } });
+    const ideUserChannel = (user?.UserData as { ideDistributionChannel?: string } | null)?.ideDistributionChannel;
+    if (ideUserChannel) {
+      const channel = await this.prisma.sDistributionChannel.findUnique({ where: { IdeDistributionChannel: ideUserChannel } });
+      if (!channel) {
+        throw new BadRequestException(
+          'El nodo comercial asignado a tu usuario ya no existe: pide que corrijan "ideDistributionChannel" en tus datos de usuario',
+        );
+      }
+      return channel.IdeDistributionChannel;
+    }
+    if (!codDistributionChannel) {
+      throw new BadRequestException('Debes indicar el canal de distribución (tu usuario no tiene un nodo comercial asignado)');
+    }
+    return this.resolveDistributionChannel(codDistributionChannel);
   }
 
   async resolveDistributionChannel(codDistributionChannel: string): Promise<string> {
