@@ -263,6 +263,15 @@ Fuera de la lista del usuario, dos cosas propias que vale la pena no perder de v
 - **Numeración sin saltos**: contrato `<CodProducto>-<Año>-<N>` y recibo `Rec<CodProducto>-<Año>-<N>` con contador transaccional `SNumberSequence` (script `setup-number-sequences.js`); un rollback libera el número. Los contratos existentes conservan su número.
 - **Detalle de contrato**: ancho completo; pestaña Movimientos con tablas apiladas movimiento -> recibo -> certificados (se omite con uno solo) -> riesgos -> coberturas -> conceptos de cálculo (`GET /contracts/:id/receipts/:ideReceipt/tree`); un movimiento sin recibos no abre nada.
 
+## Revisión de canales y comisiones (2026-11-02)
+
+Definiciones acordadas: **`SDistributionWay`** = aplicación de origen de la cotización/póliza (backoffice, API, venta, área privada); **`SDistributionChannel`** = estructura comercial (nodos jerárquicos, con broker/persona opcionales); **`SCommissionTree`** cuelga de un nodo; **`SLocation`** es solo un maestro geográfico (no interviene).
+- **FKs hacia `SDistributionChannel`** (`setup-distribution-fks.js`, detecta huérfanos antes de crear cada FK): `SCommissionTree`, `TQuote`, `TContract` (venta), `TContractDistributionChannel`, `SCommissionProduct` origen/destino; relaciones añadidas en `schema.prisma`.
+- **Vía automática** (`BACKOFFICE`, `setup-distribution-way.js`) y **nodo desde `TUser.UserData.ideDistributionChannel`** (también en el JWT); sin nodo asignado, desplegable. El backend usa siempre el nodo del usuario si lo tiene.
+- **Flujos de pasos** (`SProductProcessFlow`): los gobierna la vía; el canal es opcional (refinamiento: un flujo con canal solo aplica a ese nodo).
+- **Comisión**: se calcula con el árbol del **nodo de venta** del contrato (`TContract.IdeDistributionChannelSale`) usando la **fecha de inicio de vigencia del contrato**; sin árbol/tabla/comisión **no se puede generar el contrato** (en suplementos y renovaciones no se bloquea). `SCommissionProduct` es el **reparto** de esa comisión entre nodos y debe sumar 100% (se valida al contratar); la liquidación se basa en `TContractDistributionChannel`.
+- Pendiente: pantalla/consulta de liquidación por nodo y broker; indicador del total de reparto en la pantalla de `SCommissionProduct`; asignar `ideDistributionChannel` en la pantalla de usuarios.
+
 ## Plan inmediato (acordado 2026-10-05): Colectivos -> VPS -> retomar desarrollo
 
 Orden acordado con el usuario: (1) **Colectivos, etapa 1**, (2) **parar el desarrollo para montar la VPS** y dejar todo corriendo allí, (3) retomar el desarrollo ya sobre la VPS. Razón de hacer colectivos ANTES de producción: toca el modelo de fondo (cotización, contratación, recibos, suplementos, renovaciones, siniestros) y migrarlo con datos reales vivos sería mucho más caro. Para que la VPS no se retrase, la etapa 1 tiene un cierre claro y el resto queda para después.

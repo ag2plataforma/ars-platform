@@ -202,6 +202,9 @@ export class ContractsService {
       }
     }
 
+    // El nodo comercial debe tener comisiones configuradas: sin arbol no se puede generar el contrato.
+    await this.assertCommissionConfigured(quote.IdeDistributionChannel, quote.IdeProduct);
+
     const ideContract = await this.prisma.$transaction(
       async (tx) => {
         const contract = await this.buildContract(quote, dto, actor, tx, collective, fileGenericValues);
@@ -2897,6 +2900,17 @@ export class ContractsService {
       },
     });
 
+    // El reparto de la comision entre los nodos destino debe sumar 100%: asi la comision repartida es igual a la calculada.
+    if (splitConfig.length > 0) {
+      const total = splitConfig.reduce((sum, config) => sum + Number(config.Percentaje), 0);
+      if (Math.abs(total - 100) > 0.0001) {
+        const origin = await tx.sDistributionChannel.findUnique({ where: { IdeDistributionChannel: ideDistributionChannel } });
+        throw new ConflictException(
+          `El reparto de comision configurado para el nodo "${origin?.DesDistributionChannel ?? ideDistributionChannel}" suma ${total}%: debe sumar 100% para poder generar el contrato`,
+        );
+      }
+    }
+
     const channelsToCreate =
       splitConfig.length > 0
         ? splitConfig.map((config) => ({
@@ -5285,7 +5299,14 @@ export class ContractsService {
     const ideActivo = await this.stateMachine.getStateByCode('Activo');
     const now = new Date();
 
-    const mainChannel = await this.resolveMainDistributionChannel(ideContract, ideActivo, now, tx);
+    // La comision se calcula con el arbol del NODO DE VENTA del contrato (donde se vendio); luego se reparte entre los
+    // nodos de `TContractDistributionChannel` segun su porcentaje (la liquidacion usa esa tabla). Contratos antiguos sin
+    // nodo de venta: se mantiene el comportamiento anterior (canal principal vigente).
+    const commissionChannelId =
+      contract.IdeDistributionChannelSale ??
+      (await this.resolveMainDistributionChannel(ideContract, ideActivo, now, tx)).IdeDistributionChannel;
+    // Vigencia de la comision: fecha de inicio de vigencia del contrato (en una renovacion, la del nuevo ciclo).
+    const commissionDate = contract.TstInitial;
 
     // Operación RECEGENE -- SIEMPRE nueva (confirmado: el original no
     // reutiliza una existente), y re-apunte de TODOS los movimientos en
@@ -5457,12 +5478,23 @@ export class ContractsService {
           if (concept.SConcept.CodConcept !== 'PrimaNeta') continue;
 
           const percentage = await this.resolveCommissionPercentage({
-            ideDistributionChannel: mainChannel.IdeDistributionChannel,
+            ideDistributionChannel: commissionChannelId,
             ideProduct: contract.IdeProduct,
             idePlanProductRisk: movement.TRiskCoverage.TFileRisk.IdePlanProductRisk,
             ideCoveragePlan: movement.TRiskCoverage.IdeCoveragePlan,
             ideProcess: commissionOperationProduct.IdeProcess,
+            effectiveDate: commissionDate,
           }, tx);
+          // Un contrato nuevo no puede salir sin comision configurada (se deshace toda la contratacion). En
+          // suplementos y renovaciones se mantiene el comportamiento anterior (sin comision = 0) para no bloquear
+          // operaciones de contratos ya existentes.
+          if (percentage === null && receiptTypeCode === 'NEW') {
+            const product = await tx.sProduct.findUnique({ where: { IdeProduct: contract.IdeProduct }, select: { CodProduct: true } });
+            throw new ConflictException(
+              `No hay comision configurada para el producto "${product?.CodProduct ?? contract.IdeProduct}" en el nodo comercial de la venta ` +
+                `(plan, cobertura o proceso sin comision vigente al ${commissionDate.toISOString().slice(0, 10)}): no se puede generar el contrato`,
+            );
+          }
           const netValue = Number(concept.ConceptNetValue);
           let commissionValue = 0;
           if (percentage !== null) {
@@ -5805,6 +5837,34 @@ export class ContractsService {
   }
 
   /**
+   * Un contrato no puede generarse si el nodo comercial de la venta no tiene comisiones configuradas: debe existir al
+   * menos un arbol activo y, en el, una tabla de comisiones activa para el producto. (La comision exacta por plan,
+   * cobertura y proceso se vuelve a exigir al generar el recibo inicial.)
+   */
+  private async assertCommissionConfigured(ideDistributionChannel: string, ideProduct: string): Promise<void> {
+    const ideActivo = await this.stateMachine.getStateByCode('Activo');
+    const channel = await this.prisma.sDistributionChannel.findUnique({ where: { IdeDistributionChannel: ideDistributionChannel } });
+    const label = channel?.DesDistributionChannel ?? ideDistributionChannel;
+    const trees = await this.prisma.sCommissionTree.findMany({
+      where: { IdeDistributionChannel: ideDistributionChannel, IdeState: ideActivo },
+      select: { IdeCommissionTree: true },
+    });
+    if (trees.length === 0) {
+      throw new ConflictException(
+        `El nodo comercial "${label}" no tiene un arbol de comisiones activo configurado: no se puede generar el contrato`,
+      );
+    }
+    const tables = await this.prisma.sCommissionTable.count({
+      where: { IdeCommissionTree: { in: trees.map((t) => t.IdeCommissionTree) }, IdeProduct: ideProduct, IdeState: ideActivo },
+    });
+    if (tables === 0) {
+      throw new ConflictException(
+        `El arbol de comisiones del nodo "${label}" no tiene ninguna tabla de comisiones activa para este producto: no se puede generar el contrato`,
+      );
+    }
+  }
+
+  /**
    * Equivalente al `select sco."Percentaje" ... from SCommissionTree ctr,
    * SCommissionTable cta, SCommission sco ...` del `FReceipt` real: cadena
    * Canal -> Árbol de comisión -> Tabla (por Producto, opcionalmente
@@ -5825,11 +5885,13 @@ export class ContractsService {
       idePlanProductRisk: string;
       ideCoveragePlan: string;
       ideProcess: string;
+      /** Fecha para la vigencia de `SCommission`: inicio de vigencia del contrato. */
+      effectiveDate: Date;
     },
     tx: Prisma.TransactionClient = this.prisma,
   ): Promise<number | null> {
     const ideActivo = await this.stateMachine.getStateByCode('Activo');
-    const now = new Date();
+    const now = params.effectiveDate;
 
     const trees = await tx.sCommissionTree.findMany({
       where: { IdeDistributionChannel: params.ideDistributionChannel, IdeState: ideActivo },
