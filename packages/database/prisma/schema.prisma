@@ -301,6 +301,8 @@ model SCommissionProduct {
   TstModification               DateTime @db.Timestamp(6)
   SProduct                      SProduct @relation(fields: [IdeProduct], references: [IdeProduct], onDelete: NoAction, onUpdate: NoAction, map: "FK_SCommissionProduct_SProduct")
   SState                        SState   @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_SCommissionProduct_SState")
+  SDistributionChannelOrigin SDistributionChannel @relation("SCommissionProductOrigin", fields: [IdeDistributionChannelOrigin], references: [IdeDistributionChannel], onDelete: NoAction, onUpdate: NoAction, map: "FK_SCommissionProduct_SDistributionChannelOrigin")
+  SDistributionChannelDestiny SDistributionChannel @relation("SCommissionProductDestiny", fields: [IdeDistributionChannelDestiny], references: [IdeDistributionChannel], onDelete: NoAction, onUpdate: NoAction, map: "FK_SCommissionProduct_SDistributionChannelDestiny")
 
   @@index([IdeDistributionChannelDestiny], map: "IX_SCommissionProduct_SDistributionChannelDestiny")
   @@index([IdeDistributionChannelOrigin], map: "IX_SCommissionProduct_SDistributionChannelOrigin")
@@ -352,6 +354,7 @@ model SCommissionTree {
   SCommissionTable       SCommissionTable[]
   SState                 SState             @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_SCommissionTree_SState")
   STextContent           STextContent?      @relation(fields: [IdeTextContent], references: [IdeTextContent], onDelete: NoAction, onUpdate: NoAction, map: "FK_SCommissionTree_STextContent")
+  SDistributionChannel SDistributionChannel @relation(fields: [IdeDistributionChannel], references: [IdeDistributionChannel], onDelete: NoAction, onUpdate: NoAction, map: "FK_SCommissionTree_SDistributionChannel")
 
   @@index([IdeDistributionChannel], map: "IX_SCommissionTree_SDistributionChannel")
   @@index([IdeState], map: "IX_SCommissionTree_SState")
@@ -706,6 +709,12 @@ model SDistributionChannel {
   TBroker                      TBroker?               @relation(fields: [IdeBroker], references: [IdeBroker], onDelete: NoAction, onUpdate: NoAction, map: "FK_SDistributionChannel_TBroker")
   TPerson                      TPerson?               @relation(fields: [IdePerson], references: [IdePerson], onDelete: NoAction, onUpdate: NoAction, map: "FK_SDistributionChannel_TPerson")
   SProductProcessFlow          SProductProcessFlow[]
+  SCommissionTree              SCommissionTree[]
+  TQuote                       TQuote[]
+  TContractSale                TContract[]            @relation("TContractSale")
+  TContractDistributionChannel TContractDistributionChannel[]
+  SCommissionProductOrigin     SCommissionProduct[]   @relation("SCommissionProductOrigin")
+  SCommissionProductDestiny    SCommissionProduct[]   @relation("SCommissionProductDestiny")
 
   @@index([IdeChannelType], map: "IX_SDistributionChannel_SChannelType")
   @@index([IdeDistributionChannelParent], map: "IX_SDistributionChannel_SDistributionChannel")
@@ -2518,6 +2527,7 @@ model TContract {
   TContractPerson              TContractPerson[]
   TContractRenewalCycle        TContractRenewalCycle[]
   TReceipt                     TReceipt[]
+  SDistributionChannelSale SDistributionChannel? @relation("TContractSale", fields: [IdeDistributionChannelSale], references: [IdeDistributionChannel], onDelete: NoAction, onUpdate: NoAction, map: "FK_TContract_SDistributionChannel")
 
   @@index([IdeDistributionChannelSale], map: "IX_TContract_SDistributionChannel")
   @@index([IdePaymentFraction], map: "IX_TContract_SPaymentFraction")
@@ -2562,6 +2572,7 @@ model TContractDistributionChannel {
   TstModification                DateTime  @db.Timestamp(6)
   SState                         SState    @relation(fields: [IdeState], references: [IdeState], onDelete: NoAction, onUpdate: NoAction, map: "FK_TContractDistributionChannel_SState")
   TContract                      TContract @relation(fields: [IdeContract], references: [IdeContract], onDelete: NoAction, onUpdate: NoAction, map: "FK_TContractDistributionChannel_TContract")
+  SDistributionChannel SDistributionChannel @relation(fields: [IdeDistributionChannel], references: [IdeDistributionChannel], onDelete: NoAction, onUpdate: NoAction, map: "FK_TContractDistributionChannel_SDistributionChannel")
 
   @@index([IdeState], map: "IX_TContractDistributionChannel_SState")
   @@index([IdeContract], map: "IX_TContractDistributionChannel_TContract")
@@ -3031,6 +3042,7 @@ model TQuote {
   TQuotePerson             TQuotePerson[]
   TQuoteRisk               TQuoteRisk[]
   TQuoteSocialImpactAnswer TQuoteSocialImpactAnswer?
+  SDistributionChannel SDistributionChannel @relation(fields: [IdeDistributionChannel], references: [IdeDistributionChannel], onDelete: NoAction, onUpdate: NoAction, map: "FK_TQuote_SDistributionChannel")
 
   @@index([IdeDistributionChannel], map: "IX_TQuote_SDistributionChannel")
   @@index([IdeDistributionWay], map: "IX_TQuote_SDistributionWay")
