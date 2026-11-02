@@ -18,9 +18,10 @@ export class CreateProductProcessFlowDto {
   @IsString()
   codProduct!: string;
 
-  /** CodDistributionChannel del canal al que aplica (debe existir). */
+  /** Opcional: CodDistributionChannel de un nodo comercial concreto al que se limita el flujo (el flujo lo gobierna la vía). */
+  @IsOptional()
   @IsString()
-  codDistributionChannel!: string;
+  codDistributionChannel?: string;
 
   /**
    * CodRiskProduct opcional -- si se omite, la fila aplica a CUALQUIER

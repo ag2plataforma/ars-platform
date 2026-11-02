@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Crea (si no existe) la via de distribucion BACKOFFICE: la aplicacion backoffice la usa de forma automatica en
+ * 1) Hace opcional el canal de SProductProcessFlow ("el flujo lo gobierna la via"; un canal concreto pasa a ser solo
+ *    un refinamiento). 2) Crea (si no existe) la via de distribucion BACKOFFICE: la aplicacion backoffice la usa de forma automatica en
  * cada cotizacion/contrato (la via identifica la APLICACION de origen, no la estructura comercial). Muestra las vias
  * existentes. Idempotente.
  *
@@ -25,6 +26,8 @@ async function main() {
     ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
   });
   await client.connect();
+  await client.query(`ALTER TABLE ars_platform."SProductProcessFlow" ALTER COLUMN "IdeDistributionChannel" DROP NOT NULL`);
+  console.log('= SProductProcessFlow.IdeDistributionChannel ahora admite NULL (el flujo depende de la via).');
   const existing = await client.query(`SELECT 1 FROM ars_platform."SDistributionWay" WHERE "CodDistributionWay" = 'BACKOFFICE'`);
   if (existing.rows.length > 0) {
     console.log('= La via BACKOFFICE ya existe.');

@@ -244,7 +244,7 @@ export class CollectiveQuoteComponent {
     this.loadingFields.set(true);
     const flow$ = this.riskAttributes.resolveActiveSteps({
       codProduct: raw.codProduct,
-      codDistributionChannel: raw.codDistributionChannel,
+      codDistributionChannel: raw.codDistributionChannel || undefined,
       codRiskProduct: raw.codRiskProduct,
       codDistributionWay: raw.codDistributionWay || undefined,
     });

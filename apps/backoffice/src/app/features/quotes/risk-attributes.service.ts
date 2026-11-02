@@ -87,13 +87,12 @@ export class RiskAttributesService {
    */
   resolveActiveSteps(params: {
     codProduct: string;
-    codDistributionChannel: string;
+    codDistributionChannel?: string;
     codRiskProduct?: string;
     codDistributionWay?: string;
   }): Observable<ProcessFlowResolution> {
-    let httpParams = new HttpParams()
-      .set('codProduct', params.codProduct)
-      .set('codDistributionChannel', params.codDistributionChannel);
+    let httpParams = new HttpParams().set('codProduct', params.codProduct);
+    if (params.codDistributionChannel) httpParams = httpParams.set('codDistributionChannel', params.codDistributionChannel);
     if (params.codRiskProduct) httpParams = httpParams.set('codRiskProduct', params.codRiskProduct);
     if (params.codDistributionWay) httpParams = httpParams.set('codDistributionWay', params.codDistributionWay);
     return this.http.get<ProcessFlowResolution>(this.resolveStepsUrl, { params: httpParams });

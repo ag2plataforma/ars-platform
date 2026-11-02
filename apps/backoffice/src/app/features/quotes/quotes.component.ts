@@ -434,11 +434,11 @@ export class QuotesComponent {
     this.productFields.loading.set(true);
     const codDistributionChannel = this.form.controls.codDistributionChannel.value;
     const codDistributionWay = this.form.controls.codDistributionWay.value;
-    const flow$ = codDistributionChannel
+    const flow$ = codDistributionWay
       ? this.riskAttributes.resolveActiveSteps({
           codProduct,
-          codDistributionChannel,
-          codDistributionWay: codDistributionWay || undefined,
+          codDistributionChannel: codDistributionChannel || undefined,
+          codDistributionWay,
         })
       : of(null);
     forkJoin({ schema: this.riskAttributes.getSchema(String(product['IdeProduct']), 'PRICING'), flow: flow$ }).subscribe({
@@ -541,7 +541,7 @@ export class QuotesComponent {
     // configurados?), consulta si el flujo asignado al producto/canal
     // (`SProductProcessFlow`, pedido explícito del usuario, 2026-09-23)
     // deja ACTIVO el paso "Atributos personalizados" -- comportamiento
-    // por defecto SEGURO: sin `codDistributionChannel` todavía elegido,
+    // por defecto SEGURO: sin vía todavía definida,
     // o sin ningún flujo configurado para la combinación
     // (`codProcessFlow: null`), no se oculta nada (ver el doc-comment de
     // `ProcessFlowResolver` en `@ars-platform/shared-common`).
@@ -552,12 +552,12 @@ export class QuotesComponent {
     let config$ = this.riskConfigCache.get(cacheKey);
     if (!config$) {
       const activeSteps$ =
-        codProduct && codDistributionChannel
+        codProduct && codDistributionWay
           ? this.riskAttributes.resolveActiveSteps({
               codProduct,
-              codDistributionChannel,
+              codDistributionChannel: codDistributionChannel || undefined,
               codRiskProduct,
-              codDistributionWay: codDistributionWay || undefined,
+              codDistributionWay,
             })
           : of(null);
       config$ = forkJoin({ schema: this.riskAttributes.getSchema(ideRiskProduct, 'PRICING'), flow: activeSteps$ }).pipe(

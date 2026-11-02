@@ -38,7 +38,8 @@
  */
 export interface ProductStepsQuery {
   ideProduct: string;
-  ideDistributionChannel: string;
+  /** Opcional: nodo comercial. El flujo lo gobierna la vía; un flujo con canal solo aplica a ese nodo (refinamiento). */
+  ideDistributionChannel?: string;
   /** Opcional -- Impacto Social se resuelve a nivel de producto, no de
    *  riesgo puntual, así que este campo puede omitirse en ese caso. */
   ideRiskProduct?: string;

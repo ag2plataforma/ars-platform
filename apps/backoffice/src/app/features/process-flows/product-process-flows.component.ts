@@ -100,7 +100,7 @@ export class ProductProcessFlowsComponent {
   readonly testerResult = signal<ResolveStepsResult | null>(null);
   testerForm = this.fb.nonNullable.group({
     codProduct: ['', Validators.required],
-    codDistributionChannel: ['', Validators.required],
+    codDistributionChannel: [ANY_VALUE],
     codRiskProduct: [ANY_VALUE],
     codDistributionWay: [ANY_VALUE],
   });
@@ -110,7 +110,7 @@ export class ProductProcessFlowsComponent {
     desProductProcessFlow: ['', Validators.required],
     codProcessFlow: ['', Validators.required],
     codProduct: ['', Validators.required],
-    codDistributionChannel: ['', Validators.required],
+    codDistributionChannel: [ANY_VALUE],
     codRiskProduct: [ANY_VALUE],
     codDistributionWay: [ANY_VALUE],
   });
@@ -180,7 +180,7 @@ export class ProductProcessFlowsComponent {
       desProductProcessFlow: ['', Validators.required],
       codProcessFlow: ['', Validators.required],
       codProduct: ['', Validators.required],
-      codDistributionChannel: ['', Validators.required],
+      codDistributionChannel: [ANY_VALUE],
       codRiskProduct: [ANY_VALUE],
       codDistributionWay: [ANY_VALUE],
     });
@@ -201,7 +201,7 @@ export class ProductProcessFlowsComponent {
       desProductProcessFlow: [String(row['DesProductProcessFlow'] ?? ''), Validators.required],
       codProcessFlow: [String(processFlow?.['CodProcessFlow'] ?? ''), Validators.required],
       codProduct: [String(product?.['CodProduct'] ?? ''), Validators.required],
-      codDistributionChannel: [String(channel?.['CodDistributionChannel'] ?? ''), Validators.required],
+      codDistributionChannel: [channel ? String(channel['CodDistributionChannel'] ?? '') : ANY_VALUE],
       codRiskProduct: [riskProduct ? String(riskProduct['CodRiskProduct'] ?? '') : ANY_VALUE],
       codDistributionWay: [way ? String(way['CodDistributionWay'] ?? '') : ANY_VALUE],
     });
@@ -223,7 +223,7 @@ export class ProductProcessFlowsComponent {
       desProductProcessFlow: raw.desProductProcessFlow,
       codProcessFlow: raw.codProcessFlow,
       codProduct: raw.codProduct,
-      codDistributionChannel: raw.codDistributionChannel,
+      codDistributionChannel: raw.codDistributionChannel === ANY_VALUE ? '' : raw.codDistributionChannel,
       codRiskProduct: raw.codRiskProduct === ANY_VALUE ? undefined : raw.codRiskProduct,
       codDistributionWay: raw.codDistributionWay === ANY_VALUE ? undefined : raw.codDistributionWay,
     };
@@ -297,7 +297,7 @@ export class ProductProcessFlowsComponent {
   openTester(): void {
     this.testerResult.set(null);
     this.loadOptions();
-    this.testerForm.reset({ codProduct: '', codDistributionChannel: '', codRiskProduct: ANY_VALUE, codDistributionWay: ANY_VALUE });
+    this.testerForm.reset({ codProduct: '', codDistributionChannel: ANY_VALUE, codRiskProduct: ANY_VALUE, codDistributionWay: ANY_VALUE });
     this.testerVisible.set(true);
   }
 
@@ -311,7 +311,8 @@ export class ProductProcessFlowsComponent {
       return;
     }
     const raw = this.testerForm.getRawValue();
-    let params = new HttpParams().set('codProduct', raw.codProduct).set('codDistributionChannel', raw.codDistributionChannel);
+    let params = new HttpParams().set('codProduct', raw.codProduct);
+    if (raw.codDistributionChannel !== ANY_VALUE) params = params.set('codDistributionChannel', raw.codDistributionChannel);
     if (raw.codRiskProduct !== ANY_VALUE) params = params.set('codRiskProduct', raw.codRiskProduct);
     if (raw.codDistributionWay !== ANY_VALUE) params = params.set('codDistributionWay', raw.codDistributionWay);
 

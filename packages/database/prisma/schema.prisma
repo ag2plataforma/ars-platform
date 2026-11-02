@@ -1516,7 +1516,7 @@ model SProductProcessFlow {
   IdeProcessFlow         String               @db.Uuid
   IdeProduct             String               @db.Uuid
   IdeRiskProduct         String?              @db.Uuid
-  IdeDistributionChannel String               @db.Uuid
+  IdeDistributionChannel String?              @db.Uuid
   IdeDistributionWay     String?              @db.Uuid
   IdeTextContent         String?              @db.Uuid
   IdeState               String               @db.Uuid
@@ -1524,7 +1524,7 @@ model SProductProcessFlow {
   TstCreation            DateTime             @db.Timestamp(6)
   UsrModification        String               @db.VarChar(60)
   TstModification        DateTime             @db.Timestamp(6)
-  SDistributionChannel   SDistributionChannel @relation(fields: [IdeDistributionChannel], references: [IdeDistributionChannel], onDelete: NoAction, onUpdate: NoAction, map: "FK_SProductProcessFlow_SDistributionChannel")
+  SDistributionChannel   SDistributionChannel? @relation(fields: [IdeDistributionChannel], references: [IdeDistributionChannel], onDelete: NoAction, onUpdate: NoAction, map: "FK_SProductProcessFlow_SDistributionChannel")
   SDistributionWay       SDistributionWay?    @relation(fields: [IdeDistributionWay], references: [IdeDistributionWay], onDelete: NoAction, onUpdate: NoAction, map: "FK_SProductProcessFlow_SDistributionWay")
   SProcessFlow           SProcessFlow         @relation(fields: [IdeProcessFlow], references: [IdeProcessFlow], onDelete: NoAction, onUpdate: NoAction, map: "FK_SProductProcessFlow_SProcessFlow")
   SProduct               SProduct             @relation(fields: [IdeProduct], references: [IdeProduct], onDelete: NoAction, onUpdate: NoAction, map: "FK_SProductProcessFlow_SProduct")

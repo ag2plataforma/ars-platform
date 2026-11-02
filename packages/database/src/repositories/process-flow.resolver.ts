@@ -34,10 +34,16 @@ export class PrismaProcessFlowResolver implements ProcessFlowResolver {
       ? { OR: [{ IdeDistributionWay: query.ideDistributionWay }, { IdeDistributionWay: null }] }
       : { IdeDistributionWay: null };
 
+    // La via (aplicacion de origen) es lo que gobierna el flujo. El nodo comercial es un refinamiento OPCIONAL:
+    // un flujo sin canal aplica a cualquier nodo; uno con canal solo a ese nodo (y gana por ser mas especifico).
+    const channelCondition = query.ideDistributionChannel
+      ? { OR: [{ IdeDistributionChannel: query.ideDistributionChannel }, { IdeDistributionChannel: null }] }
+      : { IdeDistributionChannel: null };
+
     const candidates = await this.prisma.sProductProcessFlow.findMany({
       where: {
         IdeProduct: query.ideProduct,
-        IdeDistributionChannel: query.ideDistributionChannel,
+        ...channelCondition,
         SState: { CodState: 'ACTIVO' },
         AND: [riskProductCondition, distributionWayCondition],
       },
@@ -48,7 +54,7 @@ export class PrismaProcessFlowResolver implements ProcessFlowResolver {
     }
 
     const specificity = (row: (typeof candidates)[number]): number =>
-      (row.IdeRiskProduct ? 1 : 0) + (row.IdeDistributionWay ? 1 : 0);
+      (row.IdeRiskProduct ? 1 : 0) + (row.IdeDistributionWay ? 1 : 0) + (row.IdeDistributionChannel ? 1 : 0);
     const best = candidates.reduce((a, b) => (specificity(b) > specificity(a) ? b : a));
 
     const flowSteps = await this.prisma.sFlowStep.findMany({

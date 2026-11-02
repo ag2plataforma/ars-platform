@@ -10,8 +10,9 @@ export class ResolveStepsQueryDto {
   @IsString()
   codProduct!: string;
 
+  @IsOptional()
   @IsString()
-  codDistributionChannel!: string;
+  codDistributionChannel?: string;
 
   @IsOptional()
   @IsString()

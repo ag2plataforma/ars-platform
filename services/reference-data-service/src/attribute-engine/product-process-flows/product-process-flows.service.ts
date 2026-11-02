@@ -64,7 +64,7 @@ export class ProductProcessFlowsService {
     const [ideProcessFlow, ideProduct, ideDistributionChannel, ideRiskProduct, ideDistributionWay] = await Promise.all([
       this.resolveProcessFlow(dto.codProcessFlow),
       this.resolveProduct(dto.codProduct),
-      this.resolveDistributionChannel(dto.codDistributionChannel),
+      dto.codDistributionChannel ? this.resolveDistributionChannel(dto.codDistributionChannel) : Promise.resolve(null),
       dto.codRiskProduct ? this.resolveRiskProduct(dto.codRiskProduct) : Promise.resolve(null),
       dto.codDistributionWay ? this.resolveDistributionWay(dto.codDistributionWay) : Promise.resolve(null),
     ]);
@@ -93,7 +93,9 @@ export class ProductProcessFlowsService {
       extra.IdeProduct = await this.resolveProduct(dto.codProduct);
     }
     if (dto.codDistributionChannel !== undefined) {
-      extra.IdeDistributionChannel = await this.resolveDistributionChannel(dto.codDistributionChannel);
+      extra.IdeDistributionChannel = dto.codDistributionChannel
+        ? await this.resolveDistributionChannel(dto.codDistributionChannel)
+        : null;
     }
     if (dto.codRiskProduct !== undefined) {
       extra.IdeRiskProduct = dto.codRiskProduct ? await this.resolveRiskProduct(dto.codRiskProduct) : null;
@@ -120,13 +122,13 @@ export class ProductProcessFlowsService {
   async resolveSteps(query: ResolveStepsQueryDto): Promise<{ codProcessFlow: string | null; activeSteps: string[] }> {
     const [ideProduct, ideDistributionChannel, ideRiskProduct, ideDistributionWay] = await Promise.all([
       this.resolveProduct(query.codProduct),
-      this.resolveDistributionChannel(query.codDistributionChannel),
+      query.codDistributionChannel ? this.resolveDistributionChannel(query.codDistributionChannel) : Promise.resolve(undefined),
       query.codRiskProduct ? this.resolveRiskProduct(query.codRiskProduct) : Promise.resolve(undefined),
       query.codDistributionWay ? this.resolveDistributionWay(query.codDistributionWay) : Promise.resolve(undefined),
     ]);
     const resolution = await this.resolver.resolveActiveSteps({
       ideProduct,
-      ideDistributionChannel,
+      ideDistributionChannel: ideDistributionChannel ?? undefined,
       ideRiskProduct: ideRiskProduct ?? undefined,
       ideDistributionWay: ideDistributionWay ?? undefined,
     });

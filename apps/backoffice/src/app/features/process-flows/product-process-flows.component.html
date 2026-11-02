@@ -71,7 +71,7 @@
         <td>{{ row.SProcessFlow?.DesProcessFlow }}</td>
         <td>{{ row.SProduct?.DesProduct }}</td>
         <td>{{ riskProductLabel(row) }}</td>
-        <td>{{ row.SDistributionChannel?.DesDistributionChannel }}</td>
+        <td>{{ row.SDistributionChannel?.DesDistributionChannel ?? ('processFlows.assignments.anyValue' | transloco) }}</td>
         <td>{{ distributionWayLabel(row) }}</td>
         <td>
           <p-tag [value]="(isActive(row) ? 'common.active' : 'common.inactive') | transloco" [severity]="isActive(row) ? 'success' : 'danger'" />
@@ -155,10 +155,9 @@
       <p-select
         appendTo="body"
         formControlName="codDistributionChannel"
-        [options]="channels()"
+        [options]="[{ DesDistributionChannel: ('processFlows.assignments.anyValue' | transloco), CodDistributionChannel: ANY_VALUE }, ...channels()]"
         optionLabel="DesDistributionChannel"
         optionValue="CodDistributionChannel"
-        [placeholder]="'processFlows.assignments.channelSelectPlaceholder' | transloco"
         styleClass="w-full"
       />
     </div>
@@ -219,10 +218,9 @@
       <p-select
         appendTo="body"
         formControlName="codDistributionChannel"
-        [options]="channels()"
+        [options]="[{ DesDistributionChannel: ('processFlows.assignments.anyValue' | transloco), CodDistributionChannel: ANY_VALUE }, ...channels()]"
         optionLabel="DesDistributionChannel"
         optionValue="CodDistributionChannel"
-        [placeholder]="'processFlows.assignments.channelSelectPlaceholder' | transloco"
         styleClass="w-full"
       />
     </div>
