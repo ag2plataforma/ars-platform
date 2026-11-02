@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -20,6 +20,9 @@ import { CatalogRow } from '../../core/catalogs/catalog.model';
 const PATH = '/party/commissions';
 const TABLES_PATH = '/party/commission-tables';
 const PROCESSES_PATH = '/party/processes';
+const TREES_PATH = '/party/commission-trees';
+const CHANNELS_PATH = '/party/distribution-channels';
+const PRODUCTS_PATH = '/product-rating/products';
 
 /**
  * `SCommission` -- el porcentaje efectivo que cobra una tabla
@@ -66,11 +69,28 @@ export class CommissionsTabComponent {
 
   readonly tables = signal<CatalogRow[]>([]);
   readonly processes = signal<CatalogRow[]>([]);
+  readonly trees = signal<CatalogRow[]>([]);
+  readonly channels = signal<CatalogRow[]>([]);
+  readonly products = signal<CatalogRow[]>([]);
   readonly rows = signal<CatalogRow[]>([]);
   readonly loading = signal(false);
   readonly dialogVisible = signal(false);
   readonly dialogMode = signal<'create' | 'edit'>('create');
   private editingRow: CatalogRow | null = null;
+  readonly editingRowValue = signal<CatalogRow>({});
+
+  /** Opciones del selector de tabla: una tabla se identifica por su canal
+   *  (vía el árbol), su producto y su código, no solo por la descripción. */
+  readonly tableOptions = computed(() =>
+    this.tables()
+      .map((t) => ({
+        code: String(t['CodCommissionTable'] ?? ''),
+        label: this.tableLabel(t),
+        channel: this.tableChannelName(t),
+        product: this.tableProductName(t),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label)),
+  );
 
   form = this.fb.nonNullable.group({
     codCommissionTable: ['', Validators.required],
@@ -86,6 +106,9 @@ export class CommissionsTabComponent {
   }
 
   private loadDependents(): void {
+    this.catalogService.list(TREES_PATH).subscribe({ next: (rows) => this.trees.set(rows), error: () => undefined });
+    this.catalogService.list(CHANNELS_PATH).subscribe({ next: (rows) => this.channels.set(rows), error: () => undefined });
+    this.catalogService.list(PRODUCTS_PATH).subscribe({ next: (rows) => this.products.set(rows), error: () => undefined });
     this.catalogService.list(TABLES_PATH).subscribe({
       next: (rows) => this.tables.set(rows),
       error: () =>
@@ -128,9 +151,42 @@ export class CommissionsTabComponent {
     return row.SState?.CodState === 'ACTIVO';
   }
 
+  /** Canal de distribución al que pertenece una `SCommissionTable` (vía su árbol). */
+  tableChannelName(table: CatalogRow): string {
+    const ideTree = table['IdeCommissionTree'];
+    const tree = this.trees().find((t) => t['IdeCommissionTree'] === ideTree);
+    if (!tree) return '';
+    const channel = this.channels().find((c) => c['IdeDistributionChannel'] === tree['IdeDistributionChannel']);
+    return channel ? `${channel['CodDistributionChannel']} — ${channel['DesDistributionChannel']}` : '';
+  }
+
+  tableProductName(table: CatalogRow): string {
+    const product = this.products().find((p) => p['IdeProduct'] === table['IdeProduct']);
+    return product ? String(product['DesProduct'] ?? '') : '';
+  }
+
+  /** "Canal › Producto · Código (Descripción)". */
+  tableLabel(table: CatalogRow): string {
+    const parts = [this.tableChannelName(table), this.tableProductName(table)].filter(Boolean).join(' › ');
+    const own = `${table['CodCommissionTable']} (${table['DesCommissionTable']})`;
+    return parts ? `${parts} · ${own}` : own;
+  }
+
+  tableChannel(row: CatalogRow): string {
+    const table = row['SCommissionTable'] as CatalogRow | undefined;
+    return table ? this.tableChannelName(table) : '';
+  }
+
+  tableProduct(row: CatalogRow): string {
+    const table = row['SCommissionTable'] as CatalogRow | undefined;
+    return table ? this.tableProductName(table) : '';
+  }
+
   tableName(row: CatalogRow): string {
     const table = row['SCommissionTable'] as CatalogRow | undefined;
-    return table ? String(table['DesCommissionTable'] ?? '') : this.transloco.translate('commissions.noTableFallback');
+    return table
+      ? `${table['CodCommissionTable']} (${table['DesCommissionTable']})`
+      : this.transloco.translate('commissions.noTableFallback');
   }
 
   processName(row: CatalogRow): string {
@@ -170,6 +226,7 @@ export class CommissionsTabComponent {
   openEdit(row: CatalogRow): void {
     this.dialogMode.set('edit');
     this.editingRow = row;
+    this.editingRowValue.set(row);
     this.loadDependents();
     this.form = this.fb.nonNullable.group({
       codCommissionTable: [{ value: this.tableCode(row), disabled: true }],
