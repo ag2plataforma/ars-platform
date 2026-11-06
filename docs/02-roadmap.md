@@ -274,6 +274,15 @@ Definiciones acordadas: **`SDistributionWay`** = aplicación de origen de la cot
 - **Canales de distribución** (pestaña nueva, primera de Comisiones): árbol recursivo (padre/hijos con sangría y expandir/contraer), con tipo de canal, canal padre, broker, persona (búsqueda por documento o nombre) e imagen; el backend evita ciclos (un canal no puede colgar de sí mismo ni de un descendiente). Reemplaza la entrada genérica `distribution-channels` del registro de catálogos.
 - Pendiente: pantalla/consulta de liquidación por nodo y broker; indicador del total de reparto en la pantalla de `SCommissionProduct`; resolver los 2 canales huérfanos de `SCommissionProduct` (`investigate-channel-orphans.js`) y volver a correr `setup-distribution-fks.js`.
 
+## Anulación con fraccionamiento: liquidación cobrado − devengado (2026-11-05)
+
+Detectado con la póliza 2060-2026-11 (semestral, anulada el 20/01/2027): `setCancelPrime` prorrateaba el `ConceptNetValue` (que con fraccionamiento es UNA cuota) entre los días de todo el año, devolviendo la mitad de lo debido y sin mirar qué se había cobrado (devolvió 38,99 cuando solo se habían cobrado 49,24 y se habían devengado 20,78).
+- **Regla (acordada con el usuario)**: devolución = prima **cobrada** − prima **devengada** hasta la anulación. Devengado por **fecha de calendario** (se ignora la hora): `ConceptValue × (1 + recargo/100) × díasTranscurridos / díasDelContrato` del movimiento vigente cada día. El **recargo del fraccionamiento cuenta como prima** y se devuelve en proporción.
+- **Cobrado** = líneas de recibos del ciclo en estado `COBRADO` y no anulados. Los recibos **no cobrados** del ciclo (cuotas emitidas pendientes, suplementos sin cobrar) se **anulan** (`TstCancellation`/`DesCancellation`) antes de generar el recibo de anulación.
+- Se aplica según `refundPremium` / `refundTax` del endoso; la comisión sale de `% × PrimaNeta` del recibo de anulación. Si lo devengado supera lo cobrado, el recibo de anulación es un cargo (positivo).
+- Script de verificación: `investigate-cancellation-amounts.js <NumContract>` (recalcula la regla y la compara con lo guardado).
+- Pendiente de revisar: `setSupplementPrime` divide entre los días del tramo del suplemento (no del término), lo que puede inflar el cobro de un suplemento a mitad de vigencia; y los suplementos no tienen todavía cobranza propia (solo la primera cuota se marca `COBRADO`).
+
 ## Plan inmediato (acordado 2026-10-05): Colectivos -> VPS -> retomar desarrollo
 
 Orden acordado con el usuario: (1) **Colectivos, etapa 1**, (2) **parar el desarrollo para montar la VPS** y dejar todo corriendo allí, (3) retomar el desarrollo ya sobre la VPS. Razón de hacer colectivos ANTES de producción: toca el modelo de fondo (cotización, contratación, recibos, suplementos, renovaciones, siniestros) y migrarlo con datos reales vivos sería mucho más caro. Para que la VPS no se retrase, la etapa 1 tiene un cierre claro y el resto queda para después.

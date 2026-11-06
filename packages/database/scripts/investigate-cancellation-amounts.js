@@ -100,32 +100,35 @@ async function main() {
         }
         const closing = mv.filter((m) => n(m.Amount) === 0 && m.NumCoverageMovement > 1).pop();
         const original = mv.find((m) => m.NumCoverageMovement === 1);
-        if (closing && original && contract.TstCancellation) {
-          const daysOld = daysBetween(original.TstInitial, original.TstEnd);
-          // el código itera día a día INCLUSIVO: días del cierre = daysBetween + 1
-          let iter = 0;
-          for (let c = new Date(closing.TstInitial); c.getTime() <= closing.TstEnd.getTime(); c.setDate(c.getDate() + 1)) iter++;
-          const diasRestantesExactos = daysBetween(closing.TstInitial, closing.TstEnd);
-          console.log(`  >> Recálculo: días vigencia original=${daysOld} | días recorridos por setCancelPrime=${iter} (restantes exactos=${diasRestantesExactos}) | numFraction=${numFraction}`);
+        if (closing && original && contract.TstCancellation && contract.TstEnd) {
+          // Regla vigente desde 2026-11-05: devolución = cobrado - devengado, por FECHA DE CALENDARIO, recargo incluido.
+          const day = (x) => Math.floor(new Date(x).getTime() / 86_400_000);
+          const termDays = day(contract.TstEnd) - day(contract.TstInitial);
+          const earnedDays = day(contract.TstCancellation) - day(contract.TstInitial);
+          const factor = 1 + sur / 100;
+          const paidRows = await prisma.tReceiptDetail.findMany({
+            where: {
+              TCoverageMovement: { IdeRiskCoverage: rc.IdeRiskCoverage },
+              TReceipt: { IdeContract: contract.IdeContract, SState: { CodState: 'COBRADO' }, TstCancellation: null },
+            },
+          });
+          console.log(`  >> Recálculo (cobrado - devengado): días contrato=${termDays} | días devengados=${earnedDays} | recargo=${sur}%`);
           for (const oc of original.TMovementConcept) {
             const cc = closing.TMovementConcept.find((x) => x.IdeConcept === oc.IdeConcept);
             if (!cc) continue;
             const t = oc.SConcept.SConceptType?.CodConceptType;
-            if (!['CALCPRIMA', 'CALCCOMISION', 'CALCIMPUESTO'].includes(t ?? '')) continue;
-            const gross = n(oc.ConceptValue), net = n(oc.ConceptNetValue);
-            const byCode = -(net / daysOld) * iter;               // fórmula actual del código
-            const annualProrata = -(gross / daysOld) * iter;      // misma pro-rata pero sobre la prima ANUAL bruta
-            const annualExact = -(gross / daysOld) * diasRestantesExactos;
-            console.log(`     ${oc.SConcept.CodConcept.padEnd(12)} guardado=${r4(n(cc.ConceptNetValue))} | fórmula código (neto/cuota ÷ días × ${iter})=${r4(byCode)} | sobre anual bruto ×${iter} d=${r4(annualProrata)} | sobre anual bruto ×${diasRestantesExactos} d=${r4(annualExact)}`);
-            if (oc.SConcept.CodConcept === 'PrimaNeta') {
-              totalStoredRefund += n(cc.ConceptNetValue); totalCodeFormula += byCode; totalAnnualProrata += annualProrata;
-            }
+            if (!['CALCPRIMA', 'CALCIMPUESTO'].includes(t ?? '')) continue;
+            const earned = (n(oc.ConceptValue) * factor * earnedDays) / termDays;
+            const paid = paidRows.filter((x) => x.IdeConcept === oc.IdeConcept).reduce((a2, x) => a2 + n(x.ConceptValue), 0);
+            const expected = earned - paid;
+            console.log(`     ${oc.SConcept.CodConcept.padEnd(14)} devengado=${r4(earned)} cobrado=${r4(paid)} esperado=${r4(expected)} guardado=${r4(n(cc.ConceptNetValue))}`);
+            if (oc.SConcept.CodConcept === 'PrimaNeta') { totalStoredRefund += n(cc.ConceptNetValue); totalCodeFormula += expected; }
           }
         }
       }
     }
   }
-  console.log(`\nPrimaNeta devuelta (suma coberturas): guardado=${r4(totalStoredRefund)} | fórmula código=${r4(totalCodeFormula)} | pro-rata anual bruto=${r4(totalAnnualProrata)}`);
+  console.log(`\nPrimaNeta liquidada (suma coberturas): guardado=${r4(totalStoredRefund)} | esperado por la regla=${r4(totalCodeFormula)}`);
 
   console.log('\n=== 5. RECIBOS ===');
   const receipts = await prisma.tReceipt.findMany({

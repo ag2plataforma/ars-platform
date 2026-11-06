@@ -553,6 +553,9 @@ export class ContractsService {
           data: { IdeState: nextContractState, UsrModification: actor, TstModification: new Date() },
         });
 
+        // Los recibos no cobrados (cuotas pendientes, suplementos sin cobrar) se anulan ANTES de generar el recibo de la
+        // anulación, que liquida lo devengado contra lo cobrado (ver `setCancelPrime`).
+        await this.voidUnpaidReceipts(ideContract, contract.NumContract, contract.TstInitial, actor, tx);
         await this.generateReceipts(ideContract, dto.ideProductEndorsement, actor, tx);
         await this.applyStateCascade(ideContract, 'Anular', actor, tx);
       },
@@ -4123,41 +4126,28 @@ export class ContractsService {
   }
 
   /**
-   * Equivalente a `FMovementConcept('SetCancelPrime', ...)`: para cada
-   * movimiento de cierre (`IdeContractOperation IS NULL`) de cada
-   * `TRiskCoverage` del `TContractFile`, recorre DÍA A DÍA su ventana
-   * `[TstInitial, TstEnd]`; para cada día, busca el movimiento anterior
-   * (`NumCoverageMovement` menor) que cubra esa fecha, y por cada concepto
-   * de ESE movimiento anterior cuyo tipo (`SConceptType.CodConceptType`)
-   * sea `CALCPRIMA`/`CALCCOMISION`/`CALCIMPUESTO` -- habilitado por
-   * `SProductEndorsement.ConditionData.refundPremium/refundCommission/refundTax`
-   * respectivamente -- suma al concepto equivalente del movimiento NUEVO
-   * la diferencia `(valorNuevo/díasNuevo - valorNetoAnterior/díasAnterior)`.
-   * Al terminar cada movimiento, recalcula su concepto `PrimaTotal` como
-   * `PrimaNeta + suma(conceptos CALCIMPUESTO)` (redondeado a 2 decimales)
-   * y actualiza `TCoverageMovement.Prime` con ese valor. Al final de cada
-   * cobertura, actualiza `TRiskCoverage.Prime` -- el original lee ahí
-   * `ConceptValue` (NO `ConceptNetValue`) del concepto `PrimaTotal`, que
-   * `setCancelConcept` siempre deja en 0 y este método nunca modifica
-   * (solo toca `ConceptNetValue`) -- confirmado contra el código real: es
-   * un comportamiento real del original (`TRiskCoverage.Prime` queda en 0
-   * tras una anulación), no una simplificación de esta implementación, y
-   * se replica tal cual.
+   * Devolución de la anulación (`FMovementConcept('SetCancelPrime', ...)` del original, REDEFINIDA el 2026-11-05 a
+   * pedido del usuario tras revisar la póliza 2060-2026-11, anulada con pago semestral): ya no se prorratea el
+   * `ConceptNetValue` (que con fraccionamiento es UNA CUOTA, no la prima anual) sino que se liquida contra lo cobrado:
    *
-   * Nota de performance (corregido 2026-09-28): el recorrido día a día
-   * es fiel al cursor del original (una fila de `TMovementConcept` por
-   * día potencialmente evaluada), pero HASTA ACÁ cada día hacía sus
-   * propias consultas a la base dentro del `while` -- para una vigencia
-   * anual (~365 días) eso son cientos de round-trips secuenciales, que
-   * contra una base remota (reportado por el usuario el 28/09/2026: la
-   * request completa tardó ~5 minutos, superó el timeout por default de
-   * `fetch` en el gateway y el navegador recibió "fetch failed" aunque
-   * la transacción terminó confirmando bien). Se preserva EXACTAMENTE el
-   * mismo resultado numérico (`ConceptNetValue` final = valor inicial +
-   * suma de los mismos deltas por día, misma fórmula) pero el mapeo
-   * día -> movimiento viejo se resuelve en memoria contra los movimientos
-   * ya traídos de antemano (una sola consulta), y el `UPDATE` se hace
-   * UNA vez por concepto al final, no una vez por día.
+   *     devolución = prima COBRADA − prima DEVENGADA hasta la fecha de anulación
+   *
+   * - Prima devengada: por cada día de calendario desde el inicio del contrato hasta el día ANTERIOR a la anulación,
+   *   `ConceptValue × (1 + recargo/100) / díasDelContrato` del movimiento vigente ese día (el de mayor
+   *   `NumCoverageMovement` que lo cubre, así los suplementos reemplazan al movimiento anterior). El conteo es por
+   *   FECHA DE CALENDARIO (se ignora la hora de inicio y la de la anulación) y el recargo del fraccionamiento cuenta
+   *   como prima, así que se devuelve en la proporción que corresponda.
+   * - Prima cobrada: suma de las líneas (`TReceiptDetail`) de los recibos del ciclo vigente en estado `COBRADO` y no
+   *   anulados, por cobertura y concepto. Los recibos NO cobrados se anulan aparte (`voidUnpaidReceipts`), así que lo
+   *   pendiente de cobro (cuotas futuras, suplementos sin cobrar) no se devuelve ni se cobra.
+   * - `ConceptNetValue` del movimiento de cierre = devengado − cobrado (negativo = se devuelve; positivo = el cliente
+   *   debe esa diferencia). Se aplica a los conceptos `CALCPRIMA` / `CALCIMPUESTO` según `refundPremium` /
+   *   `refundTax` del endoso (`'SI'`); los demás quedan en 0. La comisión (`refundCommission`) se calcula luego en
+   *   `generateReceipts` como `% × PrimaNeta del recibo`, igual que en cualquier recibo.
+   *
+   * Después, como en el original, `PrimaTotal` = `PrimaNeta` + suma de `CALCIMPUESTO` (redondeado a 2 decimales) y
+   * `TCoverageMovement.Prime` toma ese valor. `TRiskCoverage.Prime` queda con el `ConceptValue` de `PrimaTotal` del
+   * cierre (0), comportamiento real del original que se mantiene.
    */
   private async setCancelPrime(
     ideContractFile: string,
@@ -4174,8 +4164,46 @@ export class ContractsService {
         refundCommission?: string;
         refundTax?: string;
       } | null) ?? {};
-    const { refundPremium, refundCommission, refundTax } = conditionData;
+    const { refundPremium, refundTax } = conditionData;
 
+    const contractFile = await tx.tContractFile.findUniqueOrThrow({
+      where: { IdeContractFile: ideContractFile },
+      select: { IdeContract: true },
+    });
+    const contract = await tx.tContract.findUniqueOrThrow({
+      where: { IdeContract: contractFile.IdeContract },
+      select: {
+        IdeContract: true,
+        IdeProduct: true,
+        IdePaymentFraction: true,
+        TstInitial: true,
+        TstEnd: true,
+        TstCancellation: true,
+      },
+    });
+    if (!contract.TstEnd || !contract.TstCancellation) {
+      throw new ConflictException('No se puede calcular la devolución: el contrato no tiene fecha de fin o de anulación');
+    }
+    const termStartDay = calendarDay(contract.TstInitial);
+    const termEndDay = calendarDay(contract.TstEnd);
+    const cancelDay = calendarDay(contract.TstCancellation);
+    const termDays = termEndDay - termStartDay;
+    if (termDays <= 0) {
+      throw new ConflictException('No se puede calcular la devolución: la vigencia del contrato no tiene días');
+    }
+
+    // Recargo del fraccionamiento (cuenta como prima): el configurado al contratar; si ya no hay uno vigente a esa
+    // fecha, el más reciente del producto y la fracción.
+    const productFractions = await tx.sProductPaymentFraction.findMany({
+      where: { IdeProduct: contract.IdeProduct, IdePaymentFraction: contract.IdePaymentFraction },
+      orderBy: { TstInitial: 'desc' },
+    });
+    const productFraction =
+      productFractions.find((f) => f.TstInitial <= contract.TstInitial && f.TstEnd >= contract.TstInitial) ??
+      productFractions[0];
+    const surchargeFactor = 1 + Number(productFraction?.PorSurCharge ?? 0) / 100;
+
+    const ideCobrado = await this.stateMachine.getStateByCode('COBRADO');
     const [primaNetaConcept, primaTotalConcept] = await Promise.all([
       tx.sConcept.findFirst({ where: { CodConcept: 'PrimaNeta' } }),
       tx.sConcept.findFirst({ where: { CodConcept: 'PrimaTotal' } }),
@@ -4191,76 +4219,70 @@ export class ContractsService {
       const newMovements = await tx.tCoverageMovement.findMany({
         where: { IdeRiskCoverage: ideRiskCoverage, IdeContractOperation: null },
       });
+      if (newMovements.length === 0) continue;
       let lastProcessed: string | null = null;
 
-      // Todos los movimientos viejos de esta cobertura, con sus
-      // conceptos, en UNA sola consulta -- antes se repetía (un
-      // `findFirst` de movimiento + un `findMany` de conceptos) por
-      // CADA día de vigencia del movimiento nuevo, ver nota de
-      // performance arriba.
-      const oldMovements = await tx.tCoverageMovement.findMany({
+      const allMovements = await tx.tCoverageMovement.findMany({
         where: { IdeRiskCoverage: ideRiskCoverage },
-        include: { TMovementConcept: { include: { SConcept: { include: { SConceptType: { select: { CodConceptType: true } } } } } } },
+        include: { TMovementConcept: true },
       });
 
+      // Prima cobrada por concepto (recibos COBRADO del ciclo vigente, no anulados).
+      const paidDetails = await tx.tReceiptDetail.findMany({
+        where: {
+          TCoverageMovement: { IdeRiskCoverage: ideRiskCoverage },
+          TReceipt: { IdeContract: contract.IdeContract, IdeState: ideCobrado, TstCancellation: null },
+        },
+        select: { IdeConcept: true, ConceptValue: true, TReceipt: { select: { TstInitial: true } } },
+      });
+      const paidByConcept = new Map<string, number>();
+      for (const detail of paidDetails) {
+        if (calendarDay(detail.TReceipt.TstInitial) < termStartDay) continue; // ciclos anteriores (renovaciones)
+        paidByConcept.set(detail.IdeConcept, (paidByConcept.get(detail.IdeConcept) ?? 0) + Number(detail.ConceptValue));
+      }
+
       for (const newMovement of newMovements) {
-        const daysPrimeCalcNew = daysBetween(newMovement.TstInitial, newMovement.TstEnd);
-        const candidateOldMovements = oldMovements
+        const priorMovements = allMovements
           .filter((m) => m.NumCoverageMovement < newMovement.NumCoverageMovement)
-          .sort((a, b) => b.NumCoverageMovement - a.NumCoverageMovement);
+          .sort((a, b) => b.NumCoverageMovement - a.NumCoverageMovement)
+          .map((m) => ({ movement: m, startDay: calendarDay(m.TstInitial), endDay: calendarDay(m.TstEnd) }));
+
+        // Días de calendario devengados por cada movimiento previo (el de mayor número que cubre ese día).
+        const earnedDaysByMovement = new Map<string, number>();
+        for (let day = termStartDay; day < cancelDay; day++) {
+          const covering = priorMovements.find((p) => p.startDay <= day && day < p.endDay);
+          if (!covering) continue;
+          const key = covering.movement.IdeCoverageMovement;
+          earnedDaysByMovement.set(key, (earnedDaysByMovement.get(key) ?? 0) + 1);
+        }
+        const earnedByConcept = new Map<string, number>();
+        for (const { movement } of priorMovements) {
+          const days = earnedDaysByMovement.get(movement.IdeCoverageMovement) ?? 0;
+          if (days === 0) continue;
+          for (const concept of movement.TMovementConcept) {
+            earnedByConcept.set(
+              concept.IdeConcept,
+              (earnedByConcept.get(concept.IdeConcept) ?? 0) +
+                (Number(concept.ConceptValue) * surchargeFactor * days) / termDays,
+            );
+          }
+        }
 
         const newConcepts = await tx.tMovementConcept.findMany({
           where: { IdeCoverageMovement: newMovement.IdeCoverageMovement },
+          include: { SConcept: { include: { SConceptType: { select: { CodConceptType: true } } } } },
         });
-        const newConceptByIdeConcept = new Map(newConcepts.map((c) => [c.IdeConcept, c]));
-
-        // IdeMovementConcept (del movimiento nuevo) -> delta acumulado a
-        // lo largo de todos los días que le tocaron -- mismo cálculo por
-        // día que antes, solo que sumado en memoria antes de escribirlo
-        // (una vez), en vez de un UPDATE por día.
-        const accumulatedDelta = new Map<string, number>();
-
-        let cursor = newMovement.TstInitial;
-        while (cursor.getTime() <= newMovement.TstEnd.getTime()) {
-          const cursorTime = cursor.getTime();
-          const oldMovement = candidateOldMovements.find(
-            (m) => m.TstInitial.getTime() <= cursorTime && m.TstEnd.getTime() >= cursorTime,
-          );
-
-          if (oldMovement) {
-            const daysPrimeCalcOld = daysBetween(oldMovement.TstInitial, oldMovement.TstEnd);
-            for (const oldConcept of oldMovement.TMovementConcept) {
-              const codConceptType = oldConcept.SConcept.SConceptType.CodConceptType;
-              const applies =
-                (codConceptType === 'CALCPRIMA' && refundPremium === 'SI') ||
-                (codConceptType === 'CALCCOMISION' && refundCommission === 'SI') ||
-                (codConceptType === 'CALCIMPUESTO' && refundTax === 'SI');
-              if (!applies) continue;
-
-              const newConcept = newConceptByIdeConcept.get(oldConcept.IdeConcept);
-              if (!newConcept) continue;
-
-              const delta =
-                Number(newConcept.ConceptValue) / daysPrimeCalcNew -
-                Number(oldConcept.ConceptNetValue) / daysPrimeCalcOld;
-              accumulatedDelta.set(
-                newConcept.IdeMovementConcept,
-                (accumulatedDelta.get(newConcept.IdeMovementConcept) ?? 0) + delta,
-              );
-            }
-          }
-          cursor = addDays(cursor, 1);
-        }
-
-        for (const [ideMovementConcept, totalDelta] of accumulatedDelta) {
-          const newConcept = newConcepts.find((c) => c.IdeMovementConcept === ideMovementConcept)!;
+        for (const concept of newConcepts) {
+          const codConceptType = concept.SConcept.SConceptType.CodConceptType;
+          const applies =
+            (codConceptType === 'CALCPRIMA' && refundPremium === 'SI') ||
+            (codConceptType === 'CALCIMPUESTO' && refundTax === 'SI');
+          if (!applies) continue;
+          const earned = earnedByConcept.get(concept.IdeConcept) ?? 0;
+          const paid = paidByConcept.get(concept.IdeConcept) ?? 0;
           await tx.tMovementConcept.update({
-            where: { IdeMovementConcept: ideMovementConcept },
-            data: {
-              ConceptNetValue: Number(newConcept.ConceptNetValue) + totalDelta,
-              UsrModification: actor,
-              TstModification: now,
-            },
+            where: { IdeMovementConcept: concept.IdeMovementConcept },
+            data: { ConceptNetValue: earned - paid, UsrModification: actor, TstModification: now },
           });
         }
 
@@ -4311,6 +4333,39 @@ export class ContractsService {
         });
       }
     }
+  }
+
+  /**
+   * Al anular, los recibos del ciclo vigente que NO están cobrados (cuotas emitidas y pendientes, suplementos sin
+   * cobrar) se anulan: la liquidación (`setCancelPrime`) ya compara lo devengado contra lo efectivamente cobrado, así
+   * que lo pendiente de cobro no debe seguir vivo. Se marcan con `TstCancellation`/`DesCancellation`, el mismo
+   * criterio que usa el resto del servicio para distinguir un recibo anulado.
+   */
+  private async voidUnpaidReceipts(
+    ideContract: string,
+    numContract: string,
+    contractStart: Date,
+    actor: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ): Promise<number> {
+    const ideCobrado = await this.stateMachine.getStateByCode('COBRADO');
+    const now = new Date();
+    const cycleStart = new Date(calendarDay(contractStart) * 86_400_000);
+    const result = await tx.tReceipt.updateMany({
+      where: {
+        IdeContract: ideContract,
+        TstCancellation: null,
+        IdeState: { not: ideCobrado },
+        TstInitial: { gte: cycleStart },
+      },
+      data: {
+        TstCancellation: now,
+        DesCancellation: `Anulado por la anulación de la póliza ${numContract}`,
+        UsrModification: actor,
+        TstModification: now,
+      },
+    });
+    return result.count;
   }
 
   // ==========================================================================
@@ -5929,6 +5984,11 @@ function round2(value: number): number {
 
 function trunc2(value: number): number {
   return Math.trunc(value * 100) / 100;
+}
+
+/** Día de calendario (UTC) como entero: ignora la hora. */
+function calendarDay(date: Date): number {
+  return Math.floor(date.getTime() / 86_400_000);
 }
 
 function daysBetween(from: Date, to: Date): number {
