@@ -7,9 +7,8 @@
  *   1. Contrato, producto, fracción de pago (NumFraction, recargo) y períodos de facturación.
  *   2. Operaciones (movimientos del contrato) y endoso de anulación (ConditionData).
  *   3. Por cobertura: movimientos con cada concepto (bruto anual vs neto/cuota).
- *   4. Recálculo de la devolución con la MISMA fórmula del código, comparado con lo guardado,
- *      y con dos referencias: (a) devolución sobre la prima ANUAL bruta (pro-rata por días) y
- *      (b) devolución sobre lo realmente cobrable/emitido (recibos de cuotas).
+ *   4. Recálculo de la devolución con la regla vigente (cuotas cobradas x días no consumidos de su período,
+ *      por fecha de calendario), comparado con lo guardado.
  *   5. Todos los recibos (tipo, fechas, prima, comisión, cancelación) y su suma.
  *
  * Uso: node packages/database/scripts/investigate-cancellation-amounts.js 2060-2026-11
@@ -100,35 +99,43 @@ async function main() {
         }
         const closing = mv.filter((m) => n(m.Amount) === 0 && m.NumCoverageMovement > 1).pop();
         const original = mv.find((m) => m.NumCoverageMovement === 1);
-        if (closing && original && contract.TstCancellation && contract.TstEnd) {
-          // Regla vigente desde 2026-11-05: devolución = cobrado - devengado, por FECHA DE CALENDARIO, recargo incluido.
+        if (closing && original && contract.TstCancellation) {
+          // Regla vigente desde 2026-11-07: solo se devuelven cuotas COBRADAS, cada una entre los días de SU período
+          // (fecha de calendario): importe de la línea x días del período posteriores a la anulación / días del período.
           const day = (x) => Math.floor(new Date(x).getTime() / 86_400_000);
-          const termDays = day(contract.TstEnd) - day(contract.TstInitial);
-          const earnedDays = day(contract.TstCancellation) - day(contract.TstInitial);
-          const factor = 1 + sur / 100;
+          const cancelDay = day(contract.TstCancellation);
           const paidRows = await prisma.tReceiptDetail.findMany({
             where: {
               TCoverageMovement: { IdeRiskCoverage: rc.IdeRiskCoverage },
               TReceipt: { IdeContract: contract.IdeContract, SState: { CodState: 'COBRADO' }, TstCancellation: null },
             },
+            include: { TReceipt: true },
           });
-          console.log(`  >> Recálculo (cobrado - devengado): días contrato=${termDays} | días devengados=${earnedDays} | recargo=${sur}%`);
+          console.log(`  >> Recálculo (cuotas cobradas x días no consumidos de su período): ${paidRows.length} líneas cobradas`);
           for (const oc of original.TMovementConcept) {
             const cc = closing.TMovementConcept.find((x) => x.IdeConcept === oc.IdeConcept);
             if (!cc) continue;
             const t = oc.SConcept.SConceptType?.CodConceptType;
             if (!['CALCPRIMA', 'CALCIMPUESTO'].includes(t ?? '')) continue;
-            const earned = (n(oc.ConceptValue) * factor * earnedDays) / termDays;
-            const paid = paidRows.filter((x) => x.IdeConcept === oc.IdeConcept).reduce((a2, x) => a2 + n(x.ConceptValue), 0);
-            const expected = earned - paid;
-            console.log(`     ${oc.SConcept.CodConcept.padEnd(14)} devengado=${r4(earned)} cobrado=${r4(paid)} esperado=${r4(expected)} guardado=${r4(n(cc.ConceptNetValue))}`);
-            if (oc.SConcept.CodConcept === 'PrimaNeta') { totalStoredRefund += n(cc.ConceptNetValue); totalCodeFormula += expected; }
+            let paid = 0, refund = 0;
+            const detail = [];
+            for (const x of paidRows.filter((y) => y.IdeConcept === oc.IdeConcept)) {
+              const ps = day(x.TReceipt.TstInitial), pe = day(x.TReceipt.TstEnd);
+              const pdays = pe - ps;
+              if (pdays <= 0) continue;
+              const unearned = Math.min(Math.max(pe - Math.max(cancelDay, ps), 0), pdays);
+              paid += n(x.ConceptValue);
+              refund += (n(x.ConceptValue) * unearned) / pdays;
+              detail.push(`${x.TReceipt.NumReceipt}: ${n(x.ConceptValue)} x ${unearned}/${pdays}`);
+            }
+            console.log(`     ${oc.SConcept.CodConcept.padEnd(14)} cobrado=${r4(paid)} devolución esperada=${r4(-refund)} guardado=${r4(n(cc.ConceptNetValue))}  [${detail.join(' ; ')}]`);
+            if (oc.SConcept.CodConcept === 'PrimaNeta') { totalStoredRefund += n(cc.ConceptNetValue); totalCodeFormula += -refund; }
           }
         }
       }
     }
   }
-  console.log(`\nPrimaNeta liquidada (suma coberturas): guardado=${r4(totalStoredRefund)} | esperado por la regla=${r4(totalCodeFormula)}`);
+  console.log(`\nPrimaNeta liquidada (suma coberturas): guardado=${r4(totalStoredRefund)} | esperado por la regla (cuotas cobradas x días de su período)=${r4(totalCodeFormula)}`);
 
   console.log('\n=== 5. RECIBOS ===');
   const receipts = await prisma.tReceipt.findMany({

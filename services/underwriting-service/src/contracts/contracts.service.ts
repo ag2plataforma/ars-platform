@@ -554,7 +554,7 @@ export class ContractsService {
         });
 
         // Los recibos no cobrados (cuotas pendientes, suplementos sin cobrar) se anulan ANTES de generar el recibo de la
-        // anulación, que liquida lo devengado contra lo cobrado (ver `setCancelPrime`).
+        // anulación, que devuelve solo la parte no consumida de las cuotas cobradas (ver `setCancelPrime`).
         await this.voidUnpaidReceipts(ideContract, contract.NumContract, contract.TstInitial, actor, tx);
         await this.generateReceipts(ideContract, dto.ideProductEndorsement, actor, tx);
         await this.applyStateCascade(ideContract, 'Anular', actor, tx);
@@ -4126,24 +4126,25 @@ export class ContractsService {
   }
 
   /**
-   * Devolución de la anulación (`FMovementConcept('SetCancelPrime', ...)` del original, REDEFINIDA el 2026-11-05 a
-   * pedido del usuario tras revisar la póliza 2060-2026-11, anulada con pago semestral): ya no se prorratea el
-   * `ConceptNetValue` (que con fraccionamiento es UNA CUOTA, no la prima anual) sino que se liquida contra lo cobrado:
+   * Devolución de la anulación (`FMovementConcept('SetCancelPrime', ...)` del original, REDEFINIDA el 2026-11-07 con el
+   * usuario tras probar pólizas semestrales y trimestrales). Solo se devuelve prima de cuotas EFECTIVAMENTE COBRADAS, y
+   * cada cuota se devenga entre los días de SU PROPIO período:
    *
-   *     devolución = prima COBRADA − prima DEVENGADA hasta la fecha de anulación
+   *     devolución de un recibo cobrado = importe de la línea × días del período posteriores a la anulación
+   *                                                            ÷ días del período
    *
-   * - Prima devengada: por cada día de calendario desde el inicio del contrato hasta el día ANTERIOR a la anulación,
-   *   `ConceptValue × (1 + recargo/100) / díasDelContrato` del movimiento vigente ese día (el de mayor
-   *   `NumCoverageMovement` que lo cubre, así los suplementos reemplazan al movimiento anterior). El conteo es por
-   *   FECHA DE CALENDARIO (se ignora la hora de inicio y la de la anulación) y el recargo del fraccionamiento cuenta
-   *   como prima, así que se devuelve en la proporción que corresponda.
-   * - Prima cobrada: suma de las líneas (`TReceiptDetail`) de los recibos del ciclo vigente en estado `COBRADO` y no
-   *   anulados, por cobertura y concepto. Los recibos NO cobrados se anulan aparte (`voidUnpaidReceipts`), así que lo
-   *   pendiente de cobro (cuotas futuras, suplementos sin cobrar) no se devuelve ni se cobra.
-   * - `ConceptNetValue` del movimiento de cierre = devengado − cobrado (negativo = se devuelve; positivo = el cliente
-   *   debe esa diferencia). Se aplica a los conceptos `CALCPRIMA` / `CALCIMPUESTO` según `refundPremium` /
-   *   `refundTax` del endoso (`'SI'`); los demás quedan en 0. La comisión (`refundCommission`) se calcula luego en
-   *   `generateReceipts` como `% × PrimaNeta del recibo`, igual que en cualquier recibo.
+   * - Por cada cobertura y cada recibo `COBRADO` (no anulado, del ciclo vigente) se toma cada línea
+   *   (`TReceiptDetail`, el importe de la cuota ya con el recargo del fraccionamiento incluido, así que el recargo se
+   *   devuelve en proporción) y se multiplica por la fracción no consumida del período del recibo
+   *   (`TReceipt.TstInitial`..`TstEnd`; para un suplemento es el tramo `[fecha del suplemento, fin]`).
+   * - Los días se cuentan por FECHA DE CALENDARIO (se ignora la hora). Fracción no consumida =
+   *   `(díaFin − max(díaAnulación, díaInicio)) / (díaFin − díaInicio)`, acotada a [0, 1]: un período anterior a la
+   *   anulación no devuelve nada; una cuota cobrada de un período futuro se devuelve completa.
+   * - Los días consumidos de una cuota NO cobrada se pierden: los recibos no cobrados se anulan aparte
+   *   (`voidUnpaidReceipts`) y no generan cargo.
+   * - `ConceptNetValue` del movimiento de cierre = −(suma de las devoluciones por concepto). Se aplica a los conceptos
+   *   `CALCPRIMA` / `CALCIMPUESTO` según `refundPremium` / `refundTax` del endoso (`'SI'`); los demás quedan en 0. La
+   *   comisión (`refundCommission`) se calcula luego en `generateReceipts` como `% × PrimaNeta` del recibo de anulación.
    *
    * Después, como en el original, `PrimaTotal` = `PrimaNeta` + suma de `CALCIMPUESTO` (redondeado a 2 decimales) y
    * `TCoverageMovement.Prime` toma ese valor. `TRiskCoverage.Prime` queda con el `ConceptValue` de `PrimaTotal` del
@@ -4172,36 +4173,13 @@ export class ContractsService {
     });
     const contract = await tx.tContract.findUniqueOrThrow({
       where: { IdeContract: contractFile.IdeContract },
-      select: {
-        IdeContract: true,
-        IdeProduct: true,
-        IdePaymentFraction: true,
-        TstInitial: true,
-        TstEnd: true,
-        TstCancellation: true,
-      },
+      select: { IdeContract: true, TstInitial: true, TstCancellation: true },
     });
-    if (!contract.TstEnd || !contract.TstCancellation) {
-      throw new ConflictException('No se puede calcular la devolución: el contrato no tiene fecha de fin o de anulación');
+    if (!contract.TstCancellation) {
+      throw new ConflictException('No se puede calcular la devolución: el contrato no tiene fecha de anulación');
     }
     const termStartDay = calendarDay(contract.TstInitial);
-    const termEndDay = calendarDay(contract.TstEnd);
     const cancelDay = calendarDay(contract.TstCancellation);
-    const termDays = termEndDay - termStartDay;
-    if (termDays <= 0) {
-      throw new ConflictException('No se puede calcular la devolución: la vigencia del contrato no tiene días');
-    }
-
-    // Recargo del fraccionamiento (cuenta como prima): el configurado al contratar; si ya no hay uno vigente a esa
-    // fecha, el más reciente del producto y la fracción.
-    const productFractions = await tx.sProductPaymentFraction.findMany({
-      where: { IdeProduct: contract.IdeProduct, IdePaymentFraction: contract.IdePaymentFraction },
-      orderBy: { TstInitial: 'desc' },
-    });
-    const productFraction =
-      productFractions.find((f) => f.TstInitial <= contract.TstInitial && f.TstEnd >= contract.TstInitial) ??
-      productFractions[0];
-    const surchargeFactor = 1 + Number(productFraction?.PorSurCharge ?? 0) / 100;
 
     const ideCobrado = await this.stateMachine.getStateByCode('COBRADO');
     const [primaNetaConcept, primaTotalConcept] = await Promise.all([
@@ -4222,52 +4200,30 @@ export class ContractsService {
       if (newMovements.length === 0) continue;
       let lastProcessed: string | null = null;
 
-      const allMovements = await tx.tCoverageMovement.findMany({
-        where: { IdeRiskCoverage: ideRiskCoverage },
-        include: { TMovementConcept: true },
-      });
-
-      // Prima cobrada por concepto (recibos COBRADO del ciclo vigente, no anulados).
+      // Devolución por concepto: líneas de los recibos COBRADO (ciclo vigente, no anulados) de esta cobertura,
+      // cada una por la fracción no consumida de su período.
       const paidDetails = await tx.tReceiptDetail.findMany({
         where: {
           TCoverageMovement: { IdeRiskCoverage: ideRiskCoverage },
           TReceipt: { IdeContract: contract.IdeContract, IdeState: ideCobrado, TstCancellation: null },
         },
-        select: { IdeConcept: true, ConceptValue: true, TReceipt: { select: { TstInitial: true } } },
+        select: { IdeConcept: true, ConceptValue: true, TReceipt: { select: { TstInitial: true, TstEnd: true } } },
       });
-      const paidByConcept = new Map<string, number>();
+      const refundByConcept = new Map<string, number>();
       for (const detail of paidDetails) {
-        if (calendarDay(detail.TReceipt.TstInitial) < termStartDay) continue; // ciclos anteriores (renovaciones)
-        paidByConcept.set(detail.IdeConcept, (paidByConcept.get(detail.IdeConcept) ?? 0) + Number(detail.ConceptValue));
+        const periodStartDay = calendarDay(detail.TReceipt.TstInitial);
+        const periodEndDay = calendarDay(detail.TReceipt.TstEnd);
+        if (periodStartDay < termStartDay) continue; // ciclos anteriores (renovaciones)
+        const periodDays = periodEndDay - periodStartDay;
+        if (periodDays <= 0) continue;
+        const unearnedDays = Math.min(Math.max(periodEndDay - Math.max(cancelDay, periodStartDay), 0), periodDays);
+        refundByConcept.set(
+          detail.IdeConcept,
+          (refundByConcept.get(detail.IdeConcept) ?? 0) + (Number(detail.ConceptValue) * unearnedDays) / periodDays,
+        );
       }
 
       for (const newMovement of newMovements) {
-        const priorMovements = allMovements
-          .filter((m) => m.NumCoverageMovement < newMovement.NumCoverageMovement)
-          .sort((a, b) => b.NumCoverageMovement - a.NumCoverageMovement)
-          .map((m) => ({ movement: m, startDay: calendarDay(m.TstInitial), endDay: calendarDay(m.TstEnd) }));
-
-        // Días de calendario devengados por cada movimiento previo (el de mayor número que cubre ese día).
-        const earnedDaysByMovement = new Map<string, number>();
-        for (let day = termStartDay; day < cancelDay; day++) {
-          const covering = priorMovements.find((p) => p.startDay <= day && day < p.endDay);
-          if (!covering) continue;
-          const key = covering.movement.IdeCoverageMovement;
-          earnedDaysByMovement.set(key, (earnedDaysByMovement.get(key) ?? 0) + 1);
-        }
-        const earnedByConcept = new Map<string, number>();
-        for (const { movement } of priorMovements) {
-          const days = earnedDaysByMovement.get(movement.IdeCoverageMovement) ?? 0;
-          if (days === 0) continue;
-          for (const concept of movement.TMovementConcept) {
-            earnedByConcept.set(
-              concept.IdeConcept,
-              (earnedByConcept.get(concept.IdeConcept) ?? 0) +
-                (Number(concept.ConceptValue) * surchargeFactor * days) / termDays,
-            );
-          }
-        }
-
         const newConcepts = await tx.tMovementConcept.findMany({
           where: { IdeCoverageMovement: newMovement.IdeCoverageMovement },
           include: { SConcept: { include: { SConceptType: { select: { CodConceptType: true } } } } },
@@ -4278,11 +4234,13 @@ export class ContractsService {
             (codConceptType === 'CALCPRIMA' && refundPremium === 'SI') ||
             (codConceptType === 'CALCIMPUESTO' && refundTax === 'SI');
           if (!applies) continue;
-          const earned = earnedByConcept.get(concept.IdeConcept) ?? 0;
-          const paid = paidByConcept.get(concept.IdeConcept) ?? 0;
           await tx.tMovementConcept.update({
             where: { IdeMovementConcept: concept.IdeMovementConcept },
-            data: { ConceptNetValue: earned - paid, UsrModification: actor, TstModification: now },
+            data: {
+              ConceptNetValue: -(refundByConcept.get(concept.IdeConcept) ?? 0),
+              UsrModification: actor,
+              TstModification: now,
+            },
           });
         }
 
@@ -4337,8 +4295,8 @@ export class ContractsService {
 
   /**
    * Al anular, los recibos del ciclo vigente que NO están cobrados (cuotas emitidas y pendientes, suplementos sin
-   * cobrar) se anulan: la liquidación (`setCancelPrime`) ya compara lo devengado contra lo efectivamente cobrado, así
-   * que lo pendiente de cobro no debe seguir vivo. Se marcan con `TstCancellation`/`DesCancellation`, el mismo
+   * cobrar) se anulan: la devolución (`setCancelPrime`) solo considera cuotas efectivamente cobradas y los días
+   * consumidos de una cuota no cobrada se pierden, así que lo pendiente de cobro no debe seguir vivo. Se marcan con `TstCancellation`/`DesCancellation`, el mismo
    * criterio que usa el resto del servicio para distinguir un recibo anulado.
    */
   private async voidUnpaidReceipts(
