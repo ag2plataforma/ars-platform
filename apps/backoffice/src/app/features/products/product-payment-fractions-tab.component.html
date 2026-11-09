@@ -7,6 +7,12 @@
     <button pButton type="button" icon="pi pi-plus" [label]="'products.productPaymentFractions.newButton' | transloco" (click)="openCreate()"></button>
   </div>
 
+  @if (temporalValidity()) {
+    <p class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+      {{ 'products.productPaymentFractions.temporalHint' | transloco }}
+    </p>
+  }
+
   <p-table [value]="rows()" [loading]="loading()" dataKey="IdeProductPaymentFraction" styleClass="p-datatable-sm">
     <ng-template #header>
       <tr>

@@ -52,6 +52,8 @@ export class ProductValidityTypesService {
       );
     }
 
+    await this.assertNoMultiInstallmentFractions(product.IdeProduct, validityType, dto.codProduct);
+
     const activeStateId = await this.stateMachine.getStateByCode('ACTIVO');
     const now = new Date();
     return this.prisma.sProductValidityType.create({
@@ -83,12 +85,43 @@ export class ProductValidityTypesService {
   }
 
   async setState(id: string, codState: string, actor: string): Promise<SProductValidityType> {
-    await this.findOne(id);
+    const current = await this.findOne(id);
     const stateId = await this.stateMachine.getStateByCode(codState);
+    if (codState.toUpperCase() === 'ACTIVO') {
+      const [validityType, product] = await Promise.all([
+        this.prisma.sValidityType.findUniqueOrThrow({ where: { IdeValidityType: current.IdeValidityType } }),
+        this.prisma.sProduct.findUniqueOrThrow({ where: { IdeProduct: current.IdeProduct } }),
+      ]);
+      await this.assertNoMultiInstallmentFractions(current.IdeProduct, validityType, product.CodProduct);
+    }
     return this.prisma.sProductValidityType.update({
       where: { IdeProductValidityType: id },
       data: { IdeState: stateId, UsrModification: actor, TstModification: new Date() },
       include: INCLUDE,
     });
+  }
+
+  /**
+   * Un producto de vigencia TEMPORAL solo admite el fraccionamiento único (`NumFraction = 1`): no se puede dejar activa
+   * una vigencia temporal mientras el producto tenga fracciones de pago ACTIVAS de más de una cuota. Hay que desactivarlas
+   * antes (Productos > pestaña "Fraccionamientos").
+   */
+  private async assertNoMultiInstallmentFractions(
+    ideProduct: string,
+    validityType: { IndAnnual: boolean; DesValidityType: string },
+    codProduct: string,
+  ): Promise<void> {
+    if (validityType.IndAnnual) return;
+    const offending = await this.prisma.sProductPaymentFraction.findMany({
+      where: { IdeProduct: ideProduct, SState: { CodState: 'ACTIVO' }, SPaymentFraction: { NumFraction: { gt: 1 } } },
+      include: { SPaymentFraction: true },
+    });
+    if (offending.length > 0) {
+      throw new ConflictException(
+        `El tipo de vigencia "${validityType.DesValidityType}" es temporal y solo admite el fraccionamiento único, pero el producto "${codProduct}" tiene fracciones activas con varias cuotas (${offending
+          .map((row) => row.SPaymentFraction.DesPaymentFraction)
+          .join(', ')}) -- desactivalas antes en la pestaña "Fraccionamientos"`,
+      );
+    }
   }
 }

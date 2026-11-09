@@ -58,6 +58,8 @@ export class ProductPaymentFractionsTabComponent implements OnInit {
   readonly rows = signal<CatalogRow[]>([]);
   readonly loading = signal(false);
   readonly fractions = signal<CatalogRow[]>([]);
+  /** El producto tiene vigencia TEMPORAL (`IndAnnual = false`): solo admite el fraccionamiento único. */
+  readonly temporalValidity = signal(false);
   readonly dialogVisible = signal(false);
   readonly dialogMode = signal<'create' | 'edit'>('create');
   private editingRow: CatalogRow | null = null;
@@ -66,6 +68,19 @@ export class ProductPaymentFractionsTabComponent implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    this.loadValidity();
+  }
+
+  private loadValidity(): void {
+    this.catalogService
+      .list('/product-rating/product-validity-types', { codProduct: String(this.product()['CodProduct']) })
+      .subscribe({
+        next: (rows) => {
+          const active = rows.find((r) => r.SState?.CodState === 'ACTIVO');
+          const validityType = active?.['SValidityType'] as { IndAnnual?: boolean } | undefined;
+          this.temporalValidity.set(validityType?.IndAnnual === false);
+        },
+      });
   }
 
   private buildForm(row?: CatalogRow) {
@@ -131,7 +146,10 @@ export class ProductPaymentFractionsTabComponent implements OnInit {
   /** Fracciones del catálogo que este producto todavía no tiene (al crear). */
   availableFractions(): CatalogRow[] {
     const used = new Set(this.rows().map((r) => this.fractionCode(r)));
-    return this.fractions().filter((f) => !used.has(String(f['CodPaymentFraction'])));
+    return this.fractions().filter(
+      (f) =>
+        !used.has(String(f['CodPaymentFraction'])) && (!this.temporalValidity() || Number(f['NumFraction']) <= 1),
+    );
   }
 
   openCreate(): void {

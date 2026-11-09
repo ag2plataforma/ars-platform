@@ -585,6 +585,7 @@
     "productPaymentFractions": {
       "subtitle": "Formas de pago que se ofrecen al contratar este producto. En la cotización solo aparecen las activas y vigentes hoy; la de menor orden queda elegida por defecto.",
       "newButton": "Agregar fracción",
+      "temporalHint": "Este producto tiene vigencia temporal: solo admite el fraccionamiento único (1 cuota). Las vigencias anuales admiten anual, semestral, trimestral, etc.",
       "loadErrorDetail": "No se pudieron cargar las fracciones de pago del producto.",
       "fractionColumn": "Fracción",
       "installmentsColumn": "Cuotas",
@@ -912,7 +913,18 @@
     "insuredFoundSummary": "Persona encontrada",
     "insuredFoundDetail": "Ya existe una persona con ese documento; se reutilizará al contratar.",
     "insuredNotFoundSummary": "Persona nueva",
-    "insuredNotFoundDetail": "No hay ninguna persona con ese documento; se creará al contratar."
+    "insuredNotFoundDetail": "No hay ninguna persona con ese documento; se creará al contratar.",
+    "validityLabel": "Vigencia",
+    "validityHintAnnual": "Podés elegir la fecha de inicio; si la dejás vacía empieza al contratar. La vigencia anual dura un año.",
+    "validityHintTemporal": "Podés elegir la fecha de inicio (si la dejás vacía empieza al contratar) y el fin, ya sea con una fecha o con los días de vigencia.",
+    "startDateLabel": "Fecha de inicio",
+    "endDateLabel": "Fecha de fin",
+    "validityDaysLabel": "Días de vigencia",
+    "computedEndHint": "Termina el {{date}}",
+    "validitySummary": "Vigencia: desde {{start}} hasta {{end}}",
+    "atContracting": "la contratación",
+    "byProduct": "la que defina el producto",
+    "validityDaysCount": "{{days}} días"
   },
   "quotesList": {
     "title": "Cotizaciones",

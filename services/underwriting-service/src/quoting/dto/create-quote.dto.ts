@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsInt, IsObject, IsOptional, IsString, Matches, Max, Min, ValidateNested } from 'class-validator';
 import { CreateQuoteRiskDto } from './create-quote-risk.dto';
 
 export class CreateQuoteDto {
@@ -26,6 +26,32 @@ export class CreateQuoteDto {
   @IsOptional()
   @IsObject()
   genericAttributeValue?: Record<string, string>;
+
+  /**
+   * Fecha de inicio de la vigencia (`YYYY-MM-DD`). Opcional: sin ella la póliza empieza al contratarse. No puede ser
+   * anterior a hoy.
+   */
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'tstInitial debe tener formato YYYY-MM-DD' })
+  tstInitial?: string;
+
+  /**
+   * Fecha de fin de la vigencia (`YYYY-MM-DD`). SOLO productos de vigencia temporal; excluyente con `validityDays`.
+   * Debe ser posterior al inicio.
+   */
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'tstEnd debe tener formato YYYY-MM-DD' })
+  tstEnd?: string;
+
+  /**
+   * Cantidad de días de vigencia, contados desde el inicio (fin = inicio + días). SOLO productos de vigencia
+   * temporal; excluyente con `tstEnd`.
+   */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(3660)
+  validityDays?: number;
 
   /** Al menos un riesgo a cotizar (ej. una mascota, un smartphone). */
   @IsArray()

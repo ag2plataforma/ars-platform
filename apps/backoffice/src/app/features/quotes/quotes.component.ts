@@ -347,7 +347,21 @@ export class QuotesComponent {
     codProduct: ['', Validators.required],
     codDistributionChannel: ['', Validators.required],
     codDistributionWay: [DISTRIBUTION_WAY_BACKOFFICE, Validators.required],
+    /** Vigencia (opcional): inicio para cualquier producto; fin o días solo si la vigencia del producto es temporal. */
+    tstInitial: [''],
+    tstEnd: [''],
+    validityDays: [null as number | null, [Validators.min(1), Validators.max(3660)]],
   });
+
+  /** `SValidityType.IndAnnual` del producto elegido (null = sin producto o sin tipo de vigencia activo). */
+  readonly productIndAnnual = signal<boolean | null>(null);
+  /** Solo los productos de vigencia temporal permiten definir fecha de fin o días de vigencia. */
+  readonly isTemporalProduct = computed(() => this.productIndAnnual() === false);
+  /** Hoy (`YYYY-MM-DD`, hora local) -- mínimo de los selectores de fecha. */
+  readonly todayIso = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
 
   /** Nodo comercial fijo del usuario (de su `UserData`); si es null, el canal se elige en el desplegable. */
   readonly fixedChannel = signal<CatalogRow | null>(null);
@@ -400,6 +414,42 @@ export class QuotesComponent {
     this.selectedProductCode.set(this.form.controls.codProduct.value);
     this.refreshRiskProductOptions();
     this.loadProductFields();
+    this.loadProductValidity();
+  }
+
+  /** Lee el tipo de vigencia activo del producto para saber si admite fecha de fin / días. */
+  private loadProductValidity(): void {
+    this.form.patchValue({ tstEnd: '', validityDays: null });
+    this.productIndAnnual.set(null);
+    const codProduct = this.form.controls.codProduct.value;
+    if (!codProduct) return;
+    this.catalogService.list('/product-rating/product-validity-types', { codProduct }).subscribe({
+      next: (rows) => {
+        if (this.form.controls.codProduct.value !== codProduct) return;
+        const active = rows.find((row) => row.SState?.CodState === 'ACTIVO');
+        const validityType = active?.['SValidityType'] as { IndAnnual?: boolean } | undefined;
+        this.productIndAnnual.set(validityType?.IndAnnual === undefined ? null : validityType.IndAnnual);
+      },
+      error: () => this.productIndAnnual.set(null),
+    });
+  }
+
+  /** Fecha de fin y días de vigencia son excluyentes: al completar uno se vacía el otro. */
+  onTstEndInput(): void {
+    if (this.form.controls.tstEnd.value) this.form.controls.validityDays.setValue(null);
+  }
+
+  onValidityDaysInput(): void {
+    if (this.form.controls.validityDays.value) this.form.controls.tstEnd.setValue('');
+  }
+
+  /** Fin calculado cuando se piden días de vigencia (inicio elegido, o hoy si no hay). */
+  computedEndDate(): string | null {
+    const days = this.form.controls.validityDays.value;
+    if (!days || days < 1) return null;
+    const end = new Date(`${this.form.controls.tstInitial.value || this.todayIso}T00:00:00.000Z`);
+    end.setUTCDate(end.getUTCDate() + Math.floor(days));
+    return end.toISOString().slice(0, 10);
   }
 
   private clearRisks(): void {
@@ -635,6 +685,10 @@ export class QuotesComponent {
         codProduct: raw.codProduct,
         codDistributionChannel: raw.codDistributionChannel,
         codDistributionWay: raw.codDistributionWay,
+        tstInitial: raw.tstInitial || undefined,
+        ...(this.isTemporalProduct()
+          ? { tstEnd: raw.tstEnd || undefined, validityDays: raw.validityDays || undefined }
+          : {}),
         genericAttributeValue:
           this.productFields.fields().length > 0 ? this.productFields.form.getRawValue() : undefined,
         risks: this.selectedRisks().map((entry) => {
@@ -1767,6 +1821,7 @@ export class QuotesComponent {
     this.riskToAddControl.setValue(null);
     this.riskQuantityControl.setValue(1);
     this.form.reset();
+    this.productIndAnnual.set(null);
     this.form.controls.codDistributionWay.setValue(DISTRIBUTION_WAY_BACKOFFICE);
     this.applyUserChannel(this.distributionChannels());
     this.step.set('form');

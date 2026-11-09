@@ -3026,6 +3026,8 @@ model TQuote {
   IdeDistributionWay       String                    @db.Uuid
   TstQuote                 DateTime                  @db.Timestamp(6)
   GenericAttributeValue    Json?                     @db.Json
+  TstInitial               DateTime?                 @db.Date
+  TstEnd                   DateTime?                 @db.Date
   IdeState                 String                    @db.Uuid
   UsrCreation              String                    @db.VarChar(60)
   TstCreation              DateTime                  @db.Timestamp(6)

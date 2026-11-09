@@ -109,6 +109,8 @@ export interface QuotePricingResult {
   contract: QuoteContractRef | null;
   socialImpact: SocialImpactInfo;
   genericAdjustments: GenericAdjustmentOption[];
+  /** Vigencia elegida al cotizar (fechas `YYYY-MM-DD`); `tstInitial`/`tstEnd` null = la define la contratación. */
+  validity?: { indAnnual: boolean; tstInitial: string | null; tstEnd: string | null; days: number | null };
   risks: QuoteRisk[];
 }
 
@@ -160,6 +162,12 @@ export interface CreateQuotePayload {
   codDistributionWay: string;
   /** Valores de los campos de nivel producto (comunes a todos los riesgos). */
   genericAttributeValue?: Record<string, unknown>;
+  /** Fecha de inicio `YYYY-MM-DD` (opcional; por defecto, la de contratación). */
+  tstInitial?: string;
+  /** Fecha de fin `YYYY-MM-DD` -- solo productos de vigencia temporal; excluyente con `validityDays`. */
+  tstEnd?: string;
+  /** Días de vigencia -- solo productos de vigencia temporal; excluyente con `tstEnd`. */
+  validityDays?: number;
   risks: CreateQuoteRiskPayload[];
 }
 

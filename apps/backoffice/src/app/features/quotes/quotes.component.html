@@ -48,6 +48,49 @@
           }
         </div>
 
+        @if (form.controls.codProduct.value) {
+          <div class="flex flex-col gap-2 border-t border-slate-100 pt-4">
+            <label class="text-sm font-medium text-slate-700">{{ 'quotes.validityLabel' | transloco }}</label>
+            <p class="text-xs text-slate-500">
+              {{ (isTemporalProduct() ? 'quotes.validityHintTemporal' : 'quotes.validityHintAnnual') | transloco }}
+            </p>
+            <div class="grid grid-cols-1 gap-3 pt-1 sm:grid-cols-3">
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-slate-600" for="q-tst-initial">{{ 'quotes.startDateLabel' | transloco }}</label>
+                <input pInputText id="q-tst-initial" type="date" formControlName="tstInitial" [min]="todayIso" />
+              </div>
+              @if (isTemporalProduct()) {
+                <div class="flex flex-col gap-1">
+                  <label class="text-xs font-medium text-slate-600" for="q-tst-end">{{ 'quotes.endDateLabel' | transloco }}</label>
+                  <input
+                    pInputText
+                    id="q-tst-end"
+                    type="date"
+                    formControlName="tstEnd"
+                    [min]="form.controls.tstInitial.value || todayIso"
+                    (input)="onTstEndInput()"
+                  />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="text-xs font-medium text-slate-600" for="q-validity-days">{{ 'quotes.validityDaysLabel' | transloco }}</label>
+                  <input
+                    pInputText
+                    id="q-validity-days"
+                    type="number"
+                    min="1"
+                    max="3660"
+                    formControlName="validityDays"
+                    (input)="onValidityDaysInput()"
+                  />
+                  @if (computedEndDate(); as end) {
+                    <span class="text-xs text-slate-500">{{ 'quotes.computedEndHint' | transloco: { date: end } }}</span>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        }
+
         @if (productFields.loading() || productFields.fields().length > 0) {
           <div class="flex flex-col gap-2 border-t border-slate-100 pt-4">
             <label class="text-sm font-medium text-slate-700">{{ 'quotes.productDataLabel' | transloco }}</label>
@@ -241,6 +284,14 @@
         <div>
           <h1 class="text-lg font-semibold text-slate-900">{{ 'quotes.plansTitle' | transloco: { num: pricing()!.numQuote } }}</h1>
           <p class="text-sm text-slate-500">{{ 'quotes.plansSubtitle' | transloco }}</p>
+          @if (pricing()!.validity; as v) {
+            @if (v.tstInitial || v.tstEnd) {
+              <p class="text-xs text-slate-500">
+                {{ 'quotes.validitySummary' | transloco: { start: v.tstInitial ?? ('quotes.atContracting' | transloco), end: v.tstEnd ?? ('quotes.byProduct' | transloco) } }}
+                @if (v.days) { ({{ 'quotes.validityDaysCount' | transloco: { days: v.days } }}) }
+              </p>
+            }
+          }
         </div>
         <button pButton type="button" [label]="'quotes.newQuoteButton' | transloco" severity="secondary" [text]="true" (click)="nuevaCotizacion()"></button>
       </div>

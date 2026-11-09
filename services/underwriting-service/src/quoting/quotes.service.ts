@@ -102,6 +102,8 @@ export class QuotesService {
       })),
     );
 
+    const validity = await this.resolveQuoteValidity(ideProduct, dto);
+
     const [numQuote, ideQuoteInitial, ideQuoteRiskInitial] = await Promise.all([
       this.generateNumQuote(dto.codProduct),
       this.stateMachine.getInitialState('TQuote'),
@@ -119,6 +121,8 @@ export class QuotesService {
         IdeDistributionWay: ideDistributionWay,
         TstQuote: now,
         GenericAttributeValue: dto.genericAttributeValue ?? {},
+        TstInitial: validity.tstInitial,
+        TstEnd: validity.tstEnd,
         IdeState: ideQuoteInitial,
         UsrCreation: actor,
         TstCreation: now,
@@ -143,6 +147,64 @@ export class QuotesService {
       },
       include: { TQuoteRisk: true },
     });
+  }
+
+  /**
+   * Vigencia pedida al cotizar. `tstInitial` (fecha, sin hora) es opcional: sin ella la póliza empieza al contratarse y no
+   * puede ser anterior a hoy (fecha de Madrid). El fin solo se admite en productos de vigencia TEMPORAL
+   * (`SValidityType.IndAnnual = false`), como fecha (`tstEnd`) o como cantidad de días (`validityDays`, fin = inicio + días;
+   * sin inicio explícito el inicio pasa a ser hoy para que el fin no cambie si se contrata más tarde). En vigencia ANUAL el
+   * fin es siempre inicio + 1 año y pedir fecha fin o días es un error.
+   */
+  private async resolveQuoteValidity(
+    ideProduct: string,
+    dto: Pick<CreateQuoteDto, 'tstInitial' | 'tstEnd' | 'validityDays'>,
+  ): Promise<{ tstInitial: Date | null; tstEnd: Date | null }> {
+    if (!dto.tstInitial && !dto.tstEnd && !dto.validityDays) return { tstInitial: null, tstEnd: null };
+
+    const parse = (value: string, label: string): Date => {
+      const date = new Date(`${value}T00:00:00.000Z`);
+      if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+        throw new BadRequestException(`${label} no es una fecha válida: "${value}"`);
+      }
+      return date;
+    };
+    const todayMadrid = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid' }).format(new Date());
+    const today = parse(todayMadrid, 'Hoy');
+
+    let tstInitial = dto.tstInitial ? parse(dto.tstInitial, 'La fecha de inicio') : null;
+    if (tstInitial && tstInitial.getTime() < today.getTime()) {
+      throw new BadRequestException('La fecha de inicio no puede ser anterior a hoy');
+    }
+
+    let tstEnd: Date | null = null;
+    if (dto.tstEnd || dto.validityDays) {
+      const validityType = await this.prisma.sProductValidityType.findFirst({
+        where: { IdeProduct: ideProduct, SState: { CodState: 'ACTIVO' } },
+        include: { SValidityType: true },
+      });
+      if (!validityType) {
+        throw new ConflictException('El producto no tiene un tipo de vigencia activo configurado');
+      }
+      if (validityType.SValidityType.IndAnnual) {
+        throw new BadRequestException(
+          'La fecha de fin y los días de vigencia solo se pueden definir en productos de vigencia temporal: la vigencia anual dura un año desde el inicio',
+        );
+      }
+      if (dto.tstEnd && dto.validityDays) {
+        throw new BadRequestException('Indicá la fecha de fin o los días de vigencia, no ambos');
+      }
+      if (!tstInitial) tstInitial = today;
+      if (dto.tstEnd) {
+        tstEnd = parse(dto.tstEnd, 'La fecha de fin');
+        if (tstEnd.getTime() <= tstInitial.getTime()) {
+          throw new BadRequestException('La fecha de fin debe ser posterior a la fecha de inicio');
+        }
+      } else {
+        tstEnd = new Date(tstInitial.getTime() + (dto.validityDays as number) * 86_400_000);
+      }
+    }
+    return { tstInitial, tstEnd };
   }
 
   /**
@@ -1064,6 +1126,15 @@ export class QuotesService {
         : null,
       socialImpact,
       genericAdjustments,
+      validity: {
+        indAnnual,
+        tstInitial: quote.TstInitial ? quote.TstInitial.toISOString().slice(0, 10) : null,
+        tstEnd: quote.TstEnd ? quote.TstEnd.toISOString().slice(0, 10) : null,
+        days:
+          quote.TstInitial && quote.TstEnd
+            ? Math.round((quote.TstEnd.getTime() - quote.TstInitial.getTime()) / 86_400_000)
+            : null,
+      },
       risks: quote.TQuoteRisk.map((risk) => ({
         ideQuoteRisk: risk.IdeQuoteRisk,
         ideRiskProduct: risk.IdeRiskProduct,

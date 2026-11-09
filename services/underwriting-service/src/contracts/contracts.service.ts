@@ -2479,7 +2479,13 @@ export class ContractsService {
    * cual, no es un defecto de esta implementación.
    */
   private async buildContract(
-    quote: { IdeQuote: string; IdeProduct: string; IdeDistributionChannel: string },
+    quote: {
+      IdeQuote: string;
+      IdeProduct: string;
+      IdeDistributionChannel: string;
+      TstInitial?: Date | null;
+      TstEnd?: Date | null;
+    },
     dto: CreateContractDto,
     actor: string,
     tx: Prisma.TransactionClient = this.prisma,
@@ -2504,16 +2510,31 @@ export class ContractsService {
     ]);
 
     const now = new Date();
-    const tstInitial = dto.initialDate ? new Date(dto.initialDate) : now;
+    // Inicio: el del contrato (`initialDate`) si se pide, si no el elegido al cotizar (fecha sin hora, medianoche UTC),
+    // si no ahora. Una fecha de la cotización que ya pasó al contratar no se acepta: se vuelve a cotizar.
+    if (!dto.initialDate && quote.TstInitial) {
+      const todayMadrid = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid' }).format(now);
+      if (quote.TstInitial.toISOString().slice(0, 10) < todayMadrid) {
+        throw new ConflictException(
+          `La fecha de inicio de la cotización (${quote.TstInitial.toISOString().slice(0, 10)}) ya pasó: creá una nueva cotización con una fecha de inicio vigente`,
+        );
+      }
+    }
+    const tstInitial = dto.initialDate ? new Date(dto.initialDate) : (quote.TstInitial ?? now);
     const tstEnd = new Date(tstInitial);
     tstEnd.setFullYear(tstEnd.getFullYear() + 1); // ver comentario de cabecera: placeholder confirmado igual al original para tipos de vigencia no anuales.
     if (!productValidityType.SValidityType.IndAnnual) {
-      // Vigencia temporal (ej. viajes): termina tantos dias despues del inicio como indique el campo de
-      // duracion del producto (campo marcado como "duracion en dias"). Sin ese campo queda el placeholder.
-      const durationDays = await this.resolveDurationDays(quote.IdeProduct, quote.IdeQuote, genericValues, tx);
-      if (durationDays) {
-        tstEnd.setTime(tstInitial.getTime());
-        tstEnd.setDate(tstEnd.getDate() + durationDays);
+      if (quote.TstEnd && quote.TstEnd.getTime() > tstInitial.getTime()) {
+        // Fin elegido al cotizar (fecha o días de vigencia).
+        tstEnd.setTime(quote.TstEnd.getTime());
+      } else {
+        // Vigencia temporal (ej. viajes): termina tantos dias despues del inicio como indique el campo de
+        // duracion del producto (campo marcado como "duracion en dias"). Sin ese campo queda el placeholder.
+        const durationDays = await this.resolveDurationDays(quote.IdeProduct, quote.IdeQuote, genericValues, tx);
+        if (durationDays) {
+          tstEnd.setTime(tstInitial.getTime());
+          tstEnd.setDate(tstEnd.getDate() + durationDays);
+        }
       }
     }
 
@@ -2675,13 +2696,20 @@ export class ContractsService {
   private async findAvailablePaymentFractions(ideProduct: string, tx: Prisma.TransactionClient = this.prisma) {
     const ideActivo = await this.stateMachine.getStateByCode('Activo');
     const now = new Date();
+    // Vigencia TEMPORAL (`IndAnnual = false`): solo se ofrece el pago único (`NumFraction = 1`); la vigencia anual
+    // admite todas las fracciones configuradas.
+    const validityType = await tx.sProductValidityType.findFirst({
+      where: { IdeProduct: ideProduct, SState: { CodState: 'ACTIVO' } },
+      select: { SValidityType: { select: { IndAnnual: true } } },
+    });
+    const onlySingle = validityType ? !validityType.SValidityType.IndAnnual : false;
     const rows = await tx.sProductPaymentFraction.findMany({
       where: {
         IdeProduct: ideProduct,
         IdeState: ideActivo,
         TstInitial: { lte: now },
         TstEnd: { gte: now },
-        SPaymentFraction: { IdeState: ideActivo },
+        SPaymentFraction: { IdeState: ideActivo, ...(onlySingle ? { NumFraction: { lte: 1 } } : {}) },
       },
       include: { SPaymentFraction: true },
     });

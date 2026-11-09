@@ -50,6 +50,8 @@ export class ProductPaymentFractionsService {
     if (!product) throw new NotFoundException(`No existe producto con código "${dto.codProduct}"`);
     if (!fraction) throw new NotFoundException(`No existe fracción de pago con código "${dto.codPaymentFraction}"`);
 
+    await this.assertFractionAllowedByValidity(product.IdeProduct, fraction, dto.codProduct);
+
     const existing = await this.prisma.sProductPaymentFraction.findFirst({
       where: { IdeProduct: product.IdeProduct, IdePaymentFraction: fraction.IdePaymentFraction },
     });
@@ -97,13 +99,40 @@ export class ProductPaymentFractionsService {
   }
 
   async setState(id: string, codState: string, actor: string): Promise<SProductPaymentFraction> {
-    await this.findOne(id);
+    const current = await this.findOne(id);
     const stateId = await this.stateMachine.getStateByCode(codState);
+    if (codState.toUpperCase() === 'ACTIVO') {
+      const [fraction, product] = await Promise.all([
+        this.prisma.sPaymentFraction.findUniqueOrThrow({ where: { IdePaymentFraction: current.IdePaymentFraction } }),
+        this.prisma.sProduct.findUniqueOrThrow({ where: { IdeProduct: current.IdeProduct } }),
+      ]);
+      await this.assertFractionAllowedByValidity(current.IdeProduct, fraction, product.CodProduct);
+    }
     return this.prisma.sProductPaymentFraction.update({
       where: { IdeProductPaymentFraction: id },
       data: { IdeState: stateId, UsrModification: actor, TstModification: new Date() },
       include: INCLUDE,
     });
+  }
+
+  /**
+   * Un producto de vigencia TEMPORAL (`SValidityType.IndAnnual = false`) solo admite el fraccionamiento único
+   * (`NumFraction = 1`); el de vigencia ANUAL admite cualquiera (anual, semestral, trimestral...).
+   */
+  private async assertFractionAllowedByValidity(
+    ideProduct: string,
+    fraction: { NumFraction: number; DesPaymentFraction: string },
+    codProduct: string,
+  ): Promise<void> {
+    const validityType = await this.prisma.sProductValidityType.findFirst({
+      where: { IdeProduct: ideProduct, SState: { CodState: 'ACTIVO' } },
+      include: { SValidityType: true },
+    });
+    if (validityType && !validityType.SValidityType.IndAnnual && fraction.NumFraction > 1) {
+      throw new BadRequestException(
+        `El producto "${codProduct}" tiene vigencia temporal ("${validityType.SValidityType.DesValidityType}"): solo admite el fraccionamiento único, no "${fraction.DesPaymentFraction}"`,
+      );
+    }
   }
 
   private parseDate(value: string): Date {
