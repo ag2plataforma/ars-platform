@@ -34,6 +34,8 @@ import { EndorsementReasonsController } from './endorsement-reasons.controller';
 import { EndorsementReasonsService } from './endorsement-reasons.service';
 import { OperationsController } from './operations.controller';
 import { OperationsService } from './operations.service';
+import { ProcessesController } from './processes.controller';
+import { ProcessesService } from './processes.service';
 
 /**
  * Catálogos comunes que menciona el alcance original del README de este
@@ -74,6 +76,7 @@ import { OperationsService } from './operations.service';
     EndorsementsController,
     EndorsementReasonsController,
     OperationsController,
+    ProcessesController,
   ],
   providers: [
     LanguagesService,
@@ -93,6 +96,7 @@ import { OperationsService } from './operations.service';
     EndorsementsService,
     EndorsementReasonsService,
     OperationsService,
+    ProcessesService,
   ],
 })
 export class CommonCatalogsModule {}

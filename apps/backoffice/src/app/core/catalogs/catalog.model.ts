@@ -467,6 +467,17 @@ export const PRODUCT_CATALOG_REGISTRY: CatalogConfig[] = [
     idField: 'IdeOperation',
   },
   {
+    // Agregado 2026-11-09: `SProcess` (procesos operativos usados por comisiones, requisitos y operaciones por
+    // producto) no tenía pantalla de mantenimiento, solo un GET de lectura.
+    key: 'processes',
+    label: 'catalogsRegistry.processes.label',
+    singular: 'catalogsRegistry.processes.singular',
+    path: '/reference-data/processes',
+    codField: 'CodProcess',
+    desField: 'DesProcess',
+    idField: 'IdeProcess',
+  },
+  {
     key: 'endorsements',
     label: 'catalogsRegistry.endorsements.label',
     singular: 'catalogsRegistry.endorsements.singular',

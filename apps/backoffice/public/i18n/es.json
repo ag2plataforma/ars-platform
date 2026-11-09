@@ -217,6 +217,10 @@
       "label": "Operaciones",
       "singular": "operación"
     },
+    "processes": {
+      "label": "Procesos",
+      "singular": "proceso"
+    },
     "endorsements": {
       "label": "Tipos de endoso",
       "singular": "tipo de endoso"
