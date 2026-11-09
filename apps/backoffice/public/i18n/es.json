@@ -1018,7 +1018,13 @@
       "collectionColumn": "Cobro",
       "paid": "Cobrado",
       "unpaid": "Sin cobrar",
-      "empty": "Este contrato no tiene cuotas generadas."
+      "empty": "Este contrato no tiene cuotas generadas.",
+      "collectButton": "Cobrar",
+      "collectDialogTitle": "Cobrar cuota",
+      "collectDialogText": "Se marcará como cobrada la cuota {{period}} (recibo {{receipt}}). Las cuotas se cobran en orden.",
+      "collectReasonRequired": "Escribe el motivo del cobro (mínimo 3 caracteres).",
+      "collectConfirm": "Confirmar cobro",
+      "collectedDetail": "Recibo {{receipt}} cobrado."
     },
     "activateDialog": {
       "title": "Activar contrato",

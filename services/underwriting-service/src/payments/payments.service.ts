@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService, Prisma } from '@ars-platform/database';
 import { StateMachineService } from '@ars-platform/shared-common';
 
@@ -94,11 +94,87 @@ export class PaymentsService {
     tx: Prisma.TransactionClient = this.prisma,
   ): Promise<Array<{ ideReceipt: string; numReceipt: string; amount: number }>> {
     const { receipts: first, codCurrency } = await this.findFirstReceiptGroup(ideContract, tx);
+    return this.collectReceipts(ideContract, first, codCurrency, input, tx);
+  }
+
+  /**
+   * Cobra un recibo puntual de un contrato (y los demás de su misma operación: un recibo por archivo de póliza) --
+   * cuotas 2..N, o un suplemento. Reglas:
+   * - el recibo no puede estar anulado ni cobrado, y su importe debe ser positivo (un recibo de devolución no se cobra);
+   * - las cuotas (recibos NEW/REN) se cobran EN ORDEN: no se puede cobrar la cuota N si hay una anterior sin cobrar.
+   */
+  async registerReceiptPayment(
+    ideContract: string,
+    ideReceipt: string,
+    input: RegisterPaymentInput,
+    tx: Prisma.TransactionClient = this.prisma,
+  ): Promise<Array<{ ideReceipt: string; numReceipt: string; amount: number }>> {
+    const receipt = await tx.tReceipt.findFirst({
+      where: { IdeReceipt: ideReceipt, IdeContract: ideContract },
+      include: { SReceiptType: { select: { CodReceiptType: true } } },
+    });
+    if (!receipt) {
+      throw new NotFoundException(`El contrato no tiene un recibo con id "${ideReceipt}"`);
+    }
+    const ideCobrado = await this.stateMachine.getStateByCode('COBRADO');
+    if (receipt.TstCancellation) {
+      throw new ConflictException(`El recibo "${receipt.NumReceipt}" está anulado: no se puede cobrar`);
+    }
+    if (receipt.IdeState === ideCobrado) {
+      throw new ConflictException(`El recibo "${receipt.NumReceipt}" ya está cobrado`);
+    }
+    if (Number(receipt.Prime) <= 0) {
+      throw new ConflictException(`El recibo "${receipt.NumReceipt}" no tiene un importe a cobrar (es una devolución o está en cero)`);
+    }
+
+    if (['NEW', 'REN'].includes(receipt.SReceiptType.CodReceiptType)) {
+      const earlierUnpaid = await tx.tReceipt.findFirst({
+        where: {
+          IdeContract: ideContract,
+          TstCancellation: null,
+          IdeState: { not: ideCobrado },
+          IdeContractOperation: { not: receipt.IdeContractOperation },
+          SReceiptType: { CodReceiptType: { in: ['NEW', 'REN'] } },
+          TstInitial: { lt: receipt.TstInitial },
+        },
+        orderBy: { TstInitial: 'asc' },
+      });
+      if (earlierUnpaid) {
+        throw new ConflictException(
+          `Primero hay que cobrar la cuota anterior (recibo "${earlierUnpaid.NumReceipt}"): las cuotas se cobran en orden`,
+        );
+      }
+    }
+
+    const group = await tx.tReceipt.findMany({
+      where: {
+        IdeContract: ideContract,
+        IdeContractOperation: receipt.IdeContractOperation,
+        TstCancellation: null,
+        IdeState: { not: ideCobrado },
+      },
+      orderBy: { NumReceipt: 'asc' },
+    });
+    const contract = await tx.tContract.findUniqueOrThrow({
+      where: { IdeContract: ideContract },
+      select: { SProduct: { select: { SCurrency: { select: { CodCurrency: true } } } } },
+    });
+    return this.collectReceipts(ideContract, group, contract.SProduct.SCurrency.CodCurrency, input, tx);
+  }
+
+  /** Marca los recibos como COBRADO (transición `'Cobrar'`) y deja el registro en `TPayment`. */
+  private async collectReceipts(
+    ideContract: string,
+    receipts: Array<{ IdeReceipt: string; NumReceipt: string; IdeState: string; Prime: Prisma.Decimal }>,
+    codCurrency: string,
+    input: RegisterPaymentInput,
+    tx: Prisma.TransactionClient,
+  ): Promise<Array<{ ideReceipt: string; numReceipt: string; amount: number }>> {
     const ideCobrado = await this.stateMachine.getStateByCode('COBRADO');
     const now = new Date();
 
     const paid: Array<{ ideReceipt: string; numReceipt: string; amount: number }> = [];
-    for (const receipt of first) {
+    for (const receipt of receipts) {
       if (receipt.IdeState === ideCobrado) {
         throw new ConflictException(`El recibo "${receipt.NumReceipt}" ya está cobrado`);
       }

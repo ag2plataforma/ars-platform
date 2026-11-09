@@ -440,6 +440,7 @@
                 <th class="text-right">{{ 'contractDetail.installments.amountColumn' | transloco }}</th>
                 <th>{{ 'contractDetail.installments.receiptStatusColumn' | transloco }}</th>
                 <th>{{ 'contractDetail.installments.collectionColumn' | transloco }}</th>
+                <th class="w-28"></th>
               </tr>
             </ng-template>
             <ng-template pTemplate="body" let-row>
@@ -473,11 +474,24 @@
                     {{ 'common.dash' | transloco }}
                   }
                 </td>
+                <td>
+                  @if (row.issued && !row.paid && row.ideReceipt && row.ideReceipt === nextCollectableReceipt()) {
+                    <button
+                      pButton
+                      type="button"
+                      size="small"
+                      icon="pi pi-wallet"
+                      severity="success"
+                      [label]="'contractDetail.installments.collectButton' | transloco"
+                      (click)="openCollectDialog(row)"
+                    ></button>
+                  }
+                </td>
               </tr>
             </ng-template>
             <ng-template pTemplate="emptymessage">
               <tr>
-                <td colspan="7" class="py-6 text-center text-sm text-slate-500">{{ 'contractDetail.installments.empty' | transloco }}</td>
+                <td colspan="8" class="py-6 text-center text-sm text-slate-500">{{ 'contractDetail.installments.empty' | transloco }}</td>
               </tr>
             </ng-template>
           </p-table>
@@ -860,6 +874,33 @@
 />
 
 <!-- ============================== Popup: Desglose del recibo por certificado ============================== -->
+<p-dialog
+  [header]="'contractDetail.installments.collectDialogTitle' | transloco"
+  [visible]="collectDialogVisible()"
+  (visibleChange)="!$event && closeCollectDialog()"
+  [modal]="true"
+  [style]="{ width: '30rem' }"
+>
+  <form class="flex flex-col gap-4" (submit)="$event.preventDefault(); collectInstallment()">
+    @if (collectTarget(); as target) {
+      <p class="text-sm text-slate-600">
+        {{ 'contractDetail.installments.collectDialogText' | transloco: { period: target.period, receipt: target.numReceipt } }}
+      </p>
+    }
+    <div class="flex flex-col gap-1">
+      <label class="text-sm font-medium text-slate-700">{{ 'contractDetail.activateDialog.reasonLabel' | transloco }}</label>
+      <textarea pTextarea rows="3" [formControl]="collectReason" class="w-full"></textarea>
+      @if (collectReason.touched && collectReason.invalid) {
+        <small class="text-red-600">{{ 'contractDetail.installments.collectReasonRequired' | transloco }}</small>
+      }
+    </div>
+    <div class="flex justify-end gap-2">
+      <button pButton type="button" severity="secondary" [text]="true" [label]="'common.cancel' | transloco" (click)="closeCollectDialog()"></button>
+      <button pButton type="submit" severity="success" [label]="'contractDetail.installments.collectConfirm' | transloco" [loading]="collectSubmitting()"></button>
+    </div>
+  </form>
+</p-dialog>
+
 <p-dialog
   [header]="'contractDetail.breakdownTitle' | transloco: { num: breakdown()?.numReceipt ?? '' }"
   [visible]="breakdownVisible()"

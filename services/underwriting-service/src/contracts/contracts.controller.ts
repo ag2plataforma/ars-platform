@@ -3,6 +3,7 @@ import { CurrentUser, JwtPayload } from '@ars-platform/shared-common';
 import { ContractsService } from './contracts.service';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { ActivateContractDto } from './dto/activate-contract.dto';
+import { CollectReceiptDto } from './dto/collect-receipt.dto';
 import { TransitionContractStateDto } from './dto/transition-contract-state.dto';
 import { CancelContractDto } from './dto/cancel-contract.dto';
 import { ChangeInsuredAmountDto } from './dto/change-insured-amount.dto';
@@ -137,6 +138,20 @@ export class ContractsController {
   @Post('contracts/:id/issue-next-installment')
   issueNextInstallment(@Param('id') id: string, @CurrentUser() actor: JwtPayload) {
     return this.service.issueNextInstallment(id, actor.code);
+  }
+
+  /**
+   * Botón "Cobrar" de una cuota (o suplemento) del detalle del contrato: marca como cobrado el recibo indicado (y los
+   * de su misma operación). Ver `ContractsService.collectReceipt`.
+   */
+  @Post('contracts/:id/receipts/:ideReceipt/collect')
+  collectReceipt(
+    @Param('id') id: string,
+    @Param('ideReceipt') ideReceipt: string,
+    @Body() dto: CollectReceiptDto,
+    @CurrentUser() actor: JwtPayload,
+  ) {
+    return this.service.collectReceipt(id, ideReceipt, dto, actor.code);
   }
 
   /** Etapa 2 de "Gestión de renovaciones" -- marcar/desmarcar "No

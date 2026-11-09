@@ -639,6 +639,11 @@ export class ContractsService {
     return this.http.post<ContractDetail>(`${this.base}/${ideContract}/issue-next-installment`, {});
   }
 
+  /** `POST /contracts/:id/receipts/:ideReceipt/collect` -- cobra a mano un recibo (cuota 2..N o suplemento). */
+  collectReceipt(ideContract: string, ideReceipt: string, desReason: string): Observable<ContractDetail> {
+    return this.http.post<ContractDetail>(`${this.base}/${ideContract}/receipts/${ideReceipt}/collect`, { desReason });
+  }
+
   /** `GET /contracts/renewal-candidates` -- Etapa 2 de "Gestión de
    *  renovaciones", pantalla "Renovaciones". Sin filtros todavía (alcance
    *  "simple" acordado con el usuario), solo paginación. */

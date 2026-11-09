@@ -9,6 +9,7 @@ import { PaymentsService } from '../payments/payments.service';
 import { PaymentLinksService } from '../payments/payment-links.service';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { ActivateContractDto } from './dto/activate-contract.dto';
+import { CollectReceiptDto } from './dto/collect-receipt.dto';
 import { CancelContractDto } from './dto/cancel-contract.dto';
 import { ChangeInsuredAmountDto } from './dto/change-insured-amount.dto';
 import { AddCoverageDto } from './dto/add-coverage.dto';
@@ -498,7 +499,8 @@ export class ContractsService {
    * siempre cae en `'SUP'` porque `NumOperation` ya es > 2 en este punto)
    * -> cascada final de estado a `'Anular'` en las 6 entidades del árbol
    * (`TContract` -> `TContractFile` -> `TFileRisk` -> `TRiskCoverage` ->
-   * `TCoverageMovement` -> `TMovementConcept`, ver `applyStateCascade`).
+   * `TCoverageMovement` -> `TMovementConcept`, ver `applyStateCascade`); desde 2026-11-09 el movimiento de cierre queda
+   * ACTIVO y los movimientos no se anulan (la anulación de un movimiento individual queda fuera de alcance).
    *
    * Requiere `SStateRule` configurada para los operativos `'Modificar'` y
    * `'Anular'` en las entidades del árbol (no venían en el seed original de
@@ -557,7 +559,20 @@ export class ContractsService {
         // anulación, que devuelve solo la parte no consumida de las cuotas cobradas (ver `setCancelPrime`).
         await this.voidUnpaidReceipts(ideContract, contract.NumContract, contract.TstInitial, actor, tx);
         await this.generateReceipts(ideContract, dto.ideProductEndorsement, actor, tx);
-        await this.applyStateCascade(ideContract, 'Anular', actor, tx);
+        // Los movimientos de cierre (en Borrador, ya repuntados al recibo) quedan ACTIVOS, no Anulados; el movimiento
+        // anterior queda en el estado que le dio 'Modificar' al crear el cierre. Ver `applyStateCascade`.
+        const ideMovementInitial = await this.stateMachine.getInitialState('TCoverageMovement');
+        const closingMovements = await tx.tCoverageMovement.findMany({
+          where: {
+            IdeState: ideMovementInitial,
+            TRiskCoverage: { TFileRisk: { TContractFile: { IdeContract: ideContract } } },
+          },
+          select: { IdeCoverageMovement: true },
+        });
+        for (const closing of closingMovements) {
+          await this.activateSupplementMovement(closing.IdeCoverageMovement, actor, tx);
+        }
+        await this.applyStateCascade(ideContract, 'Anular', actor, tx, { skipMovements: true });
       },
       { timeout: CANCEL_TRANSACTION_TIMEOUT_MS, maxWait: 10_000 },
     );
@@ -2360,11 +2375,18 @@ export class ContractsService {
     return this.findOne(ideContract);
   }
 
+  /**
+   * `options.skipMovements`: no transiciona `TCoverageMovement` ni `TMovementConcept`. Lo usa la anulación: un
+   * movimiento solo pasa a `Anulado` si se anula ESE movimiento (con reverso de las transacciones que lo originaron,
+   * fuera de alcance por ahora), no por anular la póliza -- el de cierre queda `Activo` y el anterior en su estado
+   * `Modificar`, igual que en un suplemento.
+   */
   private async applyStateCascade(
     ideContract: string,
     codOperative: string,
     actor: string,
     tx: Prisma.TransactionClient = this.prisma,
+    options: { skipMovements?: boolean } = {},
   ): Promise<void> {
     const now = new Date();
     const contract = await tx.tContract.findUniqueOrThrow({ where: { IdeContract: ideContract } });
@@ -2404,9 +2426,11 @@ export class ContractsService {
             data: { IdeState: nextCoverageState, UsrModification: actor, TstModification: now },
           });
 
-          const movements = await tx.tCoverageMovement.findMany({
-            where: { IdeRiskCoverage: riskCoverage.IdeRiskCoverage },
-          });
+          const movements = options.skipMovements
+            ? []
+            : await tx.tCoverageMovement.findMany({
+                where: { IdeRiskCoverage: riskCoverage.IdeRiskCoverage },
+              });
           for (const movement of movements) {
             const nextMovementState = await this.stateMachine.getNextState(
               'TCoverageMovement',
@@ -5715,6 +5739,33 @@ export class ContractsService {
       const created = await this.issueInstallmentReceipt(contract, next.baseReceipts, next.nextPeriod, actor, tx);
       if (created === 0) return; // todas las coberturas canceladas: evita un bucle infinito
     }
+  }
+
+  /**
+   * Cobro manual de un recibo ya emitido de un contrato ACTIVO (cuotas 2..N, suplementos): lo marca COBRADO y registra
+   * el cobro con el motivo del operador. Las cuotas se cobran en orden (ver `PaymentsService.registerReceiptPayment`).
+   * Las anulaciones solo devuelven prima de recibos cobrados, así que esto es lo que permite probarlas con varias cuotas.
+   */
+  async collectReceipt(ideContract: string, ideReceipt: string, dto: CollectReceiptDto, actor: string) {
+    await this.prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT "IdeContract" FROM ars_platform."TContract" WHERE "IdeContract" = ${ideContract}::uuid FOR UPDATE`;
+        const contract = await tx.tContract.findUnique({ where: { IdeContract: ideContract } });
+        if (!contract) throw new NotFoundException(`No existe contrato con id "${ideContract}"`);
+        const ideActivo = await this.stateMachine.getStateByCode('Activo');
+        if (contract.IdeState !== ideActivo) {
+          throw new ConflictException(`El contrato "${contract.NumContract}" debe estar "Activo" para cobrar recibos`);
+        }
+        await this.payments.registerReceiptPayment(
+          ideContract,
+          ideReceipt,
+          { codMethod: 'MANUAL', reason: dto.desReason, actor },
+          tx,
+        );
+      },
+      { timeout: CREATE_TRANSACTION_TIMEOUT_MS, maxWait: 10_000 },
+    );
+    return this.findOne(ideContract);
   }
 
   /**

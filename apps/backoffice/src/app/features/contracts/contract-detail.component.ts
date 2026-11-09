@@ -349,12 +349,65 @@ export class ContractDetailComponent implements OnInit {
       return {
         period,
         numReceipt: receipts.map((r) => r.NumReceipt).join(', '),
+        ideReceipt: receipts[0]?.IdeReceipt ?? null,
         prime: receipts.length ? receipts.reduce((sum, r) => sum + Number(r.Prime), 0) : null,
         issued: receipts.length > 0,
         paid: receipts.length > 0 && receipts.every((r) => r.SState.CodState === 'COBRADO'),
       };
     });
   });
+
+  /** Primera cuota emitida y sin cobrar: las cuotas se cobran en orden, así que solo esa tiene botón "Cobrar". */
+  readonly nextCollectableReceipt = computed(() => {
+    const c = this.contract();
+    if (!c || c.SState.CodState !== 'ACTIVO') return null;
+    const row = this.installmentRows().find((r) => r.issued && !r.paid);
+    return row?.ideReceipt ?? null;
+  });
+
+  // --- Cobro manual de una cuota (2..N) ---
+  readonly collectDialogVisible = signal(false);
+  readonly collectSubmitting = signal(false);
+  readonly collectTarget = signal<{ ideReceipt: string; numReceipt: string; period: number } | null>(null);
+  readonly collectReason = this.fb.nonNullable.control('', [Validators.required, Validators.minLength(3)]);
+
+  openCollectDialog(row: { ideReceipt: string | null; numReceipt: string; period: { NumPeriod: number } }): void {
+    if (!row.ideReceipt) return;
+    this.collectReason.reset('');
+    this.collectTarget.set({ ideReceipt: row.ideReceipt, numReceipt: row.numReceipt, period: row.period.NumPeriod });
+    this.collectDialogVisible.set(true);
+  }
+
+  closeCollectDialog(): void {
+    this.collectDialogVisible.set(false);
+  }
+
+  collectInstallment(): void {
+    const c = this.contract();
+    const target = this.collectTarget();
+    if (!c || !target) return;
+    if (this.collectReason.invalid) {
+      this.collectReason.markAsTouched();
+      return;
+    }
+    this.collectSubmitting.set(true);
+    this.contracts.collectReceipt(c.IdeContract, target.ideReceipt, this.collectReason.value.trim()).subscribe({
+      next: (result) => {
+        this.collectSubmitting.set(false);
+        this.collectDialogVisible.set(false);
+        this.contract.set(result);
+        this.messages.add({
+          severity: 'success',
+          summary: this.transloco.translate('common.done'),
+          detail: this.transloco.translate('contractDetail.installments.collectedDetail', { receipt: target.numReceipt }),
+        });
+      },
+      error: (err: HttpErrorResponse) => {
+        this.collectSubmitting.set(false);
+        this.showError(err);
+      },
+    });
+  }
 
   readonly issueSubmitting = signal(false);
   readonly canIssueNext = computed(() => {
